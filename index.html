@@ -126,6 +126,12 @@
   .hero canvas { height: 6.6em; width: auto; }
   .hero[aria-pressed="true"] { background: rgba(255,211,77,.2); box-shadow: inset 0 0 0 3px var(--gold), 0 0 18px rgba(255,211,77,.45); }
   .hero:focus-visible { outline: 3px solid var(--mint); outline-offset: 3px; }
+  /* beta: where "Chơi một mình" / "Chơi 2 người" starts */
+  .startsel { display: flex; gap: .5em; align-items: center; justify-content: center; flex-wrap: wrap; font-size: .8em; }
+  .startsel span { opacity: .8; font-weight: 700; }
+  .startsel button { border: 0; border-radius: 999px; padding: .25em .9em; font: 800 1em var(--display); color: var(--cream); background: rgba(255,255,255,.08); box-shadow: inset 0 0 0 1px rgba(255,255,255,.2); touch-action: manipulation; }
+  .startsel button[aria-pressed="true"] { background: rgba(255,211,77,.2); box-shadow: inset 0 0 0 2px var(--gold); color: var(--gold); }
+  .startsel button:focus-visible { outline: 3px solid var(--mint); outline-offset: 2px; }
   .roomcode { display: block; margin: .25em 0; font-family: var(--display); font-weight: 800; font-size: 3em; letter-spacing: .25em; color: var(--gold); text-shadow: 0 4px 0 #5b2d8f; }
   .codein { width: 5.5em; padding: .3em .4em; border: 0; border-radius: 16px; text-align: center; font-family: var(--display); font-weight: 800; font-size: 2em; letter-spacing: .3em; color: #3b2400; background: #fff6d8; box-shadow: inset 0 0 0 3px var(--gold); }
   /* the ending (for now the "to be continued" screen) */
@@ -236,6 +242,7 @@
     <div class="heroes" id="heroes"></div>
     <div class="help"><span>Cần trái: <b>đi khắp nơi</b></span><span>Bé <b>tự bắn</b> quái gần nhất</span><span>Đầy năng lượng: <b>Tuyệt chiêu</b></span></div>
     <p id="loading">Đang tải hình ảnh…</p>
+    <div class="startsel" id="startSel" role="group" aria-label="Bản thử: chọn màn"><span>Bản thử: chọn màn</span><button id="selMan1">Màn 1</button><button id="selShip">Trên tàu</button><button id="selMan2">Màn 2</button></div>
     <div class="row"><button class="btn" id="startBtn" hidden>Chơi một mình</button><button class="btn ghost" id="coopBtn" hidden>Chơi 2 người</button></div>
   </div>
   <div class="ver"><span id="verNum"></span><button id="verBtn">Kiểm tra bản mới</button></div>
@@ -332,7 +339,7 @@
   let META = null, ready = false;
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261026.1600", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261026.1812", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -4238,8 +4245,10 @@
     SH.open = false; $("shop").hidden = true; $("photo").hidden = true; G.cine = null; G.rescue = null; $("skipFilm").hidden = true;
   }
   // (starting straight at a later level gives the girl a head start in experience)
-  function startGame(i) {
+  // (ship = true: the beta shortcut to the ship, as after the team photo: Màn 1 behind her, Màn 2 ahead)
+  function startGame(i, ship) {
     i = clamp(Math.floor(i) || 0, 0, LEVELS.length - 1);
+    const lvl = ship ? 0 : i; i = ship ? 1 : i;   // (lvl: the level G.level shows; i: how far along she is, for the head start)
     initAudio();
     Object.assign(G, { stars: 0, hearts: 5, energy: 0, kills: 0, won: false, fade: 1, fadeDir: -1 });
     P.elem = null; P.elemT = 0; P.lv = 1 + i * 4; P.xp = 0; updateElemHud(); updateXpHud();
@@ -4252,17 +4261,29 @@
     G.sksp = ["", "", "", ""]; G.cine = null; G.rescue = null; G.shopPhase = 0; G.say = null; G.pmode = null;
     if ($("hud").dataset.ship) shipUiOff();   // (a new game from the ship)
     for (const k of Object.keys(PETS)) if (isAlly(k) && PETS[k].lv < i) G.sksp[ALLY_LETTER[k]] = SKSP_L[ALLY_LETTER[k]];
-    buildLevel(i); renderHearts(); updateHud(); updateSksp(); questTxt = null; updateQuest();
+    buildLevel(lvl); renderHearts(); updateHud(); updateSksp(); questTxt = null; updateQuest();
     G.mode = "play"; $("againBtn").hidden = false;
     for (const id of ["titleScreen", "winScreen", "pauseScreen", "bossbar", "shop", "photo"]) $(id).hidden = true;
     SH.open = false;
     // (starting straight at a later level: Simmy already wears the outfit she put on at the last shop)
     { const so = i > 0 && LEVELS[i - 1].shop ? OUTFITS4.find((o) => o.char === "simmy" && o.theme === LEVELS[i - 1].shop) : null; SIMMY.outfit = so ? outKey(so) : "base"; }
     $("hud").hidden = false; $("controls").hidden = false; $("skipFilm").hidden = true;
-    if (i === 0) startOpening();   // Màn 1 opens with the film (skippable)
-    else showBanner(LEVELS[i].name.split(": ")[1], LEVELS[i].name.split(": ")[0]);
+    if (ship) startShip();
+    else if (i === 0) startOpening();   // Màn 1 opens with the film (skippable)
+    else {
+      showBanner(LEVELS[i].name.split(": ")[1], LEVELS[i].name.split(": ")[0]);
+      if (i === 1) G.say = { seq: SAYS.level2Start, t: NET.role === "guest" ? -2.2 : -0.8 };   // (Màn 2 as from the ship: Simmy's line 13)
+    }
   }
-  $("startBtn").addEventListener("click", () => startGame(0));
+  // beta: pick where to start from the home screen (kept in localStorage `sksp-start`); in co-op the host's choice goes to both pages
+  const STARTS = { man1: "selMan1", ship: "selShip", man2: "selMan2" };
+  let startAt = "man1";
+  try { const v = localStorage.getItem("sksp-start"); if (STARTS[v]) startAt = v; } catch (e) {}
+  function renderStartSel() { for (const [k, id] of Object.entries(STARTS)) $(id).setAttribute("aria-pressed", k === startAt); }
+  for (const [k, id] of Object.entries(STARTS)) $(id).addEventListener("click", () => { startAt = k; try { localStorage.setItem("sksp-start", k); } catch (e) {} renderStartSel(); });
+  renderStartSel();
+  const startChosen = () => startGame(startAt === "man2" ? 1 : 0, startAt === "ship");
+  $("startBtn").addEventListener("click", startChosen);
 
   // ---------------------------------------------------------------- the clothes shop
   // After the boss: Simmy leads the team into a shop for the next land's theme. A big turntable character, a grid of outfit cards
@@ -6300,10 +6321,10 @@
     NET.role = "host"; NET.partner = peer; NET.pp = pres; NET.applied = null; Q = null; NET.quietT = 0;
     setCo({ role: "play", with: peer, hero });
     $("coopScreen").hidden = true;
-    startGame(0);
+    startChosen();
     sendStart();
   }
-  function sendStart() { NET.startT = 1; netEmit("start", { to: NET.partner, lv: G.level }); }
+  function sendStart() { NET.startT = 1; netEmit("start", { to: NET.partner, lv: G.level, ship: onShip() }); }
   function leaveCoop() {
     if (NET.room) NET.room.presence({ co: null, gl: null, sh: null, w: null }).catch(() => {});
     NET.role = null; NET.partner = null; NET.pp = null; NET.co = null; Q = null; QPETE = []; NET.hq.length = 0; NET.sq.length = 0; NET.fq.length = 0;
@@ -6326,7 +6347,7 @@
       const p = NET.room.peers().find((p) => p.peer === msg.peer); NET.pp = p ? p.presence : null;
       setCo({ role: "play", with: msg.peer, hero });
       $("coopScreen").hidden = true;
-      startGame(clamp(Math.floor(num(d.lv)), 0, LEVELS.length - 1));
+      startGame(clamp(Math.floor(num(d.lv)), 0, LEVELS.length - 1), d.ship === true && num(d.lv) === 0);
       return;
     }
     if (msg.peer !== NET.partner || !NET.role || G.mode === "title") return;
