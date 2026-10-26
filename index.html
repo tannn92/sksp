@@ -344,7 +344,7 @@
   let META = null, ready = false;
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261026.2252", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261026.2346", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -4808,7 +4808,7 @@
   const CARRY_FR = { salt: "sh_salt", lemon: "sh_lemon", herbs: "sh_herbs", bucket: "sh_bucket_full" };
   const newPan = () => ({ fish: false, side: 0, cook: 0, spice: null, want: null, fire: false });
   const SHIP = { ph: "dock", t: 0, mul: 1, fish: 0, dishes: 0, tub: 0, carry: { g: null, s: null }, pans: [newPan(), newPan()], bucketAt: "spot", hint: null,
-    rods: { g: newRod(), s: newRod() }, held: { g: null, s: null }, tankFish: [], tugging: null, tug: null };   // (tug: the too-big fish two pull together, the host's (tugHost); rods: each girl's fishing rod (her sister's from her presence); held: the fish she carries {kind, size, fresh: landed, not in the tank yet}; tugging: the sister whose too-big fish this page's girl tugs with her)
+    rods: { g: newRod(), s: newRod() }, held: { g: null, s: null }, tankFish: [], tugging: null, tug: null, alone: null };   // (tug: the too-big fish two pull together, the host's (tugHost); alone: {k, id}: a second too-big fish that bit while a tug ran, hers alone with Simmy (the host's word); rods: each girl's fishing rod (her sister's from her presence); held: the fish she carries {kind, size, fresh: landed, not in the tank yet}; tugging: the sister whose too-big fish this page's girl tugs with her)
   let shipFrom = null, shownAct;   // (her world position while she is on the ship; the action the button shows now)
   const onShip = () => G.mode === "ship" || (G.mode === "pause" && G.pmode === "ship");
   const dockEnd = () => 0.4 + 2 * DOCK_GAP + DOCK_LAG + DOCK_WALK + 0.9;
@@ -4918,7 +4918,7 @@
   function startShip() {
     shipFrom = { x: P.x, y: P.y };
     Object.assign(SHIP, { ph: "dock", t: 0, mul: talkMul(), fish: 0, dishes: 0, tub: 0, carry: { g: null, s: null }, pans: [newPan(), newPan()], bucketAt: "spot", hint: null,
-      rods: { g: newRod(), s: newRod() }, held: { g: null, s: null }, tankFish: [], tugging: null, tug: null });
+      rods: { g: newRod(), s: newRod() }, held: { g: null, s: null }, tankFish: [], tugging: null, tug: null, alone: null });
     fishReset(); cookReset(); for (const k of Object.keys(SPET)) delete SPET[k]; CALL.key = null; CALL.t = 0; CALL.say = null;
     Object.assign(SHIPX, { seen: null, q: null, hostHint: null, sent: null, mine: [], pose: null, tugIn: {} }); SHIPX.landed.clear(); SHIPX.tugDone.clear();
     G.mode = "ship"; G.pmode = null; G.shopPhase = "ship"; G.cine = null; G.rescue = null; G.ult = null; G.combo = null; G.say = null; IN.ultPressed = false; dropHeld();
@@ -5064,11 +5064,12 @@
   }
   // the station in reach of a girl standing at (x, y): {kind: spot|tank|pan|spice|bucket|table|tug, i?, spice?} or null; the nearest
   // (her feet to its stand point, or to its block for the tank, the bucket and the table: they are used from any free side)
-  // (tug: her sister's too-big fish is on (tugFor) and her sister is near her (within TUG_REACH: from the other fishing spot too): joining wins
-  // over anything else in reach)
+  // (tug: her sister's too-big fish is on (tugFor), her sister is near her (within TUG_REACH: from the other fishing spot too) and her own
+  // hands are empty: joining wins over anything else in reach; with something in her hands the stations are as ever (her catch into the
+  // tank beside her sister's tug))
   const TUG_REACH = 130;
   function stationAt(x, y, k) {
-    const o = tugFor(k), op = o && posOf(o);
+    const o = !SHIP.carry[k] && tugFor(k), op = o && posOf(o);
     if (op && Math.hypot(x - op[0], y - op[1]) <= TUG_REACH) return { kind: "tug" };
     let best = null, bd = 0;
     const take = (d, r, s) => { if (d <= r && (!best || d - r < bd)) { bd = d - r; best = s; } };
@@ -5243,10 +5244,13 @@
   const rodOf = (k) => SHIP.rods[k] || IDLE_ROD;
   const hooked = (R) => !!R && (R.st === "bite" || R.st === "pull");
   const bigOn = (R) => hooked(R) && !!R.fish && R.fish.size === "big";
-  // the sister of girl k whose too-big fish k can join (no one else tugs with her yet, or k does already); null when none
+  // the too-big fish on k's line (cast id) is hers alone with Simmy (SHIP.alone: it bit while the tug of the two ran for the other one)
+  const isAlone = (k, id) => !!SHIP.alone && SHIP.alone.k === k && SHIP.alone.id === id;
+  // the sister of girl k whose too-big fish k can join (no one else tugs with her yet, or k does already; not one that is hers alone with
+  // Simmy); null when none
   function tugFor(k) {
     const o = k === "s" ? "g" : "s", q = SHIP.rods[o];
-    return bigOn(q) && (!q.help || q.help === k) ? o : null;
+    return bigOn(q) && (!q.help || q.help === k) && !isAlone(o, q.id) ? o : null;
   }
   // this page's fishing extras: Simmy on the deck, splashes / ripples (SHIP_FX, picture px), fish jumping into her arms / the tank or swimming
   // off (JUMPS), how often Simmy has given each fishing hint, this girl's presses in her sister's tug
@@ -5328,7 +5332,7 @@
     if (a.st === "cast" && b.st === "wait") { play("land"); shipRing(fx, fy, 4, 0.8); shipSplash(fx, fy, 5); }
     if (a.st === "wait" && b.st === "bite") {
       play("pop"); play("hit"); shipRing(fx, fy, 5, 0.9); shipRing(fx, fy, 2, 0.6); shipSplash(fx, fy, 10, true);
-      if (b.fish.size === "big" && !soloShip()) showHint(k === "g" ? "hintBigG" : "hintBigS");
+      if (b.fish.size === "big" && !soloShip() && !bigOn(SHIP.rods[k === "g" ? "s" : "g"])) showHint(k === "g" ? "hintBigG" : "hintBigS");   // (her sister busy with her own: Simmy comes)
       else if (FHELP.bite < 3 || FHELP.missed) { FHELP.bite++; FHELP.missed = false; showHint("hintPull"); }
     }
     if (hooked(b) && b.bar > a.bar + 0.004) shipSplash(fx + (Math.random() - 0.5) * 10, fy, b.fish.size === "small" ? 1 : 2, b.fish.size !== "small");
@@ -5384,8 +5388,9 @@
   // either line (the host's own rod, or the guest's from her presence or her first "tug" event); every press of the girl with the fish and
   // of her helper goes on its bar (TUGX: each page counts its girl's presses on that fish; the guest's count comes in her presence and in
   // "tug" events, the larger wins, so a lost one loses nothing); the host decides landed (the fish into her arms on the host's SHIP) or gone,
-  // and both pages show its bar (shipState slot 12). While the guest's page is silent the bar does not drain (a slow iPad is not a lost
-  // fish); once the link is gone either page goes on alone (shipSolo) and Simmy runs over to pull with her.
+  // and both pages show its bar (shipState slot 12). While the guest's page is silent or paused the bar does not drain (a slow iPad is not
+  // a lost fish); once the link is gone either page goes on alone (shipSolo) and Simmy runs over to pull with her. One tug at a time: a
+  // second too-big fish that bites while it runs is hers alone (SHIP.alone, shipState slot 13): Simmy pulls with her as when she is alone.
   const TUG_END_T = 1.5;   // (an ended tug stays in SHIP a moment, so the guest's page sees how it ended)
   const tugOf = (k, id) => { const T = SHIP.tug; return T && T.k === k && T.id === id ? T : null; };
   // her press(es) on the too-big fish on k's line (cast id); the guest's page tells the host's at once (join: she has just joined that tug)
@@ -5394,8 +5399,15 @@
     TUGX.n += n;
     if (NET.role === "guest") netEmit("ship", { op: "tug", tk: k, id, n: TUGX.n, join: join ? 1 : 0, kind: kind || null });
   }
+  // girl c's presses counted so far on the too-big fish on k's line (cast id): this page's girl's (TUGX), the guest's (her events or her
+  // presence, the larger)
+  function tugCount(k, id, c) {
+    const gr = Q && Q.rod;
+    return c === hero ? (TUGX.k === k && TUGX.id === id ? TUGX.n : 0) : Math.max(SHIPX.tugIn[k + ":" + id] || 0, gr && gr.tugK === k && gr.tugId === id ? gr.tugN : 0);
+  }
+  // a tug starts from each girl's count so far (presses made before it, e.g. while her fish waited, are not all added at once)
   function tugNew(k, id, kind, bar) {
-    SHIP.tug = { k, id, kind, bar: bar > 0 ? bar : BAR0.big, helpers: [], t: 0, pulled: false, end: null, endT: 0, seen: { g: 0, s: 0 } };
+    SHIP.tug = { k, id, kind, bar: bar > 0 ? bar : BAR0.big, helpers: [], t: 0, pulled: false, end: null, endT: 0, seen: { g: tugCount(k, id, "g"), s: tugCount(k, id, "s") } };
     return SHIP.tug;
   }
   // the host's page, together: start, step and end the tug
@@ -5403,10 +5415,15 @@
     if (NET.role !== "host" || soloShip()) return;
     const me = hero, gk = Q.hero, gr = Q.rod;
     let T = SHIP.tug;
-    if (!T || T.end) {   // (one at a time: a second too-big fish waits, its bar held, until this one is in or gone)
+    if (!T || T.end) {   // (one tug at a time)
       for (const [k, R] of [[me, SHIP.rods[me]], [gk, gr]]) {
         if (bigOn(R) && !SHIPX.tugDone.has(k + ":" + R.id) && !(T && T.k === k && T.id === R.id)) { T = tugNew(k, R.id, R.fish.kind, R.bar); break; }
       }
+    }
+    // a second too-big fish while this tug runs (her sister is busy with her own): it is hers alone (SHIP.alone, to both pages): her page
+    // steps it like a fish alone and Simmy runs over and pulls with her; it never becomes a tug (it is not held frozen waiting for this one)
+    if (T && !T.end) for (const [k, R] of [[me, SHIP.rods[me]], [gk, gr]]) {
+      if (k !== T.k && bigOn(R) && !SHIPX.tugDone.has(k + ":" + R.id)) { SHIPX.tugDone.add(k + ":" + R.id); SHIP.alone = { k, id: R.id }; }
     }
     if (!T) return;
     if (T.end) { if ((T.endT += dt) >= TUG_END_T) SHIP.tug = null; return; }
@@ -5415,14 +5432,13 @@
     // who pulls with her: her sister when her page says she joined (this page's SHIP.tugging, the guest's presence or her "tug" event)
     const o = T.k === "g" ? "s" : "g";
     if (!T.helpers.includes(o) && !SHIP.carry[o] && (o === me ? SHIP.tugging === T.k : !!gr && gr.tugWith === T.k)) T.helpers.push(o);
-    const cnt = (c) => (c === me ? (TUGX.k === T.k && TUGX.id === T.id ? TUGX.n : 0) : Math.max(SHIPX.tugIn[key] || 0, gr && gr.tugK === T.k && gr.tugId === T.id ? gr.tugN : 0));
     let nh = 0, nhelp = 0;
     for (const c of ["g", "s"]) {
-      const v = cnt(c), d = v - T.seen[c]; if (d <= 0) continue;
+      const v = tugCount(T.k, T.id, c), d = v - T.seen[c]; if (d <= 0) continue;
       T.seen[c] = v;
       if (c === T.k) nh += d; else if (T.helpers.includes(c)) nhelp += d;
     }
-    const quiet = (NET.quietT || 0) > 0.6;   // (her page has not been heard from for a moment: nothing drains meanwhile)
+    const quiet = (NET.quietT || 0) > 0.6 || !!(Q && Q.paused);   // (her page has not been heard from for a moment, or it is paused: nothing drains meanwhile)
     if (!quiet) T.t += dt;
     const two = T.helpers.length > 0;
     T.bar += nh * (two ? TUG_ADD : PULL_ADD.big) + nhelp * TUG_ADD;
@@ -5439,9 +5455,9 @@
   function hostTug(d) {
     if (!Q || !Q.ship || (SHIP.ph !== "fish" && SHIP.ph !== "cook")) return;
     const gk = Q.hero, tk = d.tk === "s" ? "s" : "g", id = num(d.id), key = tk + ":" + id;
-    SHIPX.tugIn[key] = Math.max(SHIPX.tugIn[key] || 0, Math.max(0, Math.floor(num(d.n))));
-    let T = SHIP.tug;
+    let T = SHIP.tug;   // (a tug her event starts counts this event's presses: it starts from her count before it)
     if ((!T || T.end) && tk === gk && tk !== hero && FISH_TIERS.big.includes(d.kind) && !SHIPX.tugDone.has(key)) T = tugNew(tk, id, d.kind, 0);
+    SHIPX.tugIn[key] = Math.max(SHIPX.tugIn[key] || 0, Math.max(0, Math.floor(num(d.n))));
     if (d.join && T && !T.end && T.k === tk && tk !== gk && !T.helpers.includes(gk) && !SHIP.carry[gk]) T.helpers.push(gk);
   }
   // her own too-big fish together: its bar is the host's tug (none yet: it holds); its end is the host's word. A tug she saw that is gone
@@ -5474,15 +5490,18 @@
       if (q && q.st !== "idle" && q.spot === spot) spot = SPOTS.length - 1 - spot;
       R = Object.assign({}, R, { spot, x0: P.x, y0: P.y });
     }
-    // a too-big fish on her line: alone Simmy runs over and tugs (her presses at SIM_TUG_HZ); together it is the host's tug (tugHost)
-    const big = bigOn(R);
-    if (big && !solo && n) tugPress(hero, R.id, n, false, R.fish.kind);
+    // a too-big fish on her line: alone Simmy runs over and tugs (her presses at SIM_TUG_HZ); together it is the host's tug (tugHost),
+    // except one that is hers alone (SHIP.alone: it bit while the tug ran for her sister's): Simmy helps her as when she is alone (on her
+    // sister's page Simmy runs over to her too)
+    const big = bigOn(R), alone = big && (solo || isAlone(hero, R.id));
+    if (big && !alone && n) tugPress(hero, R.id, n, false, R.fish.kind);
     tugHost(dt);
     let help = null, hp = 0;
-    const there = simTick(dt, big && solo ? [P.x, P.y] : null);
-    if (big && solo && there) { help = "simmy"; SIM.tug = true; SIM.tapT += dt; while (SIM.tapT >= 1 / SIM_TUG_HZ) { SIM.tapT -= 1 / SIM_TUG_HZ; hp++; } }
-    else { SIM.tug = false; SIM.tapT = 0; }
-    const b = big && !solo ? tugRod(R, dt, n, tugOf(hero, R.id)) : rodStep(Object.assign({}, R, { help, hp, tugSeen: false }), dt, n, Math.random);
+    const qo = SHIP.rods[o], herAt = !solo && !alone && bigOn(qo) && isAlone(o, qo.id) && posOf(o);
+    const there = simTick(dt, alone ? [P.x, P.y] : herAt || null);
+    if (alone && there) { help = "simmy"; SIM.tug = true; SIM.tapT += dt; while (SIM.tapT >= 1 / SIM_TUG_HZ) { SIM.tapT -= 1 / SIM_TUG_HZ; hp++; } }
+    else { SIM.tug = !!herAt && there; SIM.tapT = 0; }
+    const b = big && !alone ? tugRod(R, dt, n, tugOf(hero, R.id)) : rodStep(Object.assign({}, R, { help, hp, tugSeen: false }), dt, n, Math.random);
     SHIP.rods[hero] = b; rodEvents(hero, R, b);
     // Simmy's fishing hints: at a spot with nothing to do (wind up); winding up a long time (cast); carrying a fresh fish a long time (the tank)
     const s = stationAt(P.x, P.y, hero), held = SHIP.held[hero];
@@ -5664,7 +5683,7 @@
   const GALLEY_X = 600;   // (west of this, picture px: she is in the galley)
   function sisterNeed(o) {
     const k = o === "g" ? "s" : "g", q = SHIP.rods[o];
-    if (bigOn(q) && !q.help) return "bow";   // (she can't join while she carries something, but she is still called: she puts it down first)
+    if (bigOn(q) && !q.help && !isAlone(o, q.id)) return "bow";   // (she can't join while she carries something, but she is still called: she puts it down first)
     const op = posOf(o), want = SHIP.pans.map((p) => p.want).filter(Boolean);
     if (op && op[0] < GALLEY_X && want.length) {
       const kp = posOf(k), ks = kp && stationAt(kp[0], kp[1], k);
@@ -5868,7 +5887,7 @@
   const kindIx = (kind) => FISH_KINDS.indexOf(kind) + 1, ixKind = (i) => FISH_KINDS[num(i) - 1] || null;
   // the host's SHIP, compact: [ph, t, fish, dishes, tub, carry g, carry s, pans [fish, side, cook, spice, want, fire, n], bucketAt,
   // tank's fish [[kind, n], ...], hint [key, t], held [kind g, fresh g, kind s, fresh s], tug [whose line 1 g / 2 s, cast id, kind, bar,
-  // helpers [1 g / 2 s], end 0 / 1 landed / 2 gone] or 0]
+  // helpers [1 g / 2 s], end 0 / 1 landed / 2 gone] or 0, alone [whose line 1 g / 2 s, cast id] or 0]
   const TUG_END = [null, "landed", "gone"];
   function shipState() {
     const S = SHIP, ci = (c) => Math.max(0, CARRY_IX.indexOf(c)), h = S.hint, hd = (k) => (S.held[k] ? [kindIx(S.held[k].kind), S.held[k].fresh ? 1 : 0] : [0, 0]);
@@ -5878,7 +5897,8 @@
       S.tankFish.map((e) => [kindIx(e.kind), e.n]),
       h && HINT_SHARED.includes(h.key) ? [HINT_SHARED.indexOf(h.key), Math.round(h.t * 10)] : 0,
       [...hd("g"), ...hd("s")],
-      S.tug ? [S.tug.k === "s" ? 2 : 1, S.tug.id, kindIx(S.tug.kind), Math.round(S.tug.bar * 1000), S.tug.helpers.map((c) => (c === "s" ? 2 : 1)), Math.max(0, TUG_END.indexOf(S.tug.end))] : 0];
+      S.tug ? [S.tug.k === "s" ? 2 : 1, S.tug.id, kindIx(S.tug.kind), Math.round(S.tug.bar * 1000), S.tug.helpers.map((c) => (c === "s" ? 2 : 1)), Math.max(0, TUG_END.indexOf(S.tug.end))] : 0,
+      S.alone ? [S.alone.k === "s" ? 2 : 1, S.alone.id] : 0];
   }
   // the guest's page follows the host's ship: its phase (only forward), clock, counts, hands, pans, bucket, the tank's fish, Simmy's shared
   // hints, stars
@@ -5912,6 +5932,8 @@
     const tg = a[12];   // the host's tug (its bar and its end)
     SHIP.tug = Array.isArray(tg) ? { k: num(tg[0]) === 2 ? "s" : "g", id: num(tg[1]), kind: ixKind(tg[2]) || "fs_shark", bar: clamp(num(tg[3]) / 1000, 0, 1),
       helpers: (Array.isArray(tg[4]) ? tg[4] : []).map((c) => (num(c) === 2 ? "s" : "g")), end: TUG_END[num(tg[5])] || null } : null;
+    const al = a[13];   // (a too-big fish that is hers alone with Simmy)
+    SHIP.alone = Array.isArray(al) ? { k: num(al[0]) === 2 ? "s" : "g", id: num(al[1]) } : null;
     G.stars = Math.max(0, Math.floor(num(w.st)));
   }
   // the guest's page asks the host's page to do her action (a raw fish's shake shows here at once); the same ask is not sent twice in 0.3 s
@@ -5991,10 +6013,11 @@
     if (SHIP.bucketAt === o) SHIP.bucketAt = "spot";
     SHIP.carry[o] = null; SHIP.held[o] = null; SHIP.rods[o] = null; delete SPET[o];
     if (SHIP.tugging === o) SHIP.tugging = null;
-    // the tug: her own too-big fish goes on alone with the bar as it was (Simmy runs over); one on her sister's line is over
+    // the tug: her own too-big fish goes on alone with the bar as it was (Simmy runs over); one on her sister's line is over (the tug's last
+    // bar only if it is higher: an old one never pulls hers back)
     const T = SHIP.tug, R = SHIP.rods[hero];
-    if (T && !T.end && T.k === hero && R && R.id === T.id && hooked(R)) SHIP.rods[hero] = Object.assign({}, R, { bar: T.bar, help: null, tugSeen: false });
-    SHIP.tug = null; Object.assign(TUGX, { k: null, id: 0, n: 0 }); SHIPX.tugIn = {};
+    if (T && !T.end && T.k === hero && R && R.id === T.id && hooked(R)) SHIP.rods[hero] = Object.assign({}, R, { bar: Math.max(R.bar, T.bar), help: null, tugSeen: false });
+    SHIP.tug = null; SHIP.alone = null; Object.assign(TUGX, { k: null, id: 0, n: 0 }); SHIPX.tugIn = {};
     for (const key of [...SHIPX.landed]) if (key.startsWith(o + ":")) SHIPX.landed.delete(key);   // (a page of hers that comes back starts afresh)
     COOK.prev = null; SHIPX.q = null; SHIPX.seen = null;
   }
@@ -7225,6 +7248,10 @@
     if (hb !== NET.lastHb) { NET.lastHb = hb; NET.quietT = 0; } else NET.quietT = (NET.quietT || 0) + dt;
     const lost = Math.max(NET.quietT, pc ? 0 : NET.goneT);
     if (lost > 2.5 && Math.floor(lost) !== Math.floor(lost - dt)) showBanner("Đang chờ bạn kia…", "Mạng chậm, chờ chút nhé");
+    // her sister's page is paused (her presence says so): a small note here while it lasts (her world / her tug waits for her meanwhile)
+    const pz = !!(Q && Q.paused) && (G.mode === "play" || G.mode === "ship"), pt = NET.pauseT || 0;
+    NET.pauseT = pz ? pt + dt : 0;
+    if (pz && (pt === 0 || Math.floor(NET.pauseT) !== Math.floor(pt))) showBanner("Bạn kia đang tạm dừng…", "Chờ bạn ấy quay lại nhé");
     if (NET.quietT > 15) { NET.quietT = 0; return partnerLeft(true); }
     if (NET.role === "host" && pc && pc.role === "join" && (NET.startT -= dt) <= 0) sendStart();
     if ((NET.sendT -= dt) > 0) return;
@@ -7236,7 +7263,7 @@
     NET.room.presence(patch).catch(() => {});
   }
   function girlState() {
-    const bits = (P.dead ? 1 : 0) | (P.inv > 0 ? 2 : 0) | (P.slowT > 0 ? 4 : 0) | (P.castT > 0.1 ? 8 : 0) | (P.winT ? 16 : 0) | (P.flip ? 32 : 0);
+    const bits = (P.dead ? 1 : 0) | (P.inv > 0 ? 2 : 0) | (P.slowT > 0 ? 4 : 0) | (P.castT > 0.1 ? 8 : 0) | (P.winT ? 16 : 0) | (P.flip ? 32 : 0) | (G.mode === "pause" ? 64 : 0);   // (64: this page is paused)
     return [P.x | 0, P.y | 0, P.face, (G.mode === "play" && P.fn) || "", bits, ELS.indexOf(P.elem), G.ult ? Math.round(G.ult.t * 10) : 0, hero, G.hearts, 0, P.vx | 0, P.vy | 0, P.pets.join(","), P.lv,
       PETE.map((p) => [p.x | 0, p.y | 0, p.face + (p.flip ? 8 : 0) + (p.faintT > 0 ? 16 : 0)]), P.dead ? Math.round((1 - clamp(G.reviveT / FAINT_T, 0, 1)) * 100) : 0, P.helped ? 1 : 0, P.elem ? Math.ceil(P.elemT * 10) : 0, P.outfit || "base", onShip() && SHIP.ph !== "dock" ? 1 : 0, rodSlot(), onShip() && NET.role === "guest" && SHIPX.mine.length ? SHIPX.mine : 0];   // [18] = outfit id (`of`); older copies send 18 slots; [19] = on the ship's deck (x, y are deck px then); [20] = her fishing rod (rodSlot) or 0; [21] = a guest's last landed fish on the ship ([[id, kind], ...]) or 0
   }
@@ -7286,7 +7313,7 @@
     const fn = typeof gl[3] === "string" ? gl[3] : "", pz = fn.split(".")[2];
     Q.fn = outfitFrame(Q.hero, Q.of, pz && /^(w[rldu]|c[rldu])\d$|^(stand|faint|cheer)$/.test(pz) ? pz : "stand");
     if (!FR[Q.fn]) Q.fn = "";
-    Q.dead = !!(b & 1); Q.inv = !!(b & 2); Q.slow = !!(b & 4); Q.cast = !!(b & 8); Q.win = !!(b & 16); Q.flip = !!(b & 32);
+    Q.dead = !!(b & 1); Q.inv = !!(b & 2); Q.slow = !!(b & 4); Q.cast = !!(b & 8); Q.win = !!(b & 16); Q.flip = !!(b & 32); Q.paused = !!(b & 64);
     Q.elem = ELS[num(gl[5])] || null; Q.ultT = num(gl[6]) / 10; Q.hearts = clamp(num(gl[8]), 0, 5);
     Q.pets = typeof gl[12] === "string" ? gl[12].split(",").filter((k) => PETS[k]) : [];   // their pets (shown following them)
     Q.lv = clamp(Math.floor(num(gl[13])) || 1, 1, MAX_LV);
@@ -7552,7 +7579,7 @@
     OUTFITS4, openShop, buyOutfit, wearOutfit, closeShop, shop: shopInfo, simmy: SIMMY,
     skipCine, startOpening, startAllyRescue, updateSksp, lightLetter, endLevel, startDockWalk, dockWay, opCast, drawFilmActor, WK_END,
     talkMul, lineTime, SAYS, sayAt, seqTime, said: null, saidAt: null,   // (said: an array -> talkBubble records each drawn bubble's text; saidAt: an array -> the walk-in's bubbles as [text, x, y, camX, camY, VW, VH])
-    ship: () => SHIP, ISO, ISO_K, startShip, shipAct, stationAt, buttonAction, shipCam, boardCam, shipBars, ctrlZones, deckFix, inPoly, navNext, floatAt, aquaBlock, boardAt, boardT, edgeCall, petJoy, shipFrameName, sim: SIM, drawn: null,
+    ship: () => SHIP, ISO, ISO_K, startShip, shipAct, shipSolo, stationAt, buttonAction, shipCam, boardCam, shipBars, ctrlZones, deckFix, inPoly, navNext, floatAt, aquaBlock, boardAt, boardT, edgeCall, petJoy, shipFrameName, sim: SIM, drawn: null,
     SHIPPT: { spots: SPOTS, pans: PAN_STAND, spices: SPICE_STAND, bucket: BUCKET_STAND, table: TABLE_STAND, tank: TANK_STAND, simmy: SIM_AT, simCook: SIM_COOK, open: OPEN_DECK, panUiTop: PAN_UI_TOP, walk: WALK, blocks: BLOCKS, hull: HULL, water: WATER, mastY: MAST_Y, galleyX: GALLEY_X },   // (drawn: an array -> drawShip records who / what it draws: [name, deck x, deck y, frame], ["pet", k, art, pose, x, lift], ["board", char, frame], ...)
     rodStep, newRod, rodSlot, pickFish, castDist, fishSize, FISH_TIERS, WIND_HZ, CAST_T, APP_T, BITE_HOLD, LAND_T, BAR0, DRAIN, PULL_ADD, TUG_ADD, SIM_TUG_HZ, schoolsAt, panStep, DONE, BURN, BURN2, SOLO_RATE,
     scene, SCENE_RETRY,
