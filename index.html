@@ -89,6 +89,12 @@
   #bUlt.off::after { opacity: 1; }
   #bUlt::before { inset: -10%; box-shadow: 0 0 0 5px rgba(255,255,255,.55), 0 0 34px 12px rgba(246,196,83,.85); opacity: 0; }
   #bUlt:not(.off)::before { animation: ultglow 1.1s ease-in-out infinite; }
+  /* on the ship the button is the one context button: the action's icon on a light disc (dimmed: nothing to do here) */
+  #bUlt .ico { position: absolute; left: 17%; top: 17%; width: 66%; height: 66%; pointer-events: none; display: none; }
+  #bUlt[data-act] { background-image: none; background-color: #fff3d6; box-shadow: inset 0 0 0 4px #e8a23c; }
+  #bUlt[data-act] .ico { display: block; }
+  #bUlt[data-act=""] .ico { display: none; }
+  #hud[data-ship] > .col:first-child, #hud[data-ship] #mini, #hud[data-ship] #quest, #hud[data-ship] #lvlName, #hud[data-ship] #skspLetters { visibility: hidden; }
   @keyframes ultglow { 0%, 100% { opacity: .35; transform: scale(.96); } 50% { opacity: 1; transform: scale(1.04); } }
   @keyframes pulse { 50% { box-shadow: 0 0 0 5px rgba(255,255,255,.5), 0 0 34px 10px rgba(246,196,83,.8); } }
 
@@ -326,7 +332,7 @@
   let META = null, ready = false;
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261026.0801", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261026.1557", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -366,7 +372,7 @@
     for (const A of [old, art]) if (A) for (const [n, f] of Object.entries(A.M.frames)) FR[n] = { img: A.sheets[f[0]], sx: f[1], sy: f[2], w: f[3], h: f[4], s: f[5], ax: f[6], ay: f[7] };
     FR.potion_energy = recolor("potion", "#ffc21a");
     placeholderWorldFrames();
-    for (const k of ["meadow", "stage", "shop_room"]) scene(k);
+    for (const k of ["meadow", "stage", "shop_room", "dock", "deck", "island"]) scene(k);
   }
   // ==== PLACEHOLDER world art (only what the real pack does not have yet) =================================================
   // The real art is packed into atlas4 (tools/g4_pack.py): Mochi / Matcha / Simmy / Sammy (`<char>.<outfit>.<pose><i>`),
@@ -521,6 +527,7 @@
   let musicSrc = null, musicGain = null, musicFiles = null;
   // which loop fits the moment: one per level, and the boss fight
   function musicWanted() {
+    if (onShip()) return "lv1";   // (sailing to the island: its music)
     if (G.mode !== "play" && G.mode !== "pause") return "lv0";
     if (G.boss && G.boss.alive) return "boss";
     return "lv" + clamp(G.level | 0, 0, 4);
@@ -665,8 +672,8 @@
     simmy: { name: "Simmy", owner: "any", at: 0.84, lv: 0, art: "ally_simmy", rgb: "255,140,210", col: "#ff8cd2", cd: 1.15, range: 820, style: "hearts",
       tip: "Simmy ném những ngôi sao kẹo hình trái tim vào quái" },
     // Sammy (the second S), freed from the hanging cage at the end of Đảo Cướp Biển: her headphones blast a sound wave that pushes monsters back.
-    // thanks / reply: her words when she steps out, and Simmy's answer; rsEnd = how long her rescue film runs
-    sammy: { name: "Sammy", owner: "any", at: 0.84, lv: 1, rgb: "255,179,71", col: "#ffb347", cd: 1.7, range: 760, style: "sonic", rsEnd: 8.6,
+    // thanks / reply: her words when she steps out, and Simmy's answer (each up for its lineTime; her film lasts as long as they need)
+    sammy: { name: "Sammy", owner: "any", at: 0.84, lv: 1, rgb: "255,179,71", col: "#ffb347", cd: 1.7, range: 760, style: "sonic",
       tip: "Sammy phát sóng âm từ tai nghe, đẩy lùi cả đám quái",
       thanks: ["Cảm ơn các em!", "Chị là Sammy, chị sinh đôi của Simmy!"], reply: ["Sammy!", "Chị em mình lại gặp nhau rồi!"] },
   };
@@ -727,7 +734,7 @@
     try { localStorage.setItem("sksp-outfit-" + hero, P.outfit); } catch (e) {}
   }
   loadOutfit();
-  const IN = { ultPressed: false };
+  const IN = { ultPressed: false, ultHeld: false };   // (ultHeld: the button / Space / K / C is held down now: the ship's hold actions)
   function loadPets() { P.pets = []; }   // each game sets her pets in startGame
 
   // ---------------------------------------------------------------- map generation
@@ -1099,12 +1106,17 @@
     if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(e.code)) e.preventDefault();
     if (e.repeat) return;
     keys[e.code] = true;
-    if (["KeyK", "KeyC", "Space"].includes(e.code)) IN.ultPressed = true;
+    if (["KeyK", "KeyC", "Space"].includes(e.code)) { IN.ultPressed = true; heldNow(); }
     if (e.code === "Escape" || e.code === "KeyP") togglePause();
     initAudio();
   });
-  window.addEventListener("keyup", (e) => { keys[e.code] = false; });
-  window.addEventListener("blur", () => { for (const k in keys) keys[k] = false; });
+  window.addEventListener("keyup", (e) => { keys[e.code] = false; if (["KeyK", "KeyC", "Space"].includes(e.code)) heldNow(); });
+  window.addEventListener("blur", () => { for (const k in keys) keys[k] = false; ultPtr = false; heldNow(); });
+  // IN.ultHeld: the button is held by a key (Space / K / C) or by a finger on #bUlt; letting go of one while the other still holds keeps it held
+  let ultPtr = false;
+  function heldNow() { IN.ultHeld = !!(keys.KeyK || keys.KeyC || keys.Space) || ultPtr; }
+  // forget the hold (a phase change, pause, leaving the ship): only a new press holds it again
+  function dropHeld() { keys.KeyK = keys.KeyC = keys.Space = false; ultPtr = false; IN.ultHeld = false; }
   // floating joystick anywhere on the left half: analog 2D direction
   const joy = { id: null, cx: 0, cy: 0, ax: 0, ay: 0 };
   const joyEl = $("joy"), knob = $("knob"), zone = $("joyZone");
@@ -1139,15 +1151,16 @@
     el.addEventListener("pointerup", end); el.addEventListener("pointercancel", end); el.addEventListener("lostpointercapture", end);
     el.addEventListener("contextmenu", (e) => e.preventDefault());
   }
-  holdBtn($("bUlt"), () => { IN.ultPressed = true; });
+  holdBtn($("bUlt"), () => { IN.ultPressed = true; ultPtr = true; heldNow(); }, () => { ultPtr = false; heldNow(); });
   document.addEventListener("gesturestart", (e) => e.preventDefault());
 
-  function readMove() {
+  // (noBot: the ship's deck, where the test bot does not walk the world's path)
+  function readMove(noBot) {
     if (joy.id !== null && (joy.ax || joy.ay)) return [joy.ax, joy.ay];
     const kx = (keys.ArrowRight || keys.KeyD ? 1 : 0) - (keys.ArrowLeft || keys.KeyA ? 1 : 0);
     const ky = (keys.ArrowDown || keys.KeyS ? 1 : 0) - (keys.ArrowUp || keys.KeyW ? 1 : 0);
     if (kx || ky) { const l = Math.hypot(kx, ky); return [kx / l, ky / l]; }
-    if (API.autopilot) return autopilot();
+    if (API.autopilot && !noBot) return autopilot();
     return [0, 0];
   }
   // test bot: walk the path toward the guide target; wait near a sealed gate; circle the boss at a safe distance
@@ -1863,13 +1876,75 @@
     if (SFX.level) SFX.level();
   }
 
+  // ---------------------------------------------------------------- the story's lines and how long each one stays up
+  // Every line follows from the one before (the spec's "Story"). A sequence is [[speaker, bubble lines], ...]; speaker "simmy" | "mochi" | "matcha".
+  // The bubble lines joined with a space are the line as written in the spec.
+  const SAYS = {
+    // Simmy's rescue: she thanks them, Mochi asks after the others, Simmy says where they are and what comes first
+    simmyRescue: [
+      ["simmy", ["Cảm ơn Mochi và Matcha", "đã cứu chị!"]],
+      ["mochi", ["Chị Simmy ơi, các bạn", "khác đâu rồi ạ?"]],
+      ["simmy", ["Phù thủy mang Sammy, Kairon", "và Phong Cận ra", "Đảo Cướp Biển rồi!"]],
+      ["simmy", ["Mình phải hạ Bánh Kem Khổng Lồ", "để ra khỏi rừng đã.", "Đi nào!"]],
+    ],
+    // after the candy boss: why the island, why a ship, why pirate clothes, so: the shop
+    afterCandyBoss: [
+      ["simmy", ["Hoan hô! Giờ mình ra đảo", "cứu các bạn thôi!"]],
+      ["matcha", ["Nhưng mình ra đảo", "bằng gì hả chị?"]],
+      ["simmy", ["Bằng tàu cướp biển! Mà lên", "tàu cướp biển thì phải", "mặc đồ cướp biển."]],
+      ["simmy", ["Chị biết một cửa hàng", "gần đây. Theo chị nào!"]],
+    ],
+    // after the team photo, on the way to the dock
+    afterPhoto: [["simmy", ["Cả đội xinh quá!", "Ra bến lên tàu thôi!"]]],
+    // on the ship: why they fish, why they cook, and the island in sight; then Màn 2's first line
+    shipStart: [["simmy", ["Đường ra đảo xa lắm. Mình cần", "câu 10 con cá để ăn dọc đường."]]],
+    fishDone: [["simmy", ["Đủ cá rồi! Giờ cùng nướng cá", "cho cả đội nào.", "Cẩn thận kẻo cháy nhé!"]]],
+    cookDone: [["simmy", ["Ngon quá! Ơ, nhìn kìa,", "Đảo Cướp Biển kìa!"]]],
+    level2Start: [["simmy", ["Sammy đang ở đâu đó", "trên đảo này. Đi tìm thôi!"]]],
+    // Simmy's short hints while they fish (each with a picture beside the bubble): the float went under; the fish fights; a big fish needs the net
+    // ("chị" when Mochi needs Matcha, "em" when Matcha needs Mochi)
+    hintBite: [["simmy", ["Phao chìm rồi,", "kéo đi!"]]],
+    hintFight: [["simmy", ["Cá vùng mạnh,", "thả tay ra!"]]],
+    hintBigG: [["simmy", ["Cá to! Gọi chị", "cầm vợt!"]]],
+    hintBigS: [["simmy", ["Cá to! Gọi em", "cầm vợt!"]]],
+    // ... and while they cook: a pan is gold (flip it); a pan is on fire (the bucket); no fish left (back to the rails)
+    hintFlip: [["simmy", ["Lật cá đi,", "vàng rồi!"]]],
+    hintFire: [["simmy", ["Cháy rồi!", "Lấy xô nước!"]]],
+    hintNoFish: [["simmy", ["Hết cá rồi, ra mạn tàu", "câu thêm nhé!"]]],
+  };
+  // Mochi (5) reads slowly: when she is one of the players (alone, or in co-op) every story line stays twice as long. Both co-op pages agree
+  // (each knows both girls). Films timed by their own clock (the opening, the boss's talk) run that clock at 1 / talkMul() while a bubble shows.
+  const talkMul = () => (hero === "g" || (NET.role && Q && Q.hero === "g") ? 2 : 1);
+  // (mul: a film that fixed its timing at its start passes the talkMul it started with, so a partner leaving mid-film leaves no gap)
+  const lineTime = (text, mul) => clamp(1.6 + text.length * 0.045, 2.2, 4.5) * (mul || talkMul());
+  const SAY_FADE = 0.25;
+  const seqTime = (seq, mul) => seq.reduce((s, l) => s + lineTime(l[1].join(" "), mul), 0);
+  // which line of a sequence shows t s after it starts ({i, k}: k = its fade in / out), null before it and once it is done
+  function sayAt(seq, t, mul) {
+    if (t < 0) return null;
+    let s = 0;
+    for (let i = 0; i < seq.length; i++) {
+      const L = lineTime(seq[i][1].join(" "), mul);
+      if (t < s + L) return { i, k: Math.min(clamp((t - s) / SAY_FADE, 0, 1), clamp((s + L - t) / SAY_FADE, 0, 1)) };
+      s += L;
+    }
+    return null;
+  }
+  // where a girl's bubble goes: the girl by that name (this page's or the partner's); when she is not playing, the girl who is
+  function girlSpot(name) {
+    const hk = name === "mochi" ? "g" : "s";
+    if (hero !== hk && NET.role && Q && Q.hero === hk) return [Q.x, Q.y - CHAR_H[hk] - 40];
+    return [P.x, P.y - CHAR_H[hero] - 40];
+  }
+
   // ---------------------------------------------------------------- the rescue film: the camera closes in on Simmy's cage,
   // she breaks out, wipes out her jailers with a storm of heart-shaped candy stars, thanks the girls, then joins them. The world waits meanwhile.
-  const RS_OUT = 0.9, RS_ULT = 1.7, RS_HIT = 2.5, RS_THANK = 3.6, RS_END = 6.0, RS_REPLY = 6.0;   // (RS_REPLY: when Simmy answers Sammy)
+  // From RS_THANK the film's lines (rsSeq) follow one another, each up for its lineTime; the film ends a moment after the last.
+  const RS_OUT = 0.9, RS_ULT = 1.7, RS_HIT = 2.5, RS_THANK = 3.6, RS_END = 6.0;
   // generic: who = the cage's kind (a PETS entry with owner "any"); Sammy's cage in Màn 2 reuses this
   function startAllyRescue(c, who) {
     if (G.rescue || !PETS[who]) return;
-    G.rescue = { kind: who, x: c.x, y: c.y, t: 0, mine: false };
+    G.rescue = { kind: who, x: c.x, y: c.y, t: 0, mine: false, mul: talkMul() };   // (mul: its lines' timing fixed at the start, as the walk-in's)
     P.vx = P.vy = 0;
   }
   function updateRescue(dt) {
@@ -1900,7 +1975,13 @@
       showBanner(D.name + " đi cùng các bé!", D.tip);
     }
   }
-  const rsEnd = (r) => PETS[r.kind].rsEnd || RS_END;   // (Sammy's film is longer: Simmy answers her)
+  // what is said in a girl's rescue film: Simmy's story lines; Sammy's thanks and Simmy's answer; another ally's thanks
+  function rsSeq(kind) {
+    if (kind === "simmy") return SAYS.simmyRescue;
+    const D = PETS[kind], th = D.thanks || ["Cảm ơn " + HEROES.g.name + " và " + HEROES.s.name + "!", "Từ giờ mình đi cùng các bé!"];
+    return D.reply ? [[kind, th], ["simmy", D.reply]] : [[kind, th]];
+  }
+  const rsEnd = (r) => Math.max(RS_END, RS_THANK + seqTime(rsSeq(r.kind), r.mul) + 0.4);
   const rescueZoom = () => { const r = G.rescue; if (!r) return 1; const k = Math.min(rsEase(clamp(r.t / 0.7, 0, 1)), 1 - rsEase(clamp((r.t - (rsEnd(r) - 0.6)) / 0.6, 0, 1))); return 1 + 0.55 * k; };
   // a heart-shaped candy star (Simmy's shots and her move): a glossy pink heart with a white shine and sprinkles
   function drawCandyStar(x, y, rot, alpha, sz = 1) {
@@ -1970,16 +2051,25 @@
       ctx.restore();
       if (t >= RS_HIT && t < RS_HIT + 0.35) { ctx.save(); ctx.globalAlpha = 0.5 * (1 - (t - RS_HIT) / 0.35); ctx.fillStyle = "#fff"; ctx.fillRect(G.camX - 200, G.camY - 200, VW + 400, VH + 400); ctx.restore(); }
     }
-    if (t >= RS_THANK && !(D.reply && t >= RS_REPLY)) {
-      const k2 = clamp((t - RS_THANK) / 0.3, 0, 1), th = D.thanks || ["Cảm ơn " + HEROES.g.name + " và " + HEROES.s.name + "!", "Từ giờ mình đi cùng các bé!"];
-      bubble(th[0], th[1], x, y - (CHAR_H[r.kind] || 300) - 130, k2);
-    }
-    if (D.reply && t >= RS_REPLY - 0.25) {
+    // the film's lines, one after another, each over its speaker
+    const seq = rsSeq(r.kind), say = sayAt(seq, t - RS_THANK, r.mul), si = r.kind === "simmy" ? -1 : seq.findIndex((l) => l[0] === "simmy");
+    let sx = x - 260, sy = y + 30;
+    if (si >= 0 && t >= RS_THANK + seqTime(seq.slice(0, si), r.mul) - 0.25) {
       // Simmy answers: she is already with the girls (or stands by the cage), and the two sisters are in one shot
-      const sm = [...PETE, ...QPETE].find((e) => e.kind === "simmy"), sx = sm ? sm.x : x - 260, sy = sm ? sm.y : y + 30;
-      const k3 = clamp((t - RS_REPLY) / 0.3, 0, 1), k4 = clamp((rsEnd(r) - 0.5 - t) / 0.3, 0, 1);
+      const sm = [...PETE, ...QPETE].find((e) => e.kind === "simmy"); if (sm) { sx = sm.x; sy = sm.y; }
       if (!sm) drawSimmyAt(ctx, sx, sy, CHAR_H.simmy, G.t, SIMMY.outfit, { face: 2, flip: sx > x }, !hasOutfit("simmy", "base"));   // (an ally's own page draws her already)
-      bubble(D.reply[0], D.reply[1], sx, sy - CHAR_H.simmy - 80, Math.min(k3, k4));
+    }
+    if (say) {
+      const [spk, lines] = seq[say.i];
+      // (the camera is zoomed in: the font shrinks with it, so the bubble is its usual size on the screen and stays under the HUD; kept in view)
+      const at = spk === r.kind ? [x, y - (CHAR_H[r.kind] || 300) - 60] : spk === "simmy" ? [sx, sy - CHAR_H.simmy - 30] : girlSpot(spk);
+      // (a girl's line leans away from the one rescued beside her, so it does not cover her face)
+      const zm = rescueZoom(), fs = Math.round(46 / zm);
+      ctx.font = `800 ${fs}px Grandstander, system-ui`;
+      const lean = spk !== r.kind && spk !== "simmy" ? Math.sign(at[0] - x || -1) * (Math.max(...lines.map((l) => ctx.measureText(l).width)) * 0.5 + fs * 0.8 - 50) : 0;
+      const [cx, by] = bubbleInView(lines, at[0] + lean, at[1], fs, zm), bx = cx - lean;   // (its body, not its tail, kept in view)
+      talkBubble(lines, bx, by, say.k, fs, false, lean);
+      if (API.saidAt) API.saidAt.push([lines.join(" "), bx, by, G.camX + VW / 2 * (1 - 1 / zm), G.camY + VH / 2 * (1 - 1 / zm), VW / zm, VH / zm]);
     }
   }
   // an ally inside her cage / stepping out: Simmy has her own stand-in; the others are the film cast's (drawFilmActor)
@@ -1987,16 +2077,6 @@
     if (kind === "simmy") drawSimmyAt(ctx, x, y, CHAR_H.simmy, G.t, "base", o || { face: 0 }, !hasOutfit("simmy", "base"));
     else if (kind === "sammy") drawAllyAt(ctx, "sammy", x, y, CHAR_H.sammy, G.t, "base", o || { face: 0 }, !hasOutfit("sammy", "base"));
     else drawFilmActor(ctx, kind, x, y, CHAR_H[kind] || 420, { t: G.t });   // (only with her frames packed)
-  }
-  function bubble(l1, l2, x, y, k) {
-    ctx.save(); ctx.globalAlpha = k; ctx.translate(x, y); ctx.scale(0.8 + 0.2 * k, 0.8 + 0.2 * k);
-    ctx.font = "800 44px Grandstander, system-ui"; const w = Math.max(ctx.measureText(l1).width, ctx.measureText(l2).width * 0.8) + 70;
-    ctx.fillStyle = "#fff"; ctx.strokeStyle = "rgba(60,30,80,.5)"; ctx.lineWidth = 5;
-    rrect(ctx, -w / 2, -110, w, 130, 34); ctx.fill(); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(-26, 18); ctx.lineTo(0, 60); ctx.lineTo(26, 18); ctx.fill();
-    ctx.textAlign = "center"; ctx.fillStyle = "#4a2160"; ctx.fillText(l1, 0, -48);
-    ctx.font = "700 34px Grandstander, system-ui"; ctx.fillStyle = "#8a4fb0"; ctx.fillText(l2, 0, -6);
-    ctx.restore();
   }
 
   // ---------------------------------------------------------------- pets
@@ -2251,7 +2331,7 @@
   function updateBossCut(dt) {
     const c = G.bcut, B = G.boss; if (!c) return;
     if (!B) { G.bcut = null; return; }
-    const t0 = c.t; c.t += dt;
+    const t0 = c.t; c.t += bossTalkOn(c) ? dt / talkMul() : dt;   // (his film waits while he speaks, for Mochi)
     const at = (x) => t0 < x && c.t >= x;
     P.inv = Math.max(P.inv, 1.5); P.moving = false; P.vx = P.vy = 0;
     if (c.ph === "intro") {
@@ -2275,6 +2355,11 @@
       if (c.t >= BD_END) endBossCut();
     }
   }
+  // is his bubble up in this film now? (the same moments drawBossTalk shows it)
+  function bossTalkOn(c) {
+    const BD = (G.lvl && G.lvl.boss) || {};
+    return c.ph === "intro" ? !!BD.say && c.t >= BI_SAY && c.t < BI_END - 0.3 : !!BD.bye && c.t >= BD_SAY && c.t < BD_FALL;
+  }
   const bcutZoom = () => { const c = G.bcut; if (!c) return 1; const end = c.ph === "intro" ? BI_END : BD_END, k = Math.min(rsEase(clamp(c.t / 0.8, 0, 1)), 1 - rsEase(clamp((c.t - (end - 0.6)) / 0.6, 0, 1))); return 1 + 0.3 * k; };
   // his laugh when he leaps up for a quiz: the sound (one per boss) and the shaking with a "Ha ha ha!" bubble
   function bossLaugh() {
@@ -2284,19 +2369,21 @@
   }
   const bossLaughing = (B) => B && B.alive && G.t - (B.laughAt === undefined ? -99 : B.laughAt) < 2.4;
   // a speech bubble of a few lines; the tail points down to the speaker, or up when he speaks from the sky
-  function talkBubble(lines, x, y, k, fs, up) {
+  // (dx: the bubble's body moved sideways from its tail, e.g. off a station it would cover; at most so far that the tail stays under it)
+  function talkBubble(lines, x, y, k, fs, up, dx) {
+    if (API.said) API.said.push(lines.join(" "));   // (tests: which bubbles are drawn)
     ctx.save(); ctx.globalAlpha = k; ctx.translate(x, y); const s = 0.8 + 0.2 * k; ctx.scale(s, s);
     ctx.font = `800 ${fs}px Grandstander, system-ui`;
     const lh = fs * 1.18, w = Math.max(...lines.map((l) => ctx.measureText(l).width)) + fs * 1.6, h = lines.length * lh + fs * 0.8;
-    const y0 = up ? 34 : -h - 34;
+    const y0 = up ? 34 : -h - 34, bx = dx ? clamp(dx / s, Math.min(0, -w / 2 + 50), Math.max(0, w / 2 - 50)) : 0;
     ctx.fillStyle = "#fff"; ctx.strokeStyle = "rgba(60,30,80,.55)"; ctx.lineWidth = 6;
-    rrect(ctx, -w / 2, y0, w, h, Math.min(40, h / 2)); ctx.fill(); ctx.stroke();
+    rrect(ctx, bx - w / 2, y0, w, h, Math.min(40, h / 2)); ctx.fill(); ctx.stroke();
     const ty = up ? 36 : -36, tip = up ? -6 : 6;
     ctx.beginPath(); ctx.moveTo(-30, ty); ctx.lineTo(0, tip); ctx.lineTo(30, ty); ctx.closePath(); ctx.fill();
     ctx.beginPath(); ctx.moveTo(-30, ty); ctx.lineTo(0, tip); ctx.lineTo(30, ty); ctx.stroke();
     ctx.fillStyle = "#fff"; ctx.fillRect(-27, up ? ty - 1 : ty - 4, 54, 5);
     ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle = "#4a2160";
-    lines.forEach((l, i) => ctx.fillText(l, 0, y0 + fs * 0.4 + lh * (i + 0.5)));
+    lines.forEach((l, i) => ctx.fillText(l, bx, y0 + fs * 0.4 + lh * (i + 0.5)));
     ctx.restore();
   }
   // drawn over the scene: what he says in his films, and his laugh during the quiz
@@ -3010,6 +3097,7 @@
   function play(n) { const t = performance.now(); if (t - (sfxT[n] || 0) < (n === "zap" ? 110 : 55)) return; sfxT[n] = t; SFX[n] && SFX[n](); }
   function update(dt) {
     G.t += dt; G.frame++;
+    if (G.say && ((G.say.t += dt) > seqTime(G.say.seq) + 0.5 || G.cine || G.rescue || G.bcut)) G.say = null;   // (a film takes over the screen: its own lines)
     if (G.fadeDir) {
       G.fade = clamp(G.fade + G.fadeDir * dt / 0.45, 0, 1);
       if (G.fadeDir > 0 && G.fade >= 1) { const f = G.onFade; G.onFade = null; G.fadeDir = -1; f && f(); }
@@ -3483,7 +3571,7 @@
   function drawHero() {
     if (G.mode === "title") return;
     const fn = P.fn = heroFrame4({ char: hero, outfit: P.outfit, face: P.face, flip: P.flip, moving: P.moving, dist: P.dist, castT: P.castT, dead: P.dead, winT: P.winT, ult: !!G.ult });
-    const blink = P.inv > 0 && !P.dead && !G.ult && Math.floor(G.t * 16) % 2 === 0;
+    const blink = P.inv > 0 && !P.dead && !G.ult && !G.rescue && Math.floor(G.t * 16) % 2 === 0;   // (no blinking in a rescue film: nothing can hurt her then)
     const aura = P.elem && !G.ult && !P.dead;
     if (aura) drawAura(P.elem, P.x, P.y, P.elemT, 1);
     if (P.dead) return drawFainted(hero, P.x, P.y, 1 - clamp(G.reviveT / FAINT_T, 0, 1), P.helped, Q && NET.role ? Q : null, P.outfit);
@@ -3531,7 +3619,7 @@
     Q.wd = (Q.wd || 0) + (mv < 60 ? mv : 0); Q.still = mv > 0.5 ? 0 : (Q.still || 0) + 1;
     const qWalk = Q.ultT > 0 || Q.dead || Q.still > 6 ? -1 : Q.wd;
     if (Q.dead) drawFainted(Q.hero, Q.x, Q.y, Q.rev || 0, Q.helped, P, Q.of);
-    else if (Q.fn) drawHeroSprite(Q.hero, Q.ultT > 0 ? outfitFrame(Q.hero, Q.of, "ult") : Q.fn, Q.x, Q.y, Q.ultT > 0 ? 150 * ss(0, 0.6, Q.ultT) - 150 * ss(2.0, 2.5, Q.ultT) : 0, Q.inv && !Q.dead && Math.floor(G.t * 16) % 2 === 0 ? 0.45 : 1, Q.ultT, stepPose(Q, qWalk));
+    else if (Q.fn) drawHeroSprite(Q.hero, Q.ultT > 0 ? outfitFrame(Q.hero, Q.of, "ult") : Q.fn, Q.x, Q.y, Q.ultT > 0 ? 150 * ss(0, 0.6, Q.ultT) - 150 * ss(2.0, 2.5, Q.ultT) : 0, Q.inv && !Q.dead && !G.rescue && Math.floor(G.t * 16) % 2 === 0 ? 0.45 : 1, Q.ultT, stepPose(Q, qWalk));
     if (qa) drawAura(Q.elem, Q.x, Q.y, qa, 2);
     if (Q.slow) drawWeb(Q.x, Q.y - 70, 40, 1);
     // name tag and hearts
@@ -3680,11 +3768,16 @@
     return IMG[k];
   }
   // the painted scene pictures (art4/scenes, ChatGPT; packed as assets/scene_<k>.webp): the opening's meadow, the show stage,
-  // the shop's fitting corner. Fetched once (loadAssets asks for them early); null until they are in.
+  // the shop's fitting corner. Fetched once (loadAssets asks for them early); null until they are in. A failed fetch (a dropped connection)
+  // is asked for again by a later call, at most every SCENE_RETRY s.
+  const SCENE_RETRY = 4, sceneFail = {};
   function scene(k) {
     const n = "scene_" + k;
-    if (!(n in IMG)) { IMG[n] = null; loadImg(`assets/${n}.webp`).then((i) => (IMG[n] = i)).catch(() => {}); }
-    return IMG[n];
+    if (!(n in IMG) && !(performance.now() / 1000 - (sceneFail[n] ?? -1e9) < SCENE_RETRY)) {
+      IMG[n] = null;
+      loadImg(`assets/${n}.webp`).then((i) => (IMG[n] = i)).catch(() => { delete IMG[n]; sceneFail[n] = performance.now() / 1000; });
+    }
+    return IMG[n] || null;
   }
   // a picture filling W x H, cropped but never stretched; (fx, fy) = which part stays in view (0.5 = the middle, 1 = the bottom).
   // Returns where a point of the picture lands: (u, v) as fractions of it -> [x, y] on the canvas
@@ -3935,6 +4028,7 @@
     ctx.fillStyle = "#0b0710"; ctx.fillRect(0, 0, W, H);
     if (G.mode === "shop" || G.mode === "photo") return;   // (their own screens cover the canvas)
     if (G.mode === "runway") { drawTeamScene(ctx, W, H, RW.t, false); return; }
+    if (onShip()) { drawShip(ctx, W, H); return; }
     if (!G.lvl) return;
     if (G.cine && G.cine.ph === "opening" && G.mode === "play") { drawOpening(ctx, W, H, G.cine.t); return; }
     if (resDirty) { const r = clamp(SCALE * DPR * 0.75, 0.35, 0.9); if (Math.abs(r - chunkRes) > 0.04) { chunkRes = r; chunkCache.clear(); } resDirty = false; }
@@ -4018,7 +4112,7 @@
     drawQuakesAir(); drawMeteors();
     drawQuizRain();
     drawBossTalk(L, T, R);
-    drawWalkTalk();
+    drawWalkTalk(); drawSay();
     drawRescue();
     drawParts(L, R, T, B);
     drawCombo(L, T);
@@ -4108,11 +4202,12 @@
     b.classList.add("show"); clearTimeout(bannerTimer); bannerTimer = setTimeout(() => b.classList.remove("show"), 1900);
   }
   function togglePause() {
-    if (G.mode === "play") { G.mode = "pause"; $("pauseScreen").hidden = false; }
-    else if (G.mode === "pause") { G.mode = "play"; $("pauseScreen").hidden = true; }
+    dropHeld();
+    if (G.mode === "play" || G.mode === "ship") { G.pmode = G.mode; G.mode = "pause"; $("pauseScreen").hidden = false; }   // (on the ship, pause freezes the ship)
+    else if (G.mode === "pause") { G.mode = G.pmode === "ship" ? "ship" : "play"; $("pauseScreen").hidden = true; }
   }
   $("pause").addEventListener("click", togglePause);
-  document.addEventListener("visibilitychange", () => { if (document.hidden && G.mode === "play" && !NET.role) togglePause(); });
+  document.addEventListener("visibilitychange", () => { if (document.hidden && (G.mode === "play" || G.mode === "ship") && !NET.role) togglePause(); });
   $("resumeBtn").addEventListener("click", togglePause);
   $("homeBtn").addEventListener("click", () => { $("pauseScreen").hidden = true; toTitle(); });
   $("againBtn").addEventListener("click", () => { $("winScreen").hidden = true; startGame(0); if (NET.role === "host") sendStart(); });
@@ -4137,7 +4232,8 @@
   function toTitle() {
     if (NET.role) leaveCoop();
     setTitleStory();
-    G.mode = "title"; $("quiz").hidden = true; renderHeroes();
+    if ($("hud").dataset.ship) shipUiOff();
+    G.mode = "title"; G.pmode = null; G.say = null; $("quiz").hidden = true; renderHeroes();
     $("titleScreen").hidden = false; $("hud").hidden = true; $("controls").hidden = true; $("bossbar").hidden = true; $("winScreen").hidden = true;
     SH.open = false; $("shop").hidden = true; $("photo").hidden = true; G.cine = null; G.rescue = null; $("skipFilm").hidden = true;
   }
@@ -4153,7 +4249,8 @@
     // her pet: rescued on the way in Màn 1, already with her when she starts further on
     // (the friends of everyone are with her once their level is behind her: Simmy from Màn 2 on, Sammy from Màn 3)
     P.pets = i > 0 ? Object.keys(PETS).filter((k) => PETS[k].owner === hero || (isAlly(k) && PETS[k].lv < i)) : [];
-    G.sksp = ["", "", "", ""]; G.cine = null; G.rescue = null; G.shopPhase = 0;
+    G.sksp = ["", "", "", ""]; G.cine = null; G.rescue = null; G.shopPhase = 0; G.say = null; G.pmode = null;
+    if ($("hud").dataset.ship) shipUiOff();   // (a new game from the ship)
     for (const k of Object.keys(PETS)) if (isAlly(k) && PETS[k].lv < i) G.sksp[ALLY_LETTER[k]] = SKSP_L[ALLY_LETTER[k]];
     buildLevel(i); renderHearts(); updateHud(); updateSksp(); questTxt = null; updateQuest();
     G.mode = "play"; $("againBtn").hidden = false;
@@ -4466,6 +4563,7 @@
 
   // ---- closing: Simmy changes, the team walks the runway, a photo is taken, then the beach
   function closeShop(fromNet) {
+    if (onShip()) return;   // (a late "close" from the host while she is on the ship already)
     if (!SH.open && !(fromNet && (G.mode === "play" || G.mode === "pause"))) return;
     $("pauseScreen").hidden = true;
     if (NET.role === "host" && !fromNet) netEmit("shop", { op: "close" });
@@ -4528,7 +4626,8 @@
   function endPhoto() {
     if (G.mode !== "photo") return;
     $("photo").hidden = true;
-    startLevel2();
+    // on to the dock and the ship (a guest whose host is already in Màn 2 goes straight there)
+    if (NET.role === "guest" && NET.pp && NET.pp.w && num(NET.pp.w.lv) > G.level) toLevel2(); else startShip();
   }
   $("photoGo").addEventListener("click", endPhoto);
 
@@ -4555,15 +4654,1157 @@
     G.mode = "win"; $("winScreen").hidden = false; $("controls").hidden = true; $("bossbar").hidden = true; $("hud").hidden = true;
   }
 
+  // ---------------------------------------------------------------- the ship to the island (between the team photo and Màn 2)
+  // After the photo the team walks along a dock and up the gangplank (scene "dock", line 9: the "dock" phase, skippable), then plays on one
+  // fixed screen showing the whole deck (scene "deck"): fishing until FISH_GOAL fish (line 10 starts it), cooking until DISH_GOAL dishes
+  // (line 11 starts it), then line 12, the ship sails up to the island (scene "island") and Màn 2 starts with line 13 (G.say).
+  // On the deck P.x / P.y are deck px (the deck picture's own 1248 x 832 px; the world position is put back when the ship is left).
+  // The girls walk with the usual controls; the one button (#bUlt, Space / K / C) does what the station in reach asks for (buttonAction),
+  // shown as an icon over her head and on the button. Together the host owns SHIP and the guest follows it and asks for her actions
+  // (see "the ship together" below); each girl's fishing line is her own page's; both go on into Màn 2 with the host's world.
+  // The station map, read off the painted deck (art4/scenes/deck.json): every position is a fraction of the picture.
+  const DECK = {
+    size: [1248, 832],
+    rail: [[0.47, 0.207], [0.555, 0.207], [0.639, 0.207], [0.386, 0.803], [0.555, 0.803], [0.725, 0.803]],   // where a girl stands to fish
+    ledges: [[0.386, 0.102], [0.47, 0.102], [0.555, 0.102], [0.639, 0.102], [0.725, 0.102], [0.386, 0.901], [0.47, 0.901], [0.555, 0.901], [0.639, 0.901], [0.725, 0.901]],
+    tub: [0.645, 0.346], pans: [[0.144, 0.442], [0.144, 0.575]], stove: [0.084, 0.361, 0.21, 0.643],
+    spices: { salt: [0.807, 0.387], lemon: [0.855, 0.505], herbs: [0.807, 0.621] },
+    bucket: [0.245, 0.724], table: [0.327, 0.286], mast: [0.519, 0.505], simmy: [0.513, 0.679],
+    walk: [[0.08, 0.18, 0.733, 0.827], [0.733, 0.24, 0.853, 0.775], [0.853, 0.315, 0.897, 0.691]],   // the open deck floor, [x0, y0, x1, y1]
+    block: { stove: [0.084, 0.361, 0.21, 0.643], table: [0.264, 0.21, 0.39, 0.361], mast: [0.481, 0.447, 0.558, 0.562], tub: [0.603, 0.281, 0.689, 0.411],
+      salt: [0.773, 0.346, 0.84, 0.43], lemon: [0.822, 0.459, 0.888, 0.548], herbs: [0.773, 0.579, 0.84, 0.663], bucket: [0.216, 0.681, 0.275, 0.769] },
+  };
+  const FISH_GOAL = 10, DISH_GOAL = 8;
+  const REACH = 90, PAN_R = 80, FOOT = 14;   // (deck px) a station within REACH of her feet is in reach; a pan counts from PAN_R off its middle; her feet keep FOOT off objects
+  const DECK_K = 0.45;   // deck px per world unit: the girls at their usual size against the stations (Mochi ~124 px tall on the 832 px picture)
+  const SHIP_SP = 360 * DECK_K;   // her walking speed on deck: as many body lengths a second as in the world
+  const DECK_VIEW = [0.05, 0, 0.97, 1];   // the part of the picture always on screen: the whole ship with its fishing ledges and the water past them (the floats)
+  const DECK_START = { g: [0.36, 0.7], s: [0.6, 0.7] };   // where each girl steps onto the deck
+  const SIM_HOME = [0.44, 0.6];   // Simmy's spot: left of the mast, below the table (deck.json's \`simmy\` spot stood her in front of the mast)
+  const DOCK_WALK = 6, DOCK_GAP = 0.7, ARR_SAIL = 4.5;
+  // the dock picture: the pier top runs along y 0.745, the gangplank goes up from (0.47, 0.745) to (0.64, 0.60), then onto the ship
+  const DOCK_PATH = [[-0.08, 0.745], [0.47, 0.745], [0.64, 0.6], [0.7, 0.585]];
+  const SHIP_PH = ["dock", "fish", "cook", "arrive"];
+  const ACT_ICON = { cast: "ic_rod", strike: "ic_rod", reel: "ic_rod", net: "ic_net", take: "ic_hand", put: "ic_hand", spice: "ic_hand", drop: "ic_hand", flip: "ic_flip", water: "ic_bucket" };
+  const CARRY_FR = { fish: "sh_fish_s", salt: "sh_salt", lemon: "sh_lemon", herbs: "sh_herbs", bucket: "sh_bucket_full", net: "sh_net" };
+  const newPan = () => ({ fish: false, side: 0, cook: 0, spice: null, want: null, fire: false });
+  const SHIP = { ph: "dock", t: 0, fish: 0, dishes: 0, tub: 0, carry: { g: null, s: null }, pans: [newPan(), newPan()], bucketAt: "spot", big: null, hint: null, lines: { g: null, s: null } };
+  let shipFrom = null, shownAct;   // (her world position while she is on the ship; the action the button shows now)
+  const onShip = () => G.mode === "ship" || (G.mode === "pause" && G.pmode === "ship");
+  const dockEnd = () => Math.max(0.3 + seqTime(SAYS.afterPhoto) + 0.6, 0.4 + 2 * DOCK_GAP + DOCK_WALK + 0.3);
+  const arrTalk = () => seqTime(SAYS.cookDone) + 0.4, arriveEnd = () => arrTalk() + ARR_SAIL;
+  const SAY_ON = { fish: ["shipStart", 0.5], cook: ["fishDone", 0], arrive: ["cookDone", 0] };   // the line Simmy says as each phase starts (and when)
+
+  function startShip() {
+    shipFrom = { x: P.x, y: P.y };
+    Object.assign(SHIP, { ph: "dock", t: 0, fish: 0, dishes: 0, tub: 0, carry: { g: null, s: null }, pans: [newPan(), newPan()], bucketAt: "spot", big: null, hint: null, lines: { g: null, s: null } });
+    fishReset(); cookReset(); BOT.key = null;
+    Object.assign(SHIPX, { seen: null, q: null, done: null, called: null, hostHint: null, sent: null, mine: [] }); SHIPX.landed.clear();
+    G.mode = "ship"; G.cine = null; G.rescue = null; G.ult = null; G.combo = null; IN.ultPressed = false; dropHeld();
+    P.vx = P.vy = 0; P.moving = false; P.winT = 0; P.face = 2; P.flip = false;
+    for (const id of ["shop", "photo", "winScreen", "pauseScreen", "bossbar", "quiz"]) $(id).hidden = true;
+    shipUi();
+  }
+  function shipPhase(ph) {
+    const from = SHIP.ph;
+    SHIP.ph = ph; SHIP.t = 0; IN.ultPressed = false; dropHeld(); castWind = null;
+    if (from === "dock" && ph !== "dock") {   // onto the deck
+      const s = DECK_START[hero]; P.x = s[0] * DECK.size[0]; P.y = s[1] * DECK.size[1]; P.vx = P.vy = 0; P.face = 0; P.flip = false;
+    }
+    if (ph === "arrive") { P.vx = P.vy = 0; P.moving = false; play("win"); }
+    shipUi();
+  }
+  function endShip() {
+    if (shipFrom) { P.x = shipFrom.x; P.y = shipFrom.y; shipFrom = null; }
+    P.vx = P.vy = 0; P.moving = false;
+    IN.ultPressed = false; dropHeld(); castWind = null;   // (a press during the arrival must not fire an ultimate in Màn 2)
+    shipUiOff();
+    toLevel2();   // (a guest goes back to her page and the host's world carries her into Màn 2)
+  }
+  // on into Màn 2, where Simmy says line 13 (a guest a little later: her page builds the level when the host's world says so)
+  function toLevel2() {
+    startLevel2();
+    if (G.mode === "play") G.say = { seq: SAYS.level2Start, t: NET.role === "guest" ? -2.2 : -0.8 };
+  }
+  // the HUD on the ship: no hearts / energy / level map, the star counter stays; the controls only on deck; skip only on the dock
+  function shipUi() {
+    const deck = SHIP.ph === "fish" || SHIP.ph === "cook";
+    $("hud").hidden = !deck; $("controls").hidden = !deck; $("skipFilm").hidden = SHIP.ph !== "dock";
+    $("hud").dataset.ship = "1"; shownAct = undefined;
+    if (deck) updateHud();
+  }
+  function shipUiOff() {
+    delete $("hud").dataset.ship; delete $("bUlt").dataset.act; shownAct = undefined;
+    G.ultOff = undefined;   // (the ultimate's charge state is shown again on the next frame)
+    $("skipFilm").hidden = true;
+  }
+  // the deck picture on screen: the whole ship (DECK_VIEW) always in view, filling the screen when that allows
+  function deckView() {
+    const W = cv.width, H = cv.height, [SW, SH] = DECK.size, v = DECK_VIEW;
+    const s = Math.min(Math.max(W / SW, H / SH), W / ((v[2] - v[0]) * SW), H / ((v[3] - v[1]) * SH));
+    return { s, ox: W / 2 - (v[0] + v[2]) / 2 * SW * s, oy: H / 2 - (v[1] + v[3]) / 2 * SH * s };
+  }
+  const screenScale = () => deckView().s;
+  function deckToScreen(x, y) { const v = deckView(); return [v.ox + x * v.s, v.oy + y * v.s]; }
+  // where a girl stands on the deck (this page's girl, or the partner's once she is on the ship too); null when she is not on board
+  function posOf(k) {
+    if (k === hero) return [P.x, P.y];
+    if (NET.role && Q && Q.ship && Q.hero === k) return [Q.x, Q.y];
+    return null;
+  }
+  const rectDist = (x, y, r) => { const [SW, SH] = DECK.size; return Math.hypot(Math.max(r[0] * SW - x, 0, x - r[2] * SW), Math.max(r[1] * SH - y, 0, y - r[3] * SH)); };
+  // the station nearest to (x, y) within REACH deck px: {kind: rail|tub|pan|spice|bucket|table|partner, i?, spice?} or null
+  function stationAt(x, y, k) {
+    const [SW, SH] = DECK.size, B = DECK.block;
+    let best = null, bd = REACH;
+    const take = (d, s) => { if (d <= bd) { bd = d; best = s; } };
+    DECK.rail.forEach((p, i) => take(Math.hypot(x - p[0] * SW, y - p[1] * SH), { kind: "rail", i }));
+    take(rectDist(x, y, B.tub), { kind: "tub" });
+    DECK.pans.forEach((p, i) => take(Math.max(0, Math.hypot(x - p[0] * SW, y - p[1] * SH) - PAN_R), { kind: "pan", i }));
+    for (const sp of Object.keys(DECK.spices)) take(rectDist(x, y, B[sp]), { kind: "spice", spice: sp });
+    take(rectDist(x, y, B.bucket), { kind: "bucket" });
+    take(rectDist(x, y, B.table), { kind: "table" });
+    // the other girl, while her big fish waits by the boat for the net
+    const o = k === "s" ? "g" : "s", op = SHIP.big && SHIP.big.k === o && !SHIP.big.by ? posOf(o) : null;
+    if (op && Math.hypot(x - op[0], y - op[1]) <= REACH * 1.6) return { kind: "partner" };   // (netting her big fish wins over anything else in reach: it only waits NET_WIN s)
+    return best;
+  }
+  // what the button does for girl k where she stands now (the spec's table); null: nothing
+  function buttonAction(k) {
+    const at = posOf(k); if (!at) return null;
+    const L = SHIP.lines[k], s = stationAt(at[0], at[1], k);   // her line in the water: strike while it waits, reel once hooked (nothing while a big fish waits for the net)
+    if (L) {   // (while it only waits and her sister's big fish is by the boat next to her, the button nets that: her own line stays out)
+      if (s && s.kind === "partner" && (L.st === "cast" || L.st === "wait" || L.st === "nibble")) return "net";
+      return L.st === "hooked" ? "reel" : L.st === "cast" || L.st === "wait" || L.st === "nibble" || L.st === "bite" ? "strike" : null;
+    }
+    const c = SHIP.carry[k];
+    if (s && s.kind === "partner") return "net";
+    if (!c) {
+      if (!s) return null;
+      if (s.kind === "rail") return "cast";
+      if (s.kind === "tub") return SHIP.tub > 0 ? "take" : null;
+      if (s.kind === "spice") return "take";
+      if (s.kind === "bucket") return SHIP.bucketAt === "spot" ? "take" : null;
+      if (s.kind === "pan") { const pan = SHIP.pans[s.i]; return pan.fish && !pan.fire && pan.side === 0 ? "flip" : null; }
+      return null;
+    }
+    if (s && s.kind === "pan") {
+      const pan = SHIP.pans[s.i];
+      if (c === "fish" && !pan.fish && !pan.fire) return "put";
+      if (c === "bucket" && pan.fire) return "water";
+      if (pan.want && c === pan.want) return "spice";
+      if (pan.fish && !pan.fire && pan.side === 0) return "flip";
+      return null;   // (nothing for what she holds here: it is not put down by mistake at the stove)
+    }
+    return "drop";
+  }
+  // girl k does `action` (the host's / solo page applies it to SHIP); true when something happened.
+  // take / put / drop; cast / net / land (fishing: strike and reel are her line's own, see fishTick); flip / spice / water (cooking)
+  // (where: where she stood when she pressed, sent by the guest's page; otherwise where she is now)
+  function shipAct(k, action, arg, where) {
+    k = k === "s" ? "s" : "g";
+    const at = where || posOf(k), s = at ? stationAt(at[0], at[1], k) : null, c = SHIP.carry[k];
+    if (action === "take") {
+      if (c || !s) return false;
+      if (s.kind === "tub" && SHIP.tub > 0) { SHIP.tub--; SHIP.carry[k] = "fish"; }
+      else if (s.kind === "spice") SHIP.carry[k] = s.spice;
+      else if (s.kind === "bucket" && SHIP.bucketAt === "spot") { SHIP.bucketAt = k; SHIP.carry[k] = "bucket"; }
+      else return false;
+      play("pop"); return true;
+    }
+    if (action === "put") {
+      if (c !== "fish" || !s || s.kind !== "pan") return false;
+      const pan = SHIP.pans[s.i]; if (pan.fish || pan.fire) return false;
+      Object.assign(pan, newPan(), { fish: true, n: ++SHIPX.putN }); SHIP.carry[k] = null;   // (n: which fish this is, for a guest's late flip)
+      play("fire"); return true;
+    }
+    if (action === "cast") {   // (arg: the power, 0..1, from how long the button was held)
+      if (c || !s || s.kind !== "rail" || SHIP.lines[k]) return false;
+      SHIP.lines[k] = Object.assign(newLine(k, num(arg)), { rail: s.i, id: ++SHIPX.lineN });
+      play("swoosh"); return true;
+    }
+    if (action === "net") {   // the other girl's big fish, waiting by the boat
+      const b = SHIP.big, L = b && b.k !== k && SHIP.lines[b.k];
+      if (!L || L.st !== "near" || L.netted || !s || s.kind !== "partner") return false;
+      L.netted = k; b.by = k; play("unlock");
+      if (b.k !== hero && NET.role) netEmit("ship", { op: "net", k: b.k, id: L.id || 0, by: k });   // (her line is her own page's: it lands there)
+      return true;
+    }
+    if (action === "land") {   // a fish into the tub: s / m count 1, a big one 2; +2 stars a fish
+      const n = arg === "b" ? 2 : 1;
+      SHIP.tub += n; SHIP.fish += n; G.stars += 2 * n;
+      play("candy"); play("star"); return true;
+    }
+    if (action === "flip") return !!s && s.kind === "pan" && flipPan(s.i);
+    if (action === "spice") {   // the spice the pan wants: the dish is done and slides onto the table (+3 stars)
+      if (!s || s.kind !== "pan") return false;
+      const pan = SHIP.pans[s.i]; if (!pan.want || c !== pan.want) return false;
+      const [px, py] = panAt(s.i), [tx, ty] = dishSlot(SHIP.dishes);
+      SHIP.pans[s.i] = newPan(); SHIP.carry[k] = null; SHIP.dishes++; G.stars += 3;
+      JUMPS.push({ fr: "sh_dish", x0: px, y0: py, x1: tx, y1: ty, t: 0, T: 0.9, h: 90, dish: true });
+      play("candy"); play("star"); return true;
+    }
+    if (action === "water") {   // the bucket's water on a burning pan: the fire is out; the empty bucket goes back to its spot and refills
+      if (c !== "bucket" || !s || s.kind !== "pan" || !SHIP.pans[s.i].fire) return false;
+      const [px, py] = panAt(s.i);
+      SHIP.pans[s.i] = newPan(); SHIP.carry[k] = null; SHIP.bucketAt = "fill"; COOK.bucketT = BUCKET_FILL;
+      cookSmoke(px, py, 16, false, false); shipSplash(px, py, 12, true);
+      play("swoosh"); play("web"); return true;
+    }
+    if (action === "drop") {
+      if (!c) return false;
+      if (c === "fish") SHIP.tub++;   // (a fish put down goes back into the tub)
+      if (c === "bucket") SHIP.bucketAt = "spot";   // (the bucket goes back to its spot)
+      SHIP.carry[k] = null; play("land"); return true;
+    }
+    return false;
+  }
+  // ---- fishing: patience (strike only when the float goes fully under), skill (let go while the fish fights), teamwork (a big fish needs the net)
+  // A line is plain data stepped by the pure fishStep (seeded rnd in tests); each girl's line is her own page's (SHIP.lines[k]).
+  // st: cast (the float flies out) -> wait -> nibble (the float twitches: a press now scares the fish off) -> bite (fully under for BITE_WIN s:
+  // a press hooks it, none: back to wait) -> hooked (hold = reel in, but while it fights holding fills the tension and snaps the line) ->
+  // landed, or for a big fish near (it waits NET_WIN s by the boat for the other girl's net; alone, Simmy brings it after SIMMY_NET s) -> landed.
+  // lost: scared off, snapped, or it slipped away. dist: 0..1 from the boat (where the float is); tension 0..1.
+  const BITE_WIN = 1.1, NET_WIN = 4, SIMMY_NET = 2.5;
+  const CAST_T = 0.7, WIND_T = 1.2, TWITCH = 0.55;   // the float's flight; holding this long casts as far as she can; one nibble twitch
+  const REEL_V = { s: 0.2, m: 0.15, b: 0.12 };   // dist a second while she reels a calm fish
+  const TENS_UP = 1.2, FIGHT_WARN = 0.25;   // tension a second while she holds a fighting fish (after its first FIGHT_WARN s: she sees it, then it pulls)
+  const TENS_TAP = 0.1, TENS_EASE = 0.3;   // each press while it fights yanks the line; let go while it still fights, the tension eases only slowly
+  // (so tapping fast through a fight snaps the line too: only letting go for the whole fight saves the fish)
+  const castDist = (power) => 0.25 + 0.75 * clamp(power, 0, 1);
+  function newLine(k, power) {
+    const pw = clamp(num(power), 0, 1);
+    return { k: k === "s" ? "s" : "g", st: "cast", t: 0, power: pw, size: null, dist: castDist(pw), tension: 0, fight: false, fa: 0, ft: 0, wait: 0, nib: 0, why: null, netted: null };
+  }
+  // one step of a line: a new line (the given one is left as it was). held: the button is down now; pressed: it went down this step
+  function fishStep(line, dt, held, pressed, rnd) {
+    const L = Object.assign({}, line), to = (st) => { L.st = st; L.t = 0; };
+    L.t += dt;
+    if (L.st === "cast") { if (L.t >= CAST_T) { to("wait"); L.wait = 1.2 + rnd() * 2.2 + L.power; } }   // (far casts wait a little longer)
+    else if (L.st === "wait") {   // (a press with nothing on the hook does nothing)
+      if (L.t >= L.wait) {
+        to("nibble"); L.nib = TWITCH * (2 + Math.floor(rnd() * 3));
+        const r = rnd(), far = L.power > 0.6;   // near water: mostly small fish; far: middle and big ones
+        L.size = far ? (r < 0.2 ? "s" : r < 0.65 ? "m" : "b") : (r < 0.6 ? "s" : r < 0.92 ? "m" : "b");
+      }
+    } else if (L.st === "nibble") {
+      if (pressed) { to("lost"); L.why = "scared"; }
+      else if (L.t >= L.nib) to("bite");
+    } else if (L.st === "bite") {
+      if (pressed) { to("hooked"); L.fight = false; L.fa = 0; L.tension = 0; L.ft = 1 + rnd() * 1.4; }
+      else if (L.t >= BITE_WIN) { to("wait"); L.wait = 1 + rnd() * 2; }   // (it may come back)
+    } else if (L.st === "hooked") {
+      L.ft -= dt;
+      if (L.ft <= 0) {   // calm <-> fighting, at random moments; a big fish fights longer and calms down for less
+        L.fight = !L.fight; L.fa = 0;
+        L.ft = L.fight ? 1.1 + rnd() * (L.size === "b" ? 0.9 : 0.6) : (L.size === "b" ? 0.9 : 1.1) + rnd() * 1.4;
+      }
+      if (L.fight) L.fa += dt;
+      const pull = L.fight && L.fa > FIGHT_WARN;
+      if (pull && pressed) L.tension += TENS_TAP;
+      if (held && L.fight) { if (pull) L.tension += TENS_UP * dt; }
+      else if (held) { L.dist -= REEL_V[L.size || "s"] * dt; L.tension = Math.max(0, L.tension - 0.5 * dt); }
+      else { L.tension = Math.max(0, L.tension - (L.fight ? TENS_EASE : 0.9) * dt); L.dist = Math.min(1, L.dist + (L.fight ? 0.07 : 0.03) * dt); }
+      if (L.tension >= 1) { L.tension = 1; to("lost"); L.why = "snap"; return L; }
+      if (L.dist <= 0) { L.dist = 0; L.fight = false; L.tension = 0; to(L.size === "b" ? "near" : "landed"); }
+    } else if (L.st === "near") {
+      if (L.netted) to("landed");
+      else if (L.t >= NET_WIN) { to("lost"); L.why = "slip"; }
+    }
+    return L;
+  }
+  // this page's fishing extras: the cast being wound up (power, null when not), how she is doing (for Simmy's hints), Simmy on the deck,
+  // splashes / ripples (SHIP_FX, deck px) and fish flying into the tub or swimming off (JUMPS)
+  let castWind = null;
+  const fishHelp = { hooks: 0, miss: false };
+  const SIM = { x: 0, y: 0, face: 0, flip: false, moving: false, dist: 0, path: [], net: false };
+  const SHIP_FX = [], JUMPS = [];
+  function fishReset() {
+    castWind = null; fishHelp.hooks = 0; fishHelp.miss = false;
+    const [SW, SH] = DECK.size; Object.assign(SIM, { x: SIM_HOME[0] * SW, y: SIM_HOME[1] * SH, face: 0, flip: false, moving: false, dist: 0, path: [], net: false });
+    SHIP_FX.length = 0; JUMPS.length = 0;
+  }
+  const soloShip = () => !(NET.role && Q && Q.ship);
+  const topRail = (i) => DECK.rail[i] && DECK.rail[i][1] < 0.5;
+  // where a line is: the rod in her hand pointing out over the ledge, the float on the water (deck px)
+  function lineGeo(L, x, y) {
+    const [SW, SH] = DECK.size, up = topRail(L.rail), out = up ? -1 : 1, th = (CHAR_H[L.k] || 400) * DECK_K;
+    const r = DECK.rail[L.rail] || [x / SW, y / SH], side = ((L.rail % 3) - 1) * 0.35;
+    const hand = [x + (up ? 10 : -10), y - th * 0.42], tip = [r[0] * SW + side * 30, (up ? 0.085 : 0.925) * SH];
+    const fl = (d) => [r[0] * SW + side * (20 + 90 * d), up ? lerp(58, 10, d) : lerp(784, 826, d)];
+    return { hand, tip, fl, out, at: fl(L.dist) };
+  }
+  function shipSplash(x, y, n, big) {
+    for (let i = 0; i < n && SHIP_FX.length < 160; i++) {
+      const a = -Math.PI / 2 + (Math.random() - 0.5) * 2.4, v = (big ? 90 : 55) * (0.4 + Math.random());
+      SHIP_FX.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, g: 260, life: 0.5, max: 0.5, r: 1.5 + Math.random() * (big ? 3 : 2), col: Math.random() < 0.5 ? "#ffffff" : "#bff3ff" });
+    }
+  }
+  function shipRing(x, y, r, life) { if (SHIP_FX.length < 160) SHIP_FX.push({ x, y, ring: true, r, vr: 34, life, max: life }); }
+  function shipFx(dt) {
+    for (const p of SHIP_FX) { p.life -= dt; if (p.ring) p.r += p.vr * dt; else if (p.smoke) { p.x += p.vx * dt; p.y += p.vy * dt; p.r += p.vr * dt; } else { p.vy += p.g * dt; p.x += p.vx * dt; p.y += p.vy * dt; } }
+    for (let i = SHIP_FX.length - 1; i >= 0; i--) if (SHIP_FX[i].life <= 0) SHIP_FX.splice(i, 1);
+    for (const j of JUMPS) j.t += dt;
+    for (let i = JUMPS.length - 1; i >= 0; i--) {
+      const j = JUMPS[i];
+      if (j.t >= j.T) { if (j.tub) { const [SW, SH] = DECK.size; shipSplash(DECK.tub[0] * SW, DECK.tub[1] * SH, 8); play("land"); } JUMPS.splice(i, 1); }
+    }
+  }
+  function showHint(key) { if (SHIP.hint && SHIP.hint.key === key) return; SHIP.hint = { key, t: 0 }; }
+  // what happened to her line this step: sounds, splashes, Simmy's hints, a landed fish into the tub; done lines are taken off
+  function lineEvents(k, a, b) {
+    const at = posOf(k) || [P.x, P.y], geo = lineGeo(b, at[0], at[1]), [fx, fy] = geo.at;
+    const [SW, SH] = DECK.size, fr = "sh_fish_" + (b.size || "s");
+    if (a.st === "cast" && b.st === "wait") { play("land"); shipRing(fx, fy, 4, 0.8); shipSplash(fx, fy, 4); }
+    if (b.st === "nibble" && (a.st !== "nibble" || Math.floor(a.t / TWITCH) !== Math.floor(b.t / TWITCH))) { play("land"); shipRing(fx, fy, 3, 0.5); }
+    if (b.st === "bite" && a.st !== "bite") {
+      play("pop"); shipRing(fx, fy, 5, 0.9); shipRing(fx, fy, 2, 0.6); shipSplash(fx, fy, 6);
+      if (fishHelp.hooks < 3 || fishHelp.miss) showHint("hintBite");
+    }
+    if (a.st === "bite" && b.st === "wait") fishHelp.miss = true;
+    if (b.st === "hooked" && a.st !== "hooked") { play("hit"); shipSplash(fx, fy, 10, true); fishHelp.hooks++; fishHelp.miss = false; }
+    if (b.st === "hooked") {
+      if (b.fight && !a.fight) { play("web"); shipSplash(fx, fy, 8, true); }
+      if (b.fight && Math.random() < 0.3) shipSplash(fx + (Math.random() - 0.5) * 12, fy, 1, true);
+      if (b.fight && IN.ultHeld && b.tension > 0.15) showHint("hintFight");
+    }
+    if (b.st === "near" && b.size === "b" && !b.called) {   // the big fish splashes by the boat: someone bring the net!
+      b.called = true; play("ready"); shipSplash(fx, fy, 12, true);
+      if (!soloShip()) showHint(k === "g" ? "hintBigG" : "hintBigS");
+    }
+    if (b.st === "near" && Math.random() < 0.15) shipSplash(fx + (Math.random() - 0.5) * 20, fy, 2, true);
+    if (b.st === "landed") {
+      if (NET.role === "guest") {   // (together the host's page counts it: by the event, or from her presence if the event is lost)
+        sendAct("land", b.size, { id: b.id || 0 });
+        SHIPX.mine = [...SHIPX.mine, [b.id || 0, "smb".indexOf(b.size || "s") + 1]].slice(-10);
+      } else shipAct(k, "land", b.size);
+      SHIPX.done = { L: b, t: 0.4 };   // (her presence shows the landed / lost line a moment, for her sister's page)
+      JUMPS.push({ fr, x0: fx, y0: fy, x1: DECK.tub[0] * SW, y1: DECK.tub[1] * SH, t: 0, T: 0.8, h: 160, tub: true });
+      shipSplash(fx, fy, 10, true);
+      SHIP.lines[k] = null;
+    } else if (b.st === "lost") {
+      if (b.why === "snap") play("shatter"); else play("web");
+      shipSplash(fx, fy, 10, true); shipRing(fx, fy, 6, 0.9);
+      if (b.size) JUMPS.push({ fr, x0: fx, y0: fy, x1: fx + (Math.random() - 0.5) * 160, y1: fy + geo.out * 60, t: 0, T: 1.1, h: 0, swim: true });   // (it swims off)
+      if (b.why === "scared") fishHelp.miss = true;
+      SHIPX.done = { L: b, t: 0.4 };
+      SHIP.lines[k] = null;
+    }
+  }
+  // Simmy on the deck: at her spot; alone with a big fish by the boat she walks over with the net (around the mast), then back
+  function simTick(dt, helpAt) {
+    const [SW, SH] = DECK.size, home = [SIM_HOME[0] * SW, SIM_HOME[1] * SH];
+    let goal = home;
+    if (helpAt) goal = [helpAt[0] - 75, helpAt[1] + (helpAt[1] < SH / 2 ? 25 : -20)];
+    else if (COOK.sim !== null) goal = simPanSpot(COOK.sim);   // (alone: to a gold pan, to flip it)
+    const gk = goal[0].toFixed(0) + "," + goal[1].toFixed(0);
+    if (SIM.goal !== gk) {   // (to the top rail by the open deck right of the mast; elsewhere straight)
+      SIM.goal = gk; SIM.path = [];
+      const wp = [725, 420], viaTop = (goal[1] < 0.4 * SH) !== (SIM.y < 0.4 * SH);
+      if (viaTop) SIM.path.push(wp);
+      SIM.path.push(goal);
+    }
+    SIM.net = !!helpAt; SIM.moving = false;
+    let step = 260 * dt;
+    while (SIM.path.length && step > 0) {
+      const [tx, ty] = SIM.path[0], dx = tx - SIM.x, dy = ty - SIM.y, d = Math.hypot(dx, dy);
+      if (d <= step) { SIM.x = tx; SIM.y = ty; SIM.path.shift(); step -= d; continue; }
+      SIM.x += dx / d * step; SIM.y += dy / d * step; SIM.dist += step / DECK_K; SIM.moving = true; setFace(SIM, dx, dy); step = 0;
+    }
+    if (!SIM.moving) { if (helpAt) setFace(SIM, helpAt[0] - SIM.x, helpAt[1] - SIM.y); else if (COOK.sim !== null) setFace(SIM, -1, 0); else { SIM.face = 0; SIM.flip = false; } }
+    return !SIM.path.length;   // (she is there)
+  }
+  // this page's girl fishing: wind up / cast, step her line, Simmy's net when she is alone
+  function fishTick(dt, act, pressed) {
+    let L = SHIP.lines[hero], helpAt = null;
+    if (L) {
+      if (L.st === "near" && L.size === "b" && soloShip() && NET.role !== "guest") helpAt = [P.x, P.y];
+      const there = simTick(dt, helpAt);
+      if (helpAt && there && L.t >= SIMMY_NET && !L.netted) { L.netted = "simmy"; play("unlock"); }
+      const netting = pressed && act === "net";   // (her sister's big fish netted with her own line out: that press is not her line's)
+      if (netting) doAct("net");
+      const b = fishStep(L, dt, IN.ultHeld, pressed && !netting, Math.random);
+      SHIP.lines[hero] = b; lineEvents(hero, L, b);
+      L = SHIP.lines[hero];
+      if (L) setFace(P, 0, topRail(L.rail) ? -1 : 1);   // (she faces the water)
+    } else {
+      simTick(dt, null);
+      if (pressed && act === "cast") castWind = 0;
+      else if (pressed && act) doAct(act);
+      if (castWind !== null) {   // hold to wind up (longer = farther), let go to cast
+        if (act !== "cast") castWind = null;
+        else if (IN.ultHeld) castWind = Math.min(1, castWind + dt / WIND_T);
+        else { const pw = castWind; castWind = null; shipAct(hero, "cast", pw); }
+      }
+    }
+    // her big fish by the boat: the partner's button nets it
+    const mine = SHIP.lines[hero];
+    if (mine && mine.st === "near") SHIP.big = { k: hero, t: mine.t, id: mine.id || 0, by: SHIP.big && SHIP.big.k === hero ? SHIP.big.by : null };
+    else if (SHIP.big && SHIP.big.k === hero) SHIP.big = null;
+    if (SHIPX.done && (SHIPX.done.t -= dt) <= 0) SHIPX.done = null;
+    shipFx(dt);
+  }
+  // ---- cooking: a fish in a pan cooks (its bar goes white -> gold), flip it when gold, the other side cooks the same way; then it needs the
+  // spice Simmy shows (salt, lemon or herbs) before it burns, and adding it slides the dish onto the table. Left too long the fish burns: the
+  // pan is on fire (the fish is gone) until a girl brings the bucket from its spot and throws the water (the bucket refills on its spot).
+  // Together the spice is picked (and shown) only when the second side is gold; it then burns BURN2 - DONE (7) s later: a girl already
+  // waiting at the crates makes it, one who has to run there from the stove and back does not, so they must split the jobs (one watches
+  // the pans, one fetches). Alone (relaxed, as the flips by Simmy) the spice is picked as the fish is flipped and shown beside the pan at
+  // once (faint), so she can fetch it while the second side cooks; it is wanted (bobbing) when the second side is gold.
+  // A pan is plain data stepped by the pure panStep; the host's (or a solo girl's) page owns the pans. Alone they cook slower (SOLO_RATE) and
+  // Simmy flips a pan that has been gold for SIM_FLIP_WAIT s (at most every SIM_FLIP_GAP s).
+  const DONE = 6, BURN = 10, BURN2 = 13, SOLO_RATE = 0.7, SPICES = ["salt", "lemon", "herbs"];   // (BURN: the first side burns; BURN2: the second)
+  const burnAt = (pan) => (pan.side === 1 ? BURN2 : BURN);
+  const SIM_FLIP_WAIT = 2, SIM_FLIP_GAP = 6, BUCKET_FILL = 1, NOFISH_GAP = 12, SHAKE_T = 0.45, FLIP_T = 0.45;
+  const cookRate = () => (soloShip() ? SOLO_RATE : 1);
+  const pickSpice = (rnd) => SPICES[Math.min(2, Math.floor((rnd || Math.random)() * 3))];
+  // one step of a pan: a new pan (the given one is left as it was); rnd picks the spice when none was picked at the flip
+  function panStep(pan, dt, rate, rnd) {
+    const p = Object.assign({}, pan);
+    if (!p.fish || p.fire) return p;
+    p.cook += dt * rate;
+    if (p.side === 1 && p.cook >= DONE && !p.want) p.want = p.spice || pickSpice(rnd);
+    if (p.cook >= burnAt(p)) return Object.assign(newPan(), { fire: true });   // burnt: the fish is gone, the pan is on fire
+    return p;
+  }
+  // this page's cooking extras: per pan how long it has been gold (for Simmy), its shake (a raw flip) and flip moments, its smoke;
+  // Simmy's flips (the pan she is going to, the time since her last one), the bucket refilling, Simmy's "no fish" and "flip" hints
+  const PANX = [{}, {}];
+  const COOK = { simFlipT: 0, sim: null, bucketT: 0, noFishT: 0, flipHelp: 0 };
+  function cookReset() {
+    for (const x of PANX) Object.assign(x, { ready: 0, shake: 0, flipA: 0, smokeT: 0 });
+    Object.assign(COOK, { simFlipT: SIM_FLIP_GAP, sim: null, bucketT: 0, noFishT: NOFISH_GAP, flipHelp: 0, prev: null });
+  }
+  const panAt = (i) => [DECK.pans[i][0] * DECK.size[0], DECK.pans[i][1] * DECK.size[1]];
+  const panSpot = (i) => [300, DECK.pans[i][1] * DECK.size[1]];   // where a girl stands to work a pan (right of the stove)
+  const simPanSpot = (i) => [345, DECK.pans[i][1] * DECK.size[1] + (i ? 28 : -28)];   // (Simmy: a step further, beside her)
+  const dishSlot = (n) => { const T = DECK.block.table, [SW, SH] = DECK.size, c = n % 4, r = Math.floor(n / 4) % 2; return [lerp(T[0], T[2], (c + 0.5) / 4) * SW, lerp(T[1], T[3], r ? 0.72 : 0.34) * SH]; };
+  const noFish = () => SHIP.tub <= 0 && !SHIP.pans.some((p) => p.fish || p.fire) && SHIP.carry.g !== "fish" && SHIP.carry.s !== "fish";
+  function cookSmoke(x, y, n, dark, fire) {
+    for (let i = 0; i < n && SHIP_FX.length < 160; i++) {
+      const spark = fire && Math.random() < 0.35, life = spark ? 0.6 : 1.1 + Math.random() * 0.6;
+      SHIP_FX.push({ x: x + (Math.random() - 0.5) * 30, y: y - 10, vx: (Math.random() - 0.5) * 14 - 6, vy: spark ? -70 - Math.random() * 40 : -26 - Math.random() * 14, smoke: true,
+        r: spark ? 1.5 + Math.random() : 5 + Math.random() * 4, vr: spark ? 0 : 9, life, max: life, col: spark ? "#ffb347" : dark ? "#4a4550" : "#e9e6ee" });
+    }
+  }
+  // flip pan i: on gold its other side cooks next (and the spice it will want is picked); a raw fish only makes the pan shake
+  function flipPan(i) {
+    const pan = SHIP.pans[i];
+    if (!pan || !pan.fish || pan.fire || pan.side !== 0) return false;
+    if (pan.cook < DONE * 0.8) { PANX[i].shake = SHAKE_T; play("land"); return false; }   // not done yet ("chưa chín")
+    SHIP.pans[i] = Object.assign({}, pan, { side: 1, cook: 0, spice: soloShip() ? pickSpice() : null, want: null });   // (together: picked when it is gold)
+    PANX[i].flipA = FLIP_T; PANX[i].ready = 0; play("swoosh"); play("fire");
+    return true;
+  }
+  // the pans cook (this page's SHIP); sounds, smoke and Simmy's hints as they turn gold or catch fire; alone, Simmy flips; the bucket refills
+  // (together the guest's page does not cook: its pans are the host's (syncShip); it only shows what changed since its last frame)
+  function cookTick(dt) {
+    const guest = NET.role === "guest", rate = cookRate(), solo = soloShip() && !guest;
+    const before = guest ? COOK.prev || SHIP.pans : SHIP.pans;
+    if (!guest) SHIP.pans = SHIP.pans.map((pan) => panStep(pan, dt, rate));
+    SHIP.pans.forEach((b, i) => panFx(i, before[i] || b, b, dt, guest));
+    COOK.prev = SHIP.pans;
+    // alone: Simmy walks to a gold pan and flips it once it has waited SIM_FLIP_WAIT s (not more often than every SIM_FLIP_GAP s)
+    COOK.simFlipT += dt;
+    if (!solo) COOK.sim = null;
+    else {
+      if (COOK.sim !== null && !PANX[COOK.sim].ready) COOK.sim = null;   // (a girl flipped it first)
+      if (COOK.sim === null) { let best = -1; PANX.forEach((x, i) => { if (x.ready > 0 && (best < 0 || x.ready > PANX[best].ready)) best = i; }); if (best >= 0) COOK.sim = best; }
+      if (COOK.sim !== null && !SIM.net) {
+        const i = COOK.sim, at = simPanSpot(i);
+        if (Math.hypot(SIM.x - at[0], SIM.y - at[1]) < 4 && PANX[i].ready >= SIM_FLIP_WAIT && COOK.simFlipT >= SIM_FLIP_GAP && flipPan(i)) { COOK.simFlipT = 0; COOK.sim = null; }
+      }
+    }
+    if (SHIP.bucketAt === "fill" && (COOK.bucketT -= dt) <= 0 && !guest) SHIP.bucketAt = "spot";   // (the guest's page only shows it filling)
+    // no fish in the tub and none cooking: Simmy sends them to the rails (again after a while if nobody goes)
+    if (SHIP.ph === "cook" && NET.role !== "guest" && noFish()) { if ((COOK.noFishT += dt) >= NOFISH_GAP && !SHIP.hint) { showHint("hintNoFish"); COOK.noFishT = 0; } }
+    else COOK.noFishT = NOFISH_GAP;
+  }
+  // a pan from one frame to the next (pan -> b): sounds, smoke and Simmy's hints as it turns gold or catches fire; on the guest's page also
+  // what the host's page did to it (a flip, the water, a fish put in, a dish done), which the host's page shows in shipAct
+  function panFx(i, pan, b, dt, guest) {
+    const x = PANX[i], [px, py] = panAt(i);
+    x.shake = Math.max(0, x.shake - dt); x.flipA = Math.max(0, x.flipA - dt);
+    if (b.fire && !pan.fire) { play("fire"); play("web"); cookSmoke(px, py, 14, true, true); if (!guest) showHint("hintFire"); COOK.flipHelp = 0; }
+    if (b.fish && b.side === 0 && b.cook >= DONE && pan.cook < DONE) { play("ready"); if (!guest && COOK.flipHelp++ < 3) showHint("hintFlip"); }
+    if (b.want && !pan.want) play("pop");
+    if (guest && pan !== b) {
+      if (pan.fish && b.fish && pan.side === 0 && b.side === 1) { x.flipA = FLIP_T; x.ready = 0; play("swoosh"); play("fire"); }
+      if (pan.fire && !b.fire) { cookSmoke(px, py, 16, false, false); shipSplash(px, py, 12, true); play("swoosh"); play("web"); }
+      if (!pan.fish && b.fish) play("fire");
+      if (pan.want && !b.fish && !b.fire) {
+        const [tx, ty] = dishSlot(Math.max(0, SHIP.dishes - 1));
+        JUMPS.push({ fr: "sh_dish", x0: px, y0: py, x1: tx, y1: ty, t: 0, T: 0.9, h: 90, dish: true }); play("candy"); play("star");
+      }
+    }
+    x.ready = b.fish && !b.fire && b.side === 0 && b.cook >= DONE ? x.ready + dt : 0;
+    // smoke: a wisp once it is past gold (it starts to burn), thick with sparks while the pan burns
+    const hot = b.fire ? 0.07 : b.fish && b.cook > DONE + 1 ? 0.3 : 0;
+    if (hot && (x.smokeT -= dt) <= 0) { x.smokeT = hot; cookSmoke(px, py, 1, b.fire || b.cook > DONE + 2.5, b.fire); }
+  }
+  // Simmy's hints wait while her line for the phase (10 / 11) still shows (but a big fish by the boat can't wait for the net);
+  // a waiting hint that is over by then (the bite went, the fish calmed down...) is dropped
+  const HINT_VALID = {
+    hintBite: () => !!(SHIP.lines[hero] && SHIP.lines[hero].st === "bite"),
+    hintFight: () => !!(SHIP.lines[hero] && SHIP.lines[hero].st === "hooked" && SHIP.lines[hero].fight),
+    hintFlip: () => SHIP.pans.some((p) => p.fish && !p.fire && p.side === 0 && p.cook >= DONE),
+    hintFire: () => SHIP.pans.some((p) => p.fire),
+    hintNoFish: () => noFish(),
+  };
+  const storyOn = () => { const sl = SAY_ON[SHIP.ph]; return !!sl && (SHIP.t < sl[1] || !!sayAt(SAYS[sl[0]], SHIP.t - sl[1])); };
+  function hintTick(dt) {
+    const h = SHIP.hint; if (!h) return;
+    h.wait = !/^hintBig/.test(h.key) && storyOn();
+    if (h.wait) { h.t = 0; h.held = true; return; }
+    if (h.held) { h.held = false; const v = HINT_VALID[h.key]; if (v && !v()) { SHIP.hint = null; return; } }
+    h.t += dt;
+    const q = SAYS[h.key]; if (!q || (h.t > 0.5 && !sayAt(q, h.t))) SHIP.hint = null;
+  }
+  // ---- the test bot on the deck (API.autopilot) plays like a girl, with the same moves and the same button. Fishing: near casts, a strike
+  // on the bite, reeling while the fish is calm and letting go while it fights. Cooking, in order: add the spice a pan wants (fetching it
+  // early once a fish is flipped when alone; together it waits by the crates), flip a gold pan, put out a fire, fill an empty pan (only
+  // while the other one is on its second side, so their spices are not wanted at once); out of fish it goes fishing. It walks a path found on a grid over the open deck.
+  const BOT = { key: null, path: [], best: 1e9, stuck: 0 };
+  const BOT_SPOT = { tub: [735, 290], salt: [945, 323], lemon: [1005, 419], herbs: [945, 517], bucket: [365, 603], drop: [450, 520], crates: [930, 420] };
+  const BOT_CELL = 16;
+  let botGrid = null;
+  function botPath(from, to) {
+    const [SW, SH] = DECK.size, nx = Math.ceil(SW / BOT_CELL), ny = Math.ceil(SH / BOT_CELL), C = BOT_CELL;
+    if (!botGrid) {
+      botGrid = [];
+      for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const x = (i + 0.5) * C, y = (j + 0.5) * C; botGrid.push([[0, 0], [9, 0], [-9, 0], [0, 9], [0, -9]].every(([a, b]) => deckFree(x + a, y + b)) ? 1 : 0); }
+    }
+    const cellOf = (p) => clamp(Math.floor(p[1] / C), 0, ny - 1) * nx + clamp(Math.floor(p[0] / C), 0, nx - 1);
+    const s0 = cellOf(from), g0 = cellOf(to), prev = new Map([[s0, -1]]), q = [s0];
+    let end = -1, bd = 1e9;
+    for (let qi = 0; qi < q.length; qi++) {
+      const c = q[qi], ci = c % nx, cj = (c - ci) / nx;
+      const d = Math.hypot((ci + 0.5) * C - to[0], (cj + 0.5) * C - to[1]); if (d < bd) { bd = d; end = c; }
+      if (c === g0) break;
+      for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+        const i2 = ci + a, j2 = cj + b, n = j2 * nx + i2;
+        if (i2 < 0 || j2 < 0 || i2 >= nx || j2 >= ny || prev.has(n) || !botGrid[n]) continue;
+        if (a && b && (!botGrid[cj * nx + i2] || !botGrid[j2 * nx + ci])) continue;   // (no cutting corners)
+        prev.set(n, c); q.push(n);
+      }
+    }
+    const path = [to];
+    for (let c = end; c >= 0 && c !== s0; c = prev.get(c)) { const ci = c % nx; path.unshift([(ci + 0.5) * C, ((c - ci) / nx + 0.5) * C]); }
+    return path;
+  }
+  const botClear = (a, b) => { const n = Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 6); for (let k = 1; k <= n; k++) { const f = k / n; if (!deckFree(lerp(a[0], b[0], f), lerp(a[1], b[1], f))) return false; } return true; };
+  // where the bot goes next and what it presses there ({to, act}; act null: it waits there)
+  function botPlan() {
+    const c = SHIP.carry[hero], pans = SHIP.pans, go = (to, act) => ({ to, act });
+    const o = hero === "g" ? "s" : "g", bp = SHIP.big && SHIP.big.k === o && !SHIP.big.by && posOf(o);   // together: her sister's big fish by the boat: bring the net
+    if (bp) return go([clamp(bp[0] + (bp[0] > 620 ? -60 : 60), 120, 900), bp[1] + (bp[1] < 416 ? 40 : -40)], "net");
+    if (SHIP.ph === "cook") {
+      const fire = pans.findIndex((p) => p.fire), want = pans.findIndex((p) => p.want);
+      if (want >= 0 && c === pans[want].want) return go(panSpot(want), "spice");
+      const gold = pans.findIndex((p) => p.fish && !p.fire && p.side === 0 && p.cook >= DONE);
+      if (gold >= 0) return go(panSpot(gold), "flip");
+      const next = pans.findIndex((p) => p.fish && p.side === 1 && c && p.spice === c);
+      if (next >= 0) return go(panSpot(next), null);   // (the spice it will want, in hand: wait by it)
+      if (c === "bucket") return fire >= 0 ? go(panSpot(fire), "water") : go(BOT_SPOT.drop, "drop");
+      if (c && c !== "fish") return go(BOT_SPOT.drop, "drop");
+      if (!c && want >= 0) return go(BOT_SPOT[pans[want].want], "take");
+      const early = pans.findIndex((p) => p.fish && p.side === 1 && p.spice);
+      if (!c && early >= 0) return go(BOT_SPOT[pans[early].spice], "take");
+      if (!c && pans.some((p) => p.fish && p.side === 1)) return go(BOT_SPOT.crates, null);   // (together: wait by the crates for the spice)
+      if (!c && fire >= 0 && SHIP.bucketAt === "spot") return go(BOT_SPOT.bucket, "take");
+      const free = pans.findIndex((p, i) => !p.fish && !p.fire && (!pans[1 - i].fish || pans[1 - i].side === 1));
+      if (c === "fish") return free >= 0 ? go(panSpot(free), "put") : go(panSpot(0), null);
+      if (free >= 0 && SHIP.tub > 0) return go(BOT_SPOT.tub, "take");
+      if (SHIP.tub > 0 || pans.some((p) => p.fish || p.fire)) return go(panSpot(0), null);
+    }
+    if (c) return go(BOT_SPOT.drop, "drop");
+    let best = 0, bd = 1e9;   // the nearest rail spot
+    DECK.rail.forEach((r, i) => { const d = Math.hypot(r[0] * DECK.size[0] - P.x, r[1] * DECK.size[1] - P.y); if (d < bd) { bd = d; best = i; } });
+    const r = DECK.rail[best];
+    return go([r[0] * DECK.size[0], r[1] * DECK.size[1] + (topRail(best) ? 12 : -12)], "cast");
+  }
+  // this frame's moves for the bot: {mv, held, press}
+  function shipBot(dt) {
+    const out = { mv: [0, 0], held: false, press: false }, L = SHIP.lines[hero];
+    const busy = SHIP.ph === "cook" && SHIP.pans.some((p) => p.want || p.fire || (p.fish && p.side === 0 && p.cook >= DONE));
+    if (L && !(busy && (L.st === "cast" || L.st === "wait"))) {   // (cooking calls: a line that only waits is left)
+      if (L.st === "bite" && L.t > 0.25) out.press = out.held = true;   // (a girl's reaction time)
+      else if (L.st === "hooked") out.held = !L.fight;
+      return out;
+    }
+    const plan = botPlan(), act = buttonAction(hero);
+    if (plan.act === "net" && act === "net") { out.press = true; return out; }   // (in reach of her sister already)
+    if (plan.act === "cast" && castWind !== null) { out.held = castWind < 0.15; return out; }   // (a short wind-up: a near cast)
+    if (plan.act === "drop" && act === "drop") { out.press = true; return out; }
+    const key = plan.to[0].toFixed(0) + "," + plan.to[1].toFixed(0), d = Math.hypot(plan.to[0] - P.x, plan.to[1] - P.y);
+    if (BOT.key !== key || BOT.stuck > 1.5) { BOT.key = key; BOT.path = botPath([P.x, P.y], plan.to); BOT.best = d; BOT.stuck = 0; }
+    if (d < BOT.best - 2) { BOT.best = d; BOT.stuck = 0; } else BOT.stuck += dt;
+    if (d < 12) {   // there: press when the button does what it came for
+      BOT.stuck = 0;
+      if (plan.act && act === plan.act) { out.press = true; out.held = plan.act === "cast"; }
+      return out;
+    }
+    while (BOT.path.length > 1 && (Math.hypot(BOT.path[0][0] - P.x, BOT.path[0][1] - P.y) < 8 || botClear([P.x, P.y], BOT.path[1]))) BOT.path.shift();
+    const t = BOT.path[0] || plan.to, dx = t[0] - P.x, dy = t[1] - P.y, dd = Math.hypot(dx, dy) || 1, k = BOT.path.length > 1 ? 1 : clamp(dd / 40, 0.35, 1);
+    out.mv = [dx / dd * k, dy / dd * k];
+    return out;
+  }
+  // can her feet stand at (x, y): on the open deck and not in an object
+  function deckFree(x, y) {
+    const [SW, SH] = DECK.size;
+    if (!DECK.walk.some((r) => x >= r[0] * SW && x <= r[2] * SW && y >= r[1] * SH && y <= r[3] * SH)) return false;
+    for (const r of Object.values(DECK.block)) if (x > r[0] * SW - FOOT && x < r[2] * SW + FOOT && y > r[1] * SH - FOOT && y < r[3] * SH + FOOT) return false;
+    return true;
+  }
+  // the usual movement on the deck: she slides along the rail and around the objects
+  function deckMove(dt, mv) {
+    const [ax, ay] = mv || readMove(true), acc = 3200 * DECK_K * dt;
+    P.vx += clamp(ax * SHIP_SP - P.vx, -acc, acc); P.vy += clamp(ay * SHIP_SP - P.vy, -acc, acc);
+    const nx = P.x + P.vx * dt, ny = P.y + P.vy * dt;
+    if (deckFree(nx, ny)) { P.x = nx; P.y = ny; }
+    else if (deckFree(nx, P.y)) { P.x = nx; P.vy = 0; }
+    else if (deckFree(P.x, ny)) { P.y = ny; P.vx = 0; }
+    else { P.vx = 0; P.vy = 0; }
+    const v = Math.hypot(P.vx, P.vy);
+    P.moving = v > 20 && !!(ax || ay);
+    if (P.moving) { P.dist += v / DECK_K * dt; setFace(P, P.vx, P.vy); }   // (dist in world units: the walk cycle keeps its pace)
+  }
+  // the button shows what it will do: the action's icon on it, dimmed when there is nothing to do
+  const bIco = document.createElement("canvas"); bIco.width = bIco.height = 128; bIco.className = "ico"; $("bUlt").append(bIco);
+  function showAct(act) {
+    if (act === shownAct) return;
+    shownAct = act;
+    const b = $("bUlt"); b.dataset.act = act || ""; b.classList.toggle("off", !act);
+    const g = bIco.getContext("2d"), f = act && FR[ACT_ICON[act]];
+    g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, 128, 128);
+    if (f) icon(g, ACT_ICON[act], 64, 64, 120 * f.h / Math.max(f.w, f.h));
+  }
+  function shipTick(dt) {
+    G.t += dt; G.frame++; SHIP.t += dt;
+    const guest = NET.role === "guest";
+    if (NET.role) netFrame(dt);
+    if (guest) {   // follow the host's ship (syncShip); once its world is in Màn 2, go there too
+      const w = NET.pp && NET.pp.w;
+      if (w && num(w.lv) > G.level) return endShip();
+      syncShip();
+    }
+    if (String($("stars").textContent) !== String(G.stars)) $("stars").textContent = G.stars;
+    const ph = SHIP.ph;
+    if (ph !== "fish" && ph !== "cook") IN.ultPressed = false;   // (the button only acts on deck: a press in the films is dropped)
+    if (ph === "dock") {   // (a guest waits at the end of the film until the host is on deck: syncShip takes her there)
+      if (guest) { if (SHIP.t >= dockEnd()) { SHIP.t = dockEnd(); $("skipFilm").hidden = true; } return; }   // (held: "Chờ chị / em / bạn lên tàu…", nothing to skip)
+      if (SHIP.t >= dockEnd() || API.autopilot) shipPhase("fish");
+      return;
+    }
+    if (ph === "arrive") {
+      if (SHIP.t >= arriveEnd()) { if (guest) SHIP.t = arriveEnd(); else endShip(); }   // (a guest waits on the island until the host's world moves on)
+      return;
+    }
+    // the test bot plays the deck like a girl: it moves her and presses / holds the one button (keys or the joystick come first)
+    let mv = readMove(true);
+    if (API.autopilot && !mv[0] && !mv[1]) { const b = shipBot(dt); mv = b.mv; IN.ultHeld = b.held; if (b.press) IN.ultPressed = true; }
+    // with a line out she stays at the rail; once she has walked off her rail spot while it only waits, the line comes in (not once a fish is on it)
+    const L = SHIP.lines[hero];
+    if (L && (L.st === "hooked" || L.st === "near")) { P.vx = P.vy = 0; P.moving = false; }
+    else {
+      deckMove(dt, mv);
+      const s = L && stationAt(P.x, P.y, hero), r = L && DECK.rail[L.rail];
+      const still = s && ((s.kind === "rail" && s.i === L.rail) || (s.kind === "partner" && r && Math.hypot(P.x - r[0] * DECK.size[0], P.y - r[1] * DECK.size[1]) <= REACH));
+      if (L && !still) { const [fx, fy] = lineGeo(L, P.x, P.y).at; shipRing(fx, fy, 3, 0.5); SHIP.lines[hero] = null; play("swoosh"); }
+    }
+    cookTick(dt);
+    landedFromPresence();
+    partnerLine();
+    const act = buttonAction(hero); showAct(act);
+    const pressed = IN.ultPressed; IN.ultPressed = false;
+    fishTick(dt, act, pressed);
+    hintTick(dt);
+    if (!guest) {
+      if (ph === "fish" && SHIP.fish >= FISH_GOAL) shipPhase("cook");
+      else if (ph === "cook" && SHIP.dishes >= DISH_GOAL) shipPhase("arrive");
+    }
+  }
+  // ---- the ship together (two iPads). The host's page owns SHIP (fish count, tub, who carries what, pans, fires, bucket, dishes, big fish,
+  // phase) and sends it in its world as `w.sp` (shipState); the guest's page follows it (syncShip) and asks for each of her button's actions
+  // with a "ship" event ({op: "act", k, action, arg, at, st}: at = where she stood, st = the pan as she saw it), which the host applies to
+  // SHIP as it is now through shipAct (a late flip for a fish that has been flipped, burnt or replaced since does nothing). Each girl's line
+  // is her own page's: it goes in her presence (girlState slot 20, lineSlot) and her sister's page draws it (partnerLine) and can net it.
+  const SHIPX = { putN: 0, lineN: 0, seen: null, q: null, done: null, called: null, hostHint: null, sent: null, landed: new Set(), mine: [] };   // (mine: the guest's last landed lines [id, size], in her presence)
+  const HOST_ACTS = new Set(["take", "put", "drop", "flip", "spice", "water", "net", "land"]);   // (cast, strike and reel are her own line's)
+  const LINE_ST = ["cast", "wait", "nibble", "bite", "hooked", "near", "landed", "lost"];
+  const CARRY_IX = [null, "fish", "salt", "lemon", "herbs", "bucket"], BUCKET_IX = ["spot", "fill", "g", "s"];
+  const HINT_SHARED = ["hintFlip", "hintFire", "hintNoFish"];   // (Simmy says these on both pages as the host's page says them; the others each page works out)
+  // the host's SHIP, compact: [ph, t, fish, dishes, tub, carry g, carry s, pans [fish, side, cook, spice, want, fire, n], bucketAt, big [k, id, by], hint [key, t]]
+  function shipState() {
+    const S = SHIP, ci = (c) => Math.max(0, CARRY_IX.indexOf(c)), b = S.big, h = S.hint;
+    return [SHIP_PH.indexOf(S.ph), Math.round(S.t * 10), S.fish, S.dishes, S.tub, ci(S.carry.g), ci(S.carry.s),
+      S.pans.map((p) => [p.fish ? 1 : 0, p.side, Math.round(p.cook * 20), SPICES.indexOf(p.spice) + 1, SPICES.indexOf(p.want) + 1, p.fire ? 1 : 0, p.n || 0]),
+      Math.max(0, BUCKET_IX.indexOf(S.bucketAt)),
+      b ? [b.k === "s" ? 1 : 0, b.id || 0, b.by === "g" ? 1 : b.by === "s" ? 2 : 0] : 0,
+      h && HINT_SHARED.includes(h.key) ? [HINT_SHARED.indexOf(h.key), Math.round(h.t * 10)] : 0];
+  }
+  // the guest's page follows the host's ship: its phase (only forward), clock, counts, hands, pans, bucket, Simmy's shared hints, stars
+  function syncShip() {
+    const w = NET.pp && NET.pp.w, a = w && w.sp;
+    if (!Array.isArray(a) || a === SHIPX.seen) return;
+    SHIPX.seen = a;
+    const ph = SHIP_PH[num(a[0])]; if (!ph) return;
+    if (SHIP_PH.indexOf(ph) > SHIP_PH.indexOf(SHIP.ph)) shipPhase(ph);
+    if (ph !== SHIP.ph) return;
+    const t = num(a[1]) / 10; if (SHIP.ph === "dock" ? t > SHIP.t + 0.3 : Math.abs(SHIP.t - t) > 0.3) SHIP.t = t;   // (on the dock only forward: her skip holds her at the end)
+    SHIP.fish = Math.max(0, num(a[2])); SHIP.dishes = Math.max(0, num(a[3])); SHIP.tub = Math.max(0, num(a[4]));
+    const had = SHIP.carry[hero];
+    SHIP.carry.g = CARRY_IX[num(a[5])] || null; SHIP.carry.s = CARRY_IX[num(a[6])] || null;
+    if (SHIP.carry[hero] && SHIP.carry[hero] !== had) play("pop");   // (what she asked for is in her hands)
+    if (Array.isArray(a[7])) SHIP.pans = SHIP.pans.map((p, i) => {
+      const q = a[7][i]; if (!Array.isArray(q)) return p;
+      const v = q.map(num);
+      return { fish: !!v[0], side: v[1] ? 1 : 0, cook: v[2] / 20, spice: SPICES[v[3] - 1] || null, want: SPICES[v[4] - 1] || null, fire: !!v[5], n: v[6] };
+    });
+    const bk = BUCKET_IX[num(a[8])] || "spot"; if (bk === "fill" && SHIP.bucketAt !== "fill") COOK.bucketT = BUCKET_FILL; SHIP.bucketAt = bk;
+    // her own big fish, netted by her sister (the host's page says so; the "net" event says it too)
+    const b = a[9], L = SHIP.lines[hero];
+    if (Array.isArray(b) && (b[0] ? "s" : "g") === hero && b[2] && L && L.id === num(b[1])) netMine(L, b[2] === 2 ? "s" : "g");
+    const h = a[10], hk = Array.isArray(h) ? HINT_SHARED[num(h[0])] : null;
+    if (hk && hk !== SHIPX.hostHint && !(SHIP.hint && /^hintBig/.test(SHIP.hint.key))) showHint(hk);
+    SHIPX.hostHint = hk || null;
+    G.stars = Math.max(0, Math.floor(num(w.st)));
+  }
+  function netMine(L, by) { if (L.st === "near" && !L.netted) L.netted = by; }
+  // the guest's page asks the host's page to do her action (a raw fish's shake shows here at once); the same ask is not sent twice in 0.3 s
+  function sendAct(action, arg, extra) {
+    const s = stationAt(P.x, P.y, hero), pan = s && s.kind === "pan" ? SHIP.pans[s.i] : null;
+    const key = action + (s ? s.kind + (s.i || 0) + (s.spice || "") : "");
+    if (action !== "land" && SHIPX.sent && SHIPX.sent.key === key && G.t - SHIPX.sent.t < 0.3) return false;
+    SHIPX.sent = { key, t: G.t };
+    if (action === "flip" && pan && pan.fish && !pan.fire && pan.side === 0 && pan.cook < DONE * 0.8) { PANX[s.i].shake = SHAKE_T; play("land"); }
+    netEmit("ship", Object.assign({ op: "act", k: hero, action, arg: arg === undefined ? null : arg, at: [Math.round(P.x), Math.round(P.y)],
+      st: pan ? [pan.n || 0, pan.side, pan.fire ? 1 : 0] : null }, extra || {}));
+    return true;
+  }
+  // this page's girl does her button's action: on the guest's page the host's page does it (except her own line's)
+  function doAct(act, arg) { return NET.role === "guest" && HOST_ACTS.has(act) ? sendAct(act, arg) : shipAct(hero, act, arg); }
+  // the other page's "ship" events: the guest's actions (to the host), her line netted (to the guest)
+  function onShipMsg(d) {
+    if (!onShip()) return;
+    if (NET.role === "host" && d.op === "act") return hostAct(d);
+    if (NET.role === "guest" && d.op === "net" && (d.k === "s" ? "s" : "g") === hero) { const L = SHIP.lines[hero]; if (L && L.id === num(d.id)) netMine(L, d.by === "s" ? "s" : "g"); }
+  }
+  function hostAct(d) {
+    if (!Q || !Q.ship || (SHIP.ph !== "fish" && SHIP.ph !== "cook")) return;
+    const k = Q.hero, action = String(d.action || "");
+    if (k === hero || !HOST_ACTS.has(action)) return;
+    if (action === "land") return landOnce(k, d.id, d.arg);   // her fish into the tub, once per line
+    const [SW, SH] = DECK.size, at = Array.isArray(d.at) ? [clamp(num(d.at[0]), 0, SW), clamp(num(d.at[1]), 0, SH)] : null;
+    // a flip or a spice is for the fish she saw (its n) on the side she saw: if that pan has changed since (flipped, burnt, another fish), nothing
+    const s = at && stationAt(at[0], at[1], k), st = Array.isArray(d.st) ? d.st.map(num) : null;
+    if ((action === "flip" || action === "spice") && s && s.kind === "pan") {
+      const pan = SHIP.pans[s.i];
+      if (!st || (pan.n || 0) !== st[0] || pan.side !== st[1] || pan.fire) return;
+    }
+    shipAct(k, action, d.arg, at);
+  }
+  // the guest's fish counted on the host's page once per line id: from her "land" event, or (that event lost, e.g. in a redial) from the
+  // landed lines her presence carries (girlState slot 21: [[id, size 1..3], ...], her last ten)
+  function landOnce(k, id, size) {
+    const key = k + ":" + num(id); if (SHIPX.landed.has(key)) return false;
+    SHIPX.landed.add(key); return shipAct(k, "land", size === "b" || size === "m" ? size : "s");
+  }
+  function landedFromPresence() {
+    if (NET.role !== "host" || !Q || !Q.ship || !Array.isArray(Q.landed) || (SHIP.ph !== "fish" && SHIP.ph !== "cook")) return;
+    for (const e of Q.landed) if (Array.isArray(e)) landOnce(Q.hero, e[0], "smb"[num(e[1]) - 1]);
+  }
+  // her line in her presence: [st, float x, float y, dist, fight, size, rail, tension, t, id, netted] (the landed / lost line a moment longer)
+  function lineSlot() {
+    const L = onShip() && (SHIP.lines[hero] || (SHIPX.done && SHIPX.done.L)); if (!L) return 0;
+    const [fx, fy] = lineGeo(L, P.x, P.y).at;
+    return [LINE_ST.indexOf(L.st), fx | 0, fy | 0, Math.round(L.dist * 100), L.fight ? 1 : 0, L.size ? "smb".indexOf(L.size) + 1 : 0, L.rail | 0,
+      Math.round(L.tension * 100), Math.round(L.t * 10), L.id | 0, L.netted ? 1 : 0];
+  }
+  function readLine(a, k) {
+    const st = Array.isArray(a) && LINE_ST[num(a[0])]; if (!st) return null;
+    return { k, st, x: num(a[1]), y: num(a[2]), dist: clamp(num(a[3]) / 100, 0, 1), fight: !!a[4], size: "smb"[num(a[5]) - 1] || null,
+      rail: clamp(Math.floor(num(a[6])), 0, DECK.rail.length - 1), tension: clamp(num(a[7]) / 100, 0, 1), t: num(a[8]) / 10, id: num(a[9]), netted: a[10] ? "x" : null, power: 0 };
+  }
+  // her sister's line on this page (from her presence): drawn, its splashes, her big fish by the boat (this girl's button nets it)
+  function partnerLine() {
+    const o = hero === "g" ? "s" : "g";
+    if (soloShip()) { if (SHIP.big && SHIP.big.k === o) SHIP.big = null; SHIPX.q = null; return; }
+    const q = Q.line, a = SHIPX.q;
+    if (q && (!a || a.id !== q.id || a.st !== q.st)) partnerFx(o, a && a.id === q.id ? a.st : null, q);
+    SHIPX.q = q;
+    const live = q && q.st !== "landed" && q.st !== "lost", big = SHIP.big;
+    if (live && q.st === "near") { if (!big || big.k !== hero) SHIP.big = { k: o, t: q.t, id: q.id, by: big && big.k === o && big.id === q.id ? big.by : null }; }
+    else if (big && big.k === o) SHIP.big = null;
+    const nb = SHIP.big && SHIP.big.k === o ? SHIP.big.by : null;
+    SHIP.lines[o] = live ? Object.assign({}, q, { t: q.t + Math.min(Q.age || 0, 0.5), netted: q.netted || nb }) : null;
+  }
+  function partnerFx(k, was, b) {
+    const fx = b.x, fy = b.y, [SW, SH] = DECK.size;
+    if (b.st === "wait" && was === "cast") { shipRing(fx, fy, 4, 0.8); shipSplash(fx, fy, 4); }
+    else if (b.st === "bite") { shipRing(fx, fy, 5, 0.9); shipSplash(fx, fy, 6); }
+    else if (b.st === "hooked" && was !== "hooked") shipSplash(fx, fy, 10, true);
+    else if (b.st === "near" && SHIPX.called !== k + b.id) { SHIPX.called = k + b.id; play("ready"); shipSplash(fx, fy, 12, true); showHint(k === "g" ? "hintBigG" : "hintBigS"); }
+    else if (b.st === "landed") { JUMPS.push({ fr: "sh_fish_" + (b.size || "s"), x0: fx, y0: fy, x1: DECK.tub[0] * SW, y1: DECK.tub[1] * SH, t: 0, T: 0.8, h: 160, tub: true }); shipSplash(fx, fy, 10, true); }
+    else if (b.st === "lost") { shipSplash(fx, fy, 10, true); shipRing(fx, fy, 6, 0.9); }
+  }
+  // the link dropped (or her sister left) on the ship: this page goes on alone with the ship as it is; what her sister held goes back
+  function shipSolo() {
+    const o = hero === "g" ? "s" : "g", c = SHIP.carry[o];
+    if (c === "fish") SHIP.tub++;
+    if (SHIP.bucketAt === o) SHIP.bucketAt = "spot";
+    SHIP.carry[o] = null; SHIP.lines[o] = null;
+    if (SHIP.big && SHIP.big.k === o) SHIP.big = null;
+    COOK.prev = null; SHIPX.q = null; SHIPX.seen = null;
+  }
+  function drawShip(g, W, H) {
+    g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1;
+    if (SHIP.ph === "dock") return drawDock(g, W, H, SHIP.t);
+    const ta = SHIP.ph === "arrive" ? SHIP.t - arrTalk() : -1;
+    if (ta < 0.6) drawDeck(g, W, H);
+    if (ta >= 0) drawArrival(g, W, H, ta);
+  }
+  // one of the team on the deck: her shadow, her frames by facing (drawHeroAt / drawSimmyAt), what she carries
+  function drawDeckPerson(g, k, outfit, o, x, y, carry) {
+    const [sx, sy] = deckToScreen(x, y), th = (CHAR_H[k] || 400) * DECK_K * screenScale();
+    g.fillStyle = "rgba(0,0,0,.25)"; g.beginPath(); g.ellipse(sx, sy, th * 0.2, th * 0.06, 0, 0, TAU); g.fill();
+    if (k === "simmy") drawSimmyAt(g, sx, sy, th, G.t, outfit, o, false);
+    else drawHeroAt(g, k, outfit, o, sx, sy, th, true);
+    const cf = carry && FR[CARRY_FR[carry]];
+    if (cf) { const h = th * (carry === "fish" ? 0.16 : carry === "bucket" || carry === "net" ? 0.22 : 0.15), kk = h / cf.h, sd = o.flip ? -1 : 1; g.drawImage(cf.img, cf.sx, cf.sy, cf.w, cf.h, sx + sd * th * 0.16 - cf.w * kk / 2, sy - th * 0.42 - h / 2, cf.w * kk, h); }
+    if (API.drawn) API.drawn.push([k, x, y, k === "simmy" ? "" : heroFrame4({ char: k, outfit: hasOutfit(k, outfit) ? outfit : "base", face: o.face, flip: o.flip, moving: o.moving, dist: o.dist, winT: o.winT })]);
+    return [sx, sy, th];
+  }
+  function drawDeck(g, W, H) {
+    const img = scene("deck"), v = deckView(), [SW, SH] = DECK.size;
+    g.fillStyle = "#1d8fa0"; g.fillRect(0, 0, W, H);
+    if (img) {
+      cover(g, img, W, H);   // the painted sea around the ship, a little darker, under the whole picture
+      g.fillStyle = "rgba(6,30,48,.35)"; g.fillRect(0, 0, W, H);
+      g.drawImage(img, v.ox, v.oy, SW * v.s, SH * v.s);
+    }
+    // a light shimmer on the water
+    g.save(); g.globalCompositeOperation = "lighter";
+    for (let i = 0; i < 26; i++) {
+      const u = ((i * 0.618034) % 1) * 1.1 - 0.05, w = ((i * 0.381966 * 7) % 1) * 1.1 - 0.05;
+      if (u > 0.04 && u < 0.97 && w > 0.1 && w < 0.9) continue;   // (not on the ship)
+      const a = 0.22 * Math.max(0, Math.sin(G.t * 1.3 + i * 2.1)), [x, y] = deckToScreen((u + 0.01 * Math.sin(G.t * 0.7 + i)) * SW, w * SH);
+      if (a <= 0.01) continue;
+      g.fillStyle = `rgba(255,255,255,${a})`; g.beginPath(); g.ellipse(x, y, 16 * v.s, 3 * v.s, 0, 0, TAU); g.fill();
+    }
+    g.restore();
+    drawCook(g, SHIP.ph === "arrive");   // (on arrival only the bucket and the dishes: the stove is put out)
+    // the team, sorted by the y of their feet
+    const cheer = SHIP.ph === "arrive" ? 1 : 0, ppl = [];
+    ppl.push({ k: hero, x: P.x, y: P.y, of: P.outfit, o: { face: P.face, flip: P.flip, moving: P.moving, dist: P.dist, winT: cheer }, c: SHIP.carry[hero], me: true });
+    if (NET.role && Q && Q.ship) ppl.push({ k: Q.hero, x: Q.x, y: Q.y, of: Q.of || "base", o: { face: Q.face, flip: Q.flip, moving: Math.hypot(Q.vx || 0, Q.vy || 0) > 20, dist: G.t * 360, winT: cheer }, c: SHIP.carry[Q.hero] });
+    ppl.push({ k: "simmy", x: SIM.x, y: SIM.y, of: SIMMY.outfit, o: { face: SIM.face, flip: SIM.flip, moving: SIM.moving, dist: SIM.dist, winT: cheer }, c: SIM.net ? "net" : null, simmy: true });
+    ppl.sort((a, b) => a.y - b.y);
+    let sim = null;
+    const boxes = ppl.map((p) => { const [bx, by] = deckToScreen(p.x, p.y), bh = (CHAR_H[p.k] || 400) * DECK_K * screenScale(); return [bx - bh * 0.22, by - bh, bx + bh * 0.22, by]; });
+    for (const p of ppl) {
+      const [sx, sy, th] = drawDeckPerson(g, p.k, p.of, p.o, p.x, p.y, p.c);
+      if (p.simmy) sim = [sx, sy - th - 20];
+      if (p.me && shownAct && SHIP.ph !== "arrive") {   // what the button will do, over her head
+        const f = FR[ACT_ICON[shownAct]], ih = H * 0.07, bob = Math.sin(G.t * 4) * ih * 0.06;
+        // (with a line out, or at a top-rail spot where over her head is off the screen: beside her, off the rod and the water)
+        // (and on her right when over her head it would cover her sister or Simmy standing just behind her)
+        const iw = f ? f.w * ih / f.h : ih, oy = sy - th - ih * 0.55, hit = boxes.some((b, i) => ppl[i] !== p && sx + iw / 2 > b[0] && sx - iw / 2 < b[2] && oy + ih / 2 > b[1] && oy - ih / 2 < b[3]);
+        const side = SHIP.lines[hero] || oy - ih / 2 < 4 ? -th * 0.42 - iw / 2 : hit ? th * 0.42 + iw / 2 : 0;
+        if (f) icon(g, ACT_ICON[shownAct], sx + side, sy - th * (side ? 0.62 : 1) - ih * (side ? 0 : 0.55) + bob, ih);
+        if (API.drawn) API.drawn.push([ACT_ICON[shownAct], p.x, p.y]);
+      }
+    }
+    if (SHIP.ph !== "arrive") { drawCookUi(g); drawFishing(g); drawShipFx(g); }
+    // the team's goal: fish (fishing) or plates (cooking) filling up, two rows in the top-left corner over the sea by the stern
+    // (off the fishing ledges and their water, which run along the top and the bottom of the ship)
+    const fill = SHIP.ph === "fish" ? [SHIP.fish, FISH_GOAL, "sh_fish_s"] : SHIP.ph === "cook" ? [SHIP.dishes, DISH_GOAL, "sh_dish"] : null, rf = fill && FR[fill[2]];
+    if (rf) {
+      const cols = Math.ceil(fill[1] / 2), [bx, by] = deckToScreen(0.075 * SW, 0.012 * SH), bw = 0.27 * SW * v.s, bh = 0.1 * SH * v.s;
+      const ih = Math.min(H * 0.045, bh / 2.5, bw / (cols * 1.35 * rf.w / rf.h)), kk = ih / rf.h, iw = rf.w * kk, gap = iw * 0.12, pad = ih * 0.3;
+      g.fillStyle = "rgba(18,14,38,.45)"; rrect(g, bx, by, cols * (iw + gap) - gap + pad * 2, ih * 2 + gap + pad * 2, ih * 0.5); g.fill();
+      for (let i = 0; i < fill[1]; i++) { g.globalAlpha = i < fill[0] ? 1 : 0.28; g.drawImage(rf.img, rf.sx, rf.sy, rf.w, rf.h, bx + pad + (i % cols) * (iw + gap), by + pad + Math.floor(i / cols) * (ih + gap), iw, ih); }
+      g.globalAlpha = 1;
+    }
+    // Simmy's line as a phase starts (a hint while they fish comes first: it is about now)
+    if (SHIP.ph !== "arrive" && drawHint(sim, H)) return;
+    const sl = SAY_ON[SHIP.ph], seq = sl && SAYS[sl[0]], say = seq && sayAt(seq, SHIP.t - sl[1]);
+    if (say && sim) shipBubble(seq[say.i][1], sim[0], sim[1], say.k, Math.round(H * 0.03));
+    else if (SHIP.ph === "cook") drawSimSpice(g, sim, H);
+  }
+  // a frame centred at (x, y) on the screen, h tall (rot: turned, a: alpha)
+  function frAt(g, name, x, y, h, rot, a) {
+    const f = FR[name]; if (!f) return;
+    const k = h / f.h; g.save(); g.globalAlpha = a === undefined ? 1 : a; g.translate(x, y); if (rot) g.rotate(rot);
+    g.drawImage(f.img, f.sx, f.sy, f.w, f.h, -f.w * k / 2, -h / 2, f.w * k, h); g.restore();
+  }
+  // an icon centred at (x, y), h tall; the flip icon gets the cream disc with the gold ring the other button icons have
+  function icon(g, name, x, y, h, a) {
+    if (name === "ic_flip") {
+      g.save(); g.globalAlpha = a === undefined ? 1 : a;
+      g.fillStyle = "#fbf1cf"; g.beginPath(); g.arc(x, y, h * 0.47, 0, TAU); g.fill();
+      g.strokeStyle = "#e3b04b"; g.lineWidth = h * 0.06; g.stroke(); g.restore();
+    }
+    frAt(g, name, x, y, h, 0, a);
+  }
+  // the stove and what is around it: the fish in the pans (raw, gold, charring), a flip, the flames, the bucket on its spot, the dishes on the table
+  function drawCook(g, still) {
+    const sc = deckView().s, [SW, SH] = DECK.size;
+    if (!still) SHIP.pans.forEach((pan, i) => {
+      const x = PANX[i], [px, py] = panAt(i), sh = x.shake > 0 ? Math.sin(x.shake * 70) * 4 * (x.shake / SHAKE_T) : 0, [sx, sy] = deckToScreen(px + sh, py);
+      if (pan.fire) {
+        frAt(g, "sh_burnt", sx, sy, 28 * sc, 0.3, 0.9);   // (what is left of the fish)
+        g.save(); g.globalCompositeOperation = "lighter";   // the fire's warm light
+        const R = 75 * sc, gr = g.createRadialGradient(sx, sy - 18 * sc, 4 * sc, sx, sy - 18 * sc, R);
+        gr.addColorStop(0, `rgba(255,150,40,${0.4 + 0.08 * Math.sin(G.t * 13)})`); gr.addColorStop(1, "rgba(255,110,20,0)");
+        g.fillStyle = gr; g.beginPath(); g.arc(sx, sy - 18 * sc, R, 0, TAU); g.fill(); g.restore();
+        const fl = 1 + 0.07 * Math.sin(G.t * 17 + i * 2) + 0.04 * Math.sin(G.t * 31);
+        frAt(g, "sh_fire", sx, sy - 28 * sc * fl, 72 * sc * fl, 0.06 * Math.sin(G.t * 9 + i));
+        if (API.drawn) API.drawn.push(["sh_fire", px, py]);
+      } else if (pan.fish) {
+        const f = x.flipA > 0 ? 1 - x.flipA / FLIP_T : 0, gold = pan.side === 1 || pan.cook >= DONE * 0.8;
+        const fr = f > 0 && f < 0.5 ? "sh_fish_m" : gold ? "sh_cooked" : "sh_fish_m", h = 30 * sc;   // (a flip: it jumps and turns over, gold side up)
+        const jy = -Math.sin(f * Math.PI) * 34 * sc, k = f > 0 ? Math.max(0.12, Math.abs(Math.cos(f * Math.PI))) : 1;
+        g.save(); g.translate(sx, sy + jy); g.scale(1, k); frAt(g, fr, 0, 0, h, -0.15); 
+        const burn = clamp((pan.cook - DONE) / (burnAt(pan) - DONE), 0, 1);   // past gold it chars
+        if (burn > 0) frAt(g, "sh_burnt", 0, 0, h * 0.95, -0.15, burn * 0.9);
+        g.restore();
+      }
+    });
+    // the bucket on its spot: full (take it) or, just after the water, empty and filling
+    if (SHIP.bucketAt === "spot" || SHIP.bucketAt === "fill") {
+      const B = DECK.block.bucket, [bx, by] = deckToScreen((B[0] + B[2]) / 2 * SW, (B[1] + B[3]) / 2 * SH - 4), full = SHIP.bucketAt === "spot";
+      frAt(g, full ? "sh_bucket_full" : "sh_bucket", bx, by, 62 * sc);
+      if (!full) { const p = 1 - clamp(COOK.bucketT / BUCKET_FILL, 0, 1); frAt(g, "sh_bucket_full", bx, by, 62 * sc, 0, p); }
+      if (API.drawn) API.drawn.push([full ? "sh_bucket_full" : "sh_bucket", bx, by]);
+    }
+    // the dishes on the table (one still sliding over is drawn by the effects)
+    const n = Math.min(DISH_GOAL, SHIP.dishes - (still ? 0 : JUMPS.filter((j) => j.dish).length));   // (on arrival the last one has landed)
+    for (let k = 0; k < n; k++) {
+      const [dx, dy] = dishSlot(k), [x, y] = deckToScreen(dx, dy);
+      frAt(g, "sh_dish", x, y, 26 * sc);
+      if (API.drawn) API.drawn.push(["sh_dish", dx, dy]);
+    }
+  }
+  // over the stove: each pan's cook bar (white raw -> gold done -> black burnt, a gold tick where it is done) and the spice it needs, as a
+  // picture in a bubble (faint while the second side cooks, bobbing once it wants it); pan 0's above it, pan 1's below it
+  const cookCol = (c, B) => {
+    const mix = (a, b, f) => a.map((v, i) => Math.round(v + (b[i] - v) * f));
+    const W = [250, 248, 240], Gd = [255, 196, 40], Bk = [40, 30, 30];
+    const v = c < DONE ? mix(W, Gd, ss(0.3 * DONE, DONE, c)) : mix(Gd, Bk, clamp((c - DONE) / (B - DONE), 0, 1));
+    return `rgb(${v[0]},${v[1]},${v[2]})`;
+  };
+  function drawCookUi(g) {
+    const sc = deckView().s;
+    SHIP.pans.forEach((pan, i) => {
+      const [px, py] = panAt(i), dir = i ? 1 : -1;
+      if (pan.fish) {
+        const [cx, cy] = deckToScreen(px, py + dir * 46), w = 76 * sc, h = 10 * sc, x0 = cx - w / 2;
+        g.fillStyle = "rgba(18,14,38,.6)"; rrect(g, x0 - 4 * sc, cy - h / 2 - 4 * sc, w + 8 * sc, h + 8 * sc, h * 0.9); g.fill();
+        g.fillStyle = "rgba(255,255,255,.22)"; rrect(g, x0, cy - h / 2, w, h, h / 2); g.fill();
+        const B = burnAt(pan);
+        g.fillStyle = cookCol(pan.cook, B); rrect(g, x0, cy - h / 2, Math.max(h, w * clamp(pan.cook / B, 0, 1)), h, h / 2); g.fill();
+        g.fillStyle = "#ffd23a"; g.fillRect(x0 + w * DONE / B - 1.5 * sc, cy - h / 2 - 4 * sc, 3 * sc, h + 8 * sc);
+        const hotK = pan.side === 0 && pan.cook >= DONE ? 0.5 + 0.5 * Math.sin(G.t * 10) : 0;   // gold and not flipped: the bar flashes
+        if (hotK) { g.strokeStyle = `rgba(255,236,140,${hotK})`; g.lineWidth = 3 * sc; rrect(g, x0 - 4 * sc, cy - h / 2 - 4 * sc, w + 8 * sc, h + 8 * sc, h * 0.9); g.stroke(); }
+        if (API.drawn) API.drawn.push(["cook", px, py, pan.side, pan.cook]);
+      }
+      const sp = pan.want || (pan.fish && pan.side === 1 ? pan.spice : null);
+      if (sp) {
+        const on = !!pan.want, bob = on ? Math.sin(G.t * 5) * 3 * sc : 0, r = 25 * sc, [bx, by0] = deckToScreen(px, py + dir * 90), by = by0 + bob;
+        g.save(); g.globalAlpha = on ? 1 : 0.6;
+        g.fillStyle = "#fff"; g.strokeStyle = on ? "#ffb02e" : "rgba(60,30,80,.45)"; g.lineWidth = (on ? 4 : 2.5) * sc;
+        g.beginPath(); g.arc(bx, by, r, 0, TAU); g.fill(); g.stroke();
+        g.beginPath(); g.moveTo(bx - 7 * sc, by - dir * (r - 2 * sc)); g.lineTo(bx, by - dir * (r + 10 * sc)); g.lineTo(bx + 7 * sc, by - dir * (r - 2 * sc)); g.closePath(); g.fill();
+        g.restore();
+        frAt(g, "sh_" + sp, bx, by, r * 1.35, 0, on ? 1 : 0.6);
+        if (API.drawn) API.drawn.push(["want", px, py, sp, on]);
+      }
+    });
+  }
+  // Simmy shows the spices wanted now (a picture bubble over her head, when she is not talking)
+  function drawSimSpice(g, sim, H) {
+    const w = SHIP.pans.map((p) => p.want).filter(Boolean); if (!w.length || !sim) return;
+    const ih = H * 0.05, pad = ih * 0.25, bw = w.length * ih * 1.1 + pad * 2 - ih * 0.1, bh = ih + pad * 2, x0 = sim[0] - bw / 2, y0 = sim[1] - bh - 14;
+    g.fillStyle = "#fff"; g.strokeStyle = "rgba(60,30,80,.55)"; g.lineWidth = 3;
+    rrect(g, x0, y0, bw, bh, bh * 0.4); g.fill(); g.stroke();
+    g.beginPath(); g.moveTo(sim[0] - 9, y0 + bh - 1); g.lineTo(sim[0], y0 + bh + 12); g.lineTo(sim[0] + 9, y0 + bh - 1); g.closePath(); g.fill();
+    w.forEach((sp, i) => frAt(g, "sh_" + sp, x0 + pad + ih * 0.5 + i * ih * 1.1, y0 + pad + ih / 2 + Math.sin(G.t * 5 + i) * 2, ih));
+  }
+  // a girl's fishing on the deck: rod, line, float (bobbing / twitching / under), the fish on the line, her reel meters; her cast wound up
+  function drawFishing(g) {
+    const v = deckView(), S = (x, y) => deckToScreen(x, y), sc = v.s;
+    for (const k of ["g", "s"]) {
+      const L = SHIP.lines[k], at = L && posOf(k); if (!at) continue;
+      const geo = lineGeo(L, at[0], at[1]), [hx, hy] = S(...geo.hand), [tx, ty] = S(...geo.tip);
+      // the rod: its frame's handle (bottom left) in her hand, its tip (top right) out over the ledge
+      const rf = FR.sh_rod;
+      if (rf) {
+        const len = Math.hypot(tx - hx, ty - hy), kk = len / (0.9 * Math.SQRT2 * rf.w);
+        g.save(); g.translate(hx, hy); g.rotate(Math.atan2(ty - hy, tx - hx) + Math.PI / 4);
+        g.drawImage(rf.img, rf.sx, rf.sy, rf.w, rf.h, -0.05 * rf.w * kk, -0.95 * rf.h * kk, rf.w * kk, rf.h * kk); g.restore();
+      }
+      if (API.drawn) API.drawn.push(["sh_rod", geo.tip[0], geo.tip[1], L.st, k]);
+      // where the float is now
+      let [fx, fy] = geo.at, under = 0, sink = 0, sq = 1;
+      if (L.st === "cast") { const p = clamp(L.t / CAST_T, 0, 1); fx = lerp(geo.tip[0], fx, p); fy = Math.max(8, lerp(geo.tip[1], fy, p) - Math.sin(Math.PI * p) * 40); }   // (its arc stays on the screen past the top rail)
+      else if (L.st === "wait") fy += Math.sin(G.t * 3 + L.power * 9) * 1.2;
+      else if (L.st === "nibble") { const ph = (L.t % TWITCH) / TWITCH; if (ph < 0.3) { sink = Math.sin(ph / 0.3 * Math.PI) * 4; sq = 1 - sink * 0.04; } fy += sink; }
+      else if (L.st === "bite") { under = 1; fy += 4 + Math.sin(G.t * 20) * 0.8; }
+      else if (L.st === "hooked" && L.fight) { fx += (Math.random() - 0.5) * 6; fy += (Math.random() - 0.5) * 6; }
+      const [px, py] = S(fx, fy);
+      // the line: white and slack while it waits, taut once hooked; red while the fish fights; thicker with the tension
+      const fight = L.st === "hooked" && L.fight, taut = L.st === "hooked" || L.st === "near";
+      const red = fight ? 1 : L.tension, sh = fight ? (Math.random() - 0.5) * 4 * sc : 0;
+      g.strokeStyle = `rgba(255,${Math.round(255 - 200 * red)},${Math.round(255 - 210 * red)},.9)`; g.lineWidth = Math.max(1.2, (1.4 + 2.2 * L.tension + (fight ? 1 : 0)) * sc);
+      g.beginPath(); g.moveTo(tx, ty); g.quadraticCurveTo((tx + px) / 2 + sh, (ty + py) / 2 + (taut ? 0 : 10 * sc) + sh, px, py); g.stroke();
+      // the fish under the float once it is on; a big one splashing by the boat
+      if (L.size && (L.st === "hooked" || L.st === "near")) {
+        const fh = { s: 14, m: 19, b: 34 }[L.size] * sc, wob = Math.sin(G.t * (fight || L.st === "near" ? 18 : 6)) * 0.25;
+        frAt(g, "sh_fish_" + L.size, px, py + geo.out * 6 * sc, fh, geo.out * Math.PI / 2 + wob, L.st === "near" ? 0.95 : 0.5);
+      }
+      // the float (half under while it twitches, gone under when it bites: only the ripples show)
+      if (L.st !== "near") frAt(g, "sh_float", px, py, 16 * sc * sq, 0, under ? 0.3 : 1);
+      if (API.drawn) API.drawn.push(["sh_float", fx, fy, L.st, k]);
+      // her meters while reeling: how far the fish is (fish on a blue track, the boat at the left) and the tension (red)
+      if (L.st === "hooked" && k === hero) {
+        const [mx, my] = S(at[0], at[1]), w = 92 * sc, hh = 9 * sc, x0 = mx - w / 2, y0 = my + 14 * sc;
+        g.fillStyle = "rgba(18,14,38,.55)"; rrect(g, x0 - 6 * sc, y0 - 6 * sc, w + 12 * sc, hh * 2 + 18 * sc, 8 * sc); g.fill();
+        g.fillStyle = "#bfefff"; rrect(g, x0, y0, w, hh, hh / 2); g.fill();
+        g.fillStyle = "#3aa7d8"; rrect(g, x0, y0, Math.max(hh, w * L.dist), hh, hh / 2); g.fill();
+        frAt(g, "sh_fish_" + (L.size || "s"), x0 + w * L.dist, y0 + hh / 2, hh * 1.7, Math.PI, 1);
+        const ty0 = y0 + hh + 6 * sc, hot = L.tension > 0.65 && Math.sin(G.t * 24) > 0;
+        g.fillStyle = "rgba(255,255,255,.35)"; rrect(g, x0, ty0, w, hh * 0.8, hh * 0.4); g.fill();
+        if (L.tension > 0.01) { g.fillStyle = hot ? "#ffffff" : "#ff4a4a"; rrect(g, x0, ty0, Math.max(hh * 0.8, w * L.tension), hh * 0.8, hh * 0.4); g.fill(); }
+      }
+    }
+    // the cast being wound up: an arc over her filling up, and a ring on the water where the float will land
+    if (castWind !== null) {
+      const s = stationAt(P.x, P.y, hero);
+      if (s && s.kind === "rail") {
+        const th = (CHAR_H[hero] || 400) * DECK_K * sc, [cx, cy] = S(P.x, P.y), r = th * 0.62, a0 = Math.PI * 1.1, a1 = a0 + Math.PI * 0.8 * castWind;
+        g.lineCap = "round";
+        g.strokeStyle = "rgba(18,14,38,.45)"; g.lineWidth = 12 * sc; g.beginPath(); g.arc(cx, cy - th * 0.5, r, a0, Math.PI * 1.9); g.stroke();
+        g.strokeStyle = `hsl(${Math.round(55 + 70 * castWind)},90%,55%)`; g.lineWidth = 8 * sc; g.beginPath(); g.arc(cx, cy - th * 0.5, r, a0, Math.max(a0 + 0.02, a1)); g.stroke();
+        g.lineCap = "butt";
+        const tg = lineGeo({ k: hero, rail: s.i, dist: castDist(castWind) }, P.x, P.y), [gx, gy] = S(...tg.at);
+        g.strokeStyle = "rgba(255,255,255,.8)"; g.lineWidth = 2 * sc; g.beginPath(); g.ellipse(gx, gy, 9 * sc, 4 * sc, 0, 0, TAU); g.stroke();
+      }
+    }
+  }
+  // splashes and ripples on the water, fish flying into the tub or swimming off
+  function drawShipFx(g) {
+    const sc = deckView().s;
+    for (const p of SHIP_FX) {
+      const [x, y] = deckToScreen(p.x, p.y), a = clamp(p.life / p.max, 0, 1);
+      if (p.ring) { g.strokeStyle = `rgba(255,255,255,${0.7 * a})`; g.lineWidth = 1.6 * sc; g.beginPath(); g.ellipse(x, y, p.r * sc, p.r * 0.45 * sc, 0, 0, TAU); g.stroke(); }
+      else if (p.smoke) { g.globalAlpha = a * (p.r > 3 ? 0.45 : 1); g.fillStyle = p.col; g.beginPath(); g.arc(x, y, p.r * sc, 0, TAU); g.fill(); g.globalAlpha = 1; }
+      else { g.globalAlpha = a; g.fillStyle = p.col; g.beginPath(); g.arc(x, y, p.r * sc, 0, TAU); g.fill(); g.globalAlpha = 1; }
+    }
+    for (const j of JUMPS) {
+      const p = clamp(j.t / j.T, 0, 1), [x, y] = deckToScreen(lerp(j.x0, j.x1, p), lerp(j.y0, j.y1, p) - j.h * 4 * p * (1 - p));
+      const fh = ({ sh_fish_s: 16, sh_fish_m: 21, sh_fish_b: 28 }[j.fr] || 20) * sc * (j.swim ? 1 : 1.3);
+      if (j.swim) frAt(g, j.fr, x, y, fh, Math.atan2(j.y1 - j.y0, j.x1 - j.x0), 0.5 * (1 - p));
+      else frAt(g, j.fr, x, y, fh, (p - 0.5) * 2.4 * (j.x1 > j.x0 ? 1 : -1), 1);
+    }
+  }
+  // Simmy's bubble on the deck: over her head, kept below the top of the screen and moved sideways off the fish tub and, when it fits
+  // in the gap between them, off the dishes table too (a long line covers the table rather than the tub)
+  // (returns its box on the screen: [left, top, width, height])
+  function shipBubble(lines, x, y, k, fs) {
+    ctx.font = `800 ${fs}px Grandstander, system-ui`;
+    const s = 0.8 + 0.2 * k, w = (Math.max(...lines.map((l) => ctx.measureText(l).width)) + fs * 1.6) * s, h = (lines.length * fs * 1.18 + fs * 0.8) * s;
+    const [SW, SH] = DECK.size, T = DECK.block.tub, A = DECK.block.table, [tl, tt] = deckToScreen(T[0] * SW, T[1] * SH), [, tb] = deckToScreen(0, T[3] * SH);
+    const [ar, at] = deckToScreen(A[2] * SW + 16, A[1] * SH), [, ab] = deckToScreen(0, A[3] * SH);
+    y = Math.max(y, h + 34 * s + 8);
+    const top = y - 34 * s - h, bot = y - 34 * s, L = ar + 8, R = tl - 8;   // (the dishes reach a little past the table's right edge)
+    let dx = 0;
+    if (top < Math.max(tb, ab) && bot > Math.min(tt, at) && x + w / 2 > L && x - w / 2 < tl + 200) {
+      // (too wide for the gap: it covers the empty table while they fish and cook; at the arrival the table holds their dishes)
+      const c = w <= R - L ? clamp(x, L + w / 2, R - w / 2) : SHIP.ph === "arrive" ? Math.max(x, L + w / 2) : x + w / 2 > R ? R - w / 2 : x;
+      dx = c - x;
+    }
+    const lim = Math.max(0, w / 2 - 50 * s); dx = clamp(dx, -lim, lim);   // (the tail stays under it)
+    talkBubble(lines, x, y, k, fs, false, dx);
+    if (API.drawn) API.drawn.push(["bubble", x + dx - w / 2, y - 34 * s - h, w, h]);
+    return [x + dx - w / 2, y - 34 * s - h, w, h];
+  }
+  // Simmy's hint (with its picture beside the bubble), over her head
+  const HINT_PIC = { hintBite: "sh_float", hintFight: "ic_hand", hintBigG: "sh_net", hintBigS: "sh_net", hintFlip: "ic_flip", hintFire: "ic_bucket", hintNoFish: "ic_rod" };
+  function drawHint(sim, H) {
+    const q = SHIP.hint && !SHIP.hint.wait && SAYS[SHIP.hint.key], say = q && sayAt(q, SHIP.hint.t);
+    if (!say || !sim) return false;
+    // (its picture as a badge on the bubble's top-right corner: beside it, it sat over the table or the tub, or next to her own action icon)
+    const lines = q[say.i][1], fs = Math.round(H * 0.03), ph = fs * 2.2, [bx, by, bw] = shipBubble(lines, sim[0], sim[1], say.k, fs);
+    icon(ctx, HINT_PIC[SHIP.hint.key], bx + bw - ph * 0.1, Math.max(ph * 0.55, by - ph * 0.1), ph, say.k);
+    return true;
+  }
+  // the walk-on: the team walks along the pier and up the gangplank onto the ship, Simmy first (her line 9 over her head)
+  function drawDock(g, W, H, t) {
+    const img = scene("dock");
+    g.fillStyle = "#7fd3e8"; g.fillRect(0, 0, W, H);
+    let map = (u, v) => [u * W, v * H];
+    if (img) map = cover(g, img, W, H, 0.5, 0.75);
+    const ph = map(0, 1)[1] - map(0, 0)[1];
+    const team = teamMembers(), walkers = [team.find((m) => m.char === "simmy"), ...team.filter((m) => m.char !== "simmy")];
+    // the path in picture fractions, by length (the picture is 1.5 times wider than tall)
+    const seg = DOCK_PATH.slice(1).map((p, i) => Math.hypot((p[0] - DOCK_PATH[i][0]) * 1.5, p[1] - DOCK_PATH[i][1])), tot = seg.reduce((a, b) => a + b, 0);
+    const at = (p) => { let d = p * tot; for (let i = 0; i < seg.length; i++) { if (d <= seg[i] || i === seg.length - 1) { const f = Math.min(1, d / seg[i]); return [lerp(DOCK_PATH[i][0], DOCK_PATH[i + 1][0], f), lerp(DOCK_PATH[i][1], DOCK_PATH[i + 1][1], f)]; } d -= seg[i]; } };
+    let sim = null;
+    walkers.forEach((m, i) => {
+      const t0 = 0.4 + i * DOCK_GAP, p = clamp((t - t0) / DOCK_WALK, 0, 1), [u, v] = at(p), [x, y] = map(u, v);
+      const hm = ph * 0.2 * (CHAR_H[m.char] || 400) / 400, a = 1 - ss(0.9, 1, p);
+      if (m.char === "simmy") sim = [x, y - hm - 16];
+      if (a <= 0.01) return;
+      const o = { face: 2, flip: false, moving: p > 0 && p < 1, dist: Math.max(0, t - t0) * 250 };
+      g.save(); g.globalAlpha = a;
+      g.fillStyle = "rgba(0,0,0,.25)"; g.beginPath(); g.ellipse(x, y, hm * 0.2, hm * 0.05, 0, 0, TAU); g.fill();
+      if (m.char === "simmy") drawSimmyAt(g, x, y, hm, t, m.outfit, o, false); else drawHeroAt(g, m.char, m.outfit, o, x, y, hm, true);
+      g.restore();
+    });
+    const say = sayAt(SAYS.afterPhoto, t - 0.3);
+    if (say && sim) talkBubble(SAYS.afterPhoto[say.i][1], sim[0], sim[1], say.k, Math.round(H * 0.035));
+    const f = ss(dockEnd() - 0.7, dockEnd(), t);
+    if (f > 0) { g.fillStyle = `rgba(14,18,48,${f})`; g.fillRect(0, 0, W, H); }
+    // a guest at the end of the film waits for her sister (the host) to be on deck: the older sister is "chị", Mochi is "em"
+    // ("bạn" until the host's presence says who she is)
+    if (NET.role === "guest" && t >= dockEnd()) {
+      const hk = Q && Q.hero, txt = "Chờ " + (hk === "s" ? "chị" : hk === "g" ? "em" : "bạn") + " lên tàu…";
+      g.globalAlpha = 0.85 + 0.15 * Math.sin(G.t * 3); g.fillStyle = "#fff6e5"; g.font = `800 ${Math.round(H * 0.045)}px Grandstander, system-ui, sans-serif`;
+      g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(txt, W / 2, H / 2); g.globalAlpha = 1;
+      if (API.drawn) API.drawn.push(["dockWait", txt]);
+    }
+  }
+  // the arrival: the island comes into view and the ship sails up to it (t from when it shows), then Màn 2
+  function drawArrival(g, W, H, t) {
+    const img = scene("island"), a = ss(0, 0.6, t), z = 1 + 0.12 * ss(0, ARR_SAIL, t), rock = Math.sin(t * 1.4) * 0.006;
+    g.save(); g.globalAlpha = a;
+    g.fillStyle = "#7fd3e8"; g.fillRect(0, 0, W, H);
+    if (img) { g.translate(W / 2, H * 0.55); g.rotate(rock); g.scale(z, z); g.translate(-W / 2, -H * 0.55); cover(g, img, W, H, 0.5, 0.5); }
+    g.restore();
+    const f = ss(ARR_SAIL - 0.8, ARR_SAIL, t);
+    if (f > 0) { g.fillStyle = `rgba(14,18,48,${f})`; g.fillRect(0, 0, W, H); }
+  }
+  // a story line over Simmy (or a girl) in the world, e.g. line 13 as Màn 2 starts; G.say.t runs in update()
+  function drawSay() {
+    if (!G.say || G.cine || G.rescue || G.bcut) return;
+    const say = sayAt(G.say.seq, G.say.t); if (!say) return;
+    const [spk, lines] = G.say.seq[say.i], sm = PETE.find((e) => e.kind === "simmy");
+    const at = spk === "simmy" ? (sm ? [sm.x, sm.y - CHAR_H.simmy - 50] : [P.x, P.y - CHAR_H[hero] - 40]) : girlSpot(spk);
+    talkBubble(lines, at[0], at[1], say.k, 44);
+  }
+
   // ---------------------------------------------------------------- Simmy leads the team into the clothes shop (after the boss, before openShop)
   // In the world itself: a shop door appears at the far side of the arena (the magic gate painted gold, lanterns, barrels, a chest and the
   // skull flag beside it: painted art only, the sign and the sparkles are text and light), Simmy says where they are going and walks to it,
-  // the girls follow on their walk frames, everyone steps in and the screen fades into the shop. WK_END s, skippable (tap, like the films).
+  // the girls follow on their walk frames, everyone steps in and the screen fades into the shop. Skippable (tap, like the films).
+  // First they talk where they stand (SAYS.afterCandyBoss: why the island, why pirate clothes); the shop pops up with its last line
+  // ("Chị biết một cửa hàng gần đây...") at c.shopAt; then the walk: every WK_* moment comes c.talk (= the lines' time) later, the film ends at c.end.
   // Together: the host's world carries the phase "walk" (G.shopPhase) and the host also sends a "walk" event; each page walks its own girl
   // and its own Simmy (presence carries them to the other page). The host (or a solo girl) opens the shop when its film ends or is skipped;
   // a guest whose film is over first waits on the last picture until the host's "open" arrives - by event or by the phase (syncShop),
   // and a guest left alone (partner gone) opens it herself, so the shop always opens.
-  const WK_END = 5.6, WK_FADE = 4.6, WK_SAY = ["Theo chị nào! Chị biết", "một cửa hàng đồ cướp biển", "siêu xinh!"];
+  const WK_END = 5.6, WK_FADE = 4.6;
   // the shop door: at the far side of the arena (the same spot on both pages)
   function shopDoor() { const A = G.arena; return A ? { x: A.x + A.r * 0.42, y: A.y - A.r * 0.16 } : { x: P.x + 700, y: P.y - 120 }; }
   // the shop front: [frame, dx, dy, height, flip, when it appears (s)]
@@ -4581,8 +5822,9 @@
     const real = !!FR.shop_door;   // (the painted shop is packed)
     if (!real && !FR.shop_door_gate && FR.portal) FR.shop_door_gate = recolor("portal", "#ffbf3d");   // (the gate's swirl turns warm gold)
     const D = shopDoor(), mine = PETE.find((e) => e.kind === "simmy"), theirs = QPETE.find((e) => e.kind === "simmy");
-    const c = G.cine = { ph: "walkin", t: 0, theme, D, hold: false, front: [], real };
-    for (const [name, dx, dy, h, flip, at] of real ? WK_SHOP.front : WK_FRONT) if (FR[name]) c.front.push({ name, x: D.x + dx, y: D.y + dy, h, flip, at });
+    const W = SAYS.afterCandyBoss, mul = talkMul(), talk = seqTime(W, mul), shopAt = seqTime(W.slice(0, -1), mul);   // (fixed for the whole film)
+    const c = G.cine = { ph: "walkin", t: 0, theme, D, hold: false, front: [], real, mul, talk, shopAt, end: WK_END + talk };
+    for (const [name, dx, dy, h, flip, at] of real ? WK_SHOP.front : WK_FRONT) if (FR[name]) c.front.push({ name, x: D.x + dx, y: D.y + dy, h, flip, at: at + shopAt });
     // the doorway they walk into; with the painted shop the walkers are drawn over it while they stand in its doorway (sy: its sorting y)
     c.door = real ? { x: D.x + WK_SHOP.dx * WK_SHOP.h, y: D.y - WK_SHOP.floor * WK_SHOP.h + 10 } : { x: D.x, y: D.y + 18 };
     if (real) c.front[0].sy = D.y - WK_SHOP.floor * WK_SHOP.h - 60;
@@ -4599,6 +5841,9 @@
     for (const id of ["hud", "controls", "bossbar", "quiz"]) $(id).hidden = true;
     $("skipFilm").hidden = false;
     if (G.boss && !G.boss.alive) burst(G.boss.x, G.boss.y - 120, 40, ["#fff4c2", "#ffd34d", "#ff9ad5", "#fff"], 420, 0.9);   // (his remains vanish in sparkles)
+  }
+  // the shop appears (when Simmy says she knows one)
+  function wkShopPops(D) {
     SFX.portal(); G.parts.push({ type: "fx", name: "fx_rays", x: D.x, y: D.y - 300, sc: 1.1, life: 1.2, max: 1.2, grow: 0.8 });
     burst(D.x, D.y - 300, 44, ["#ffd34d", "#fff4c2", "#ff9ad5", "#fff"], 560, 1.1);
   }
@@ -4614,34 +5859,55 @@
     const c = G.cine;
     if (NET.role === "guest") { applySnapshot(); syncShop(); if (G.cine !== c) return; }   // (the host's shop opening ends the film here)
     else if (c.hold) { openShop(c.theme); return; }   // (a guest whose partner left while she waited)
-    if (!c.hold) c.t = Math.min(WK_END, c.t + dt);
-    const t = c.t, D = c.D;
+    const t0 = c.t;
+    if (!c.hold) c.t = Math.min(c.end, c.t + dt);
+    const t = c.t, D = c.D, S = c.talk;
+    if (t0 < c.shopAt && t >= c.shopAt) wkShopPops(D);
     G.ult = null;   // (no blinking: nothing can hurt her while the world waits)
-    const [vx, vy] = wkWalk(P, c.pp, 1.5, 3.8, 4.1, 5.2, t, dt); P.vx = vx; P.vy = vy;
+    // (while they talk she stands where she is, by Simmy; then the walk)
+    const [vx, vy] = wkWalk(P, c.pp, 1.5 + S, 3.8 + S, 4.1 + S, 5.2 + S, t, dt); P.vx = vx; P.vy = vy;
     if (c.hold) { P.vx = P.vy = 0; P.moving = false; }
-    if (c.sim) wkWalk(c.sim, c.sp, 0.9, 3.2, 3.4, 4.4, t, dt);
+    if (c.sim) wkWalk(c.sim, c.sp, 0.9 + S, 3.2 + S, 3.4 + S, 4.4 + S, t, dt);
     followPets(PETE.filter((p) => p !== c.sim), P, dt, false);
     if (Q && NET.role) { if (QPETE.map((p) => p.kind).join() !== Q.pets.join()) QPETE = Q.pets.map((k, i) => ({ kind: k, x: Q.x, y: Q.y, face: 0, flip: false, dist: 0, i })); partnerPets(dt); }
     // the camera frames the door, its sign and the girl
     const [cx, cy] = wkCam(c), k = 1 - Math.pow(0.01, dt);
     G.camX = lerp(G.camX, cx, k); G.camY = lerp(G.camY, cy, k);
     G.shake = Math.max(0, G.shake - 40 * dt);
-    if (Math.random() < dt * 14 && G.parts.length < 300) { const a = Math.random() * TAU, r = rnd(120, 330); G.parts.push({ type: "dot", x: D.x + Math.cos(a) * r, y: D.y - 290 + Math.sin(a) * r * 1.1, vx: 0, vy: -50, life: 0.9, max: 0.9, r: rnd(3, 7), col: Math.random() < 0.5 ? "#ffd34d" : "#fff" }); }
+    if (t >= c.shopAt && Math.random() < dt * 14 && G.parts.length < 300) { const a = Math.random() * TAU, r = rnd(120, 330); G.parts.push({ type: "dot", x: D.x + Math.cos(a) * r, y: D.y - 290 + Math.sin(a) * r * 1.1, vx: 0, vy: -50, life: 0.9, max: 0.9, r: rnd(3, 7), col: Math.random() < 0.5 ? "#ffd34d" : "#fff" }); }
     for (const m of G.mons) if (!m.alive) m.die += dt;
     G.mons = G.mons.filter((m) => m.alive || m.die < 0.6);
     updateParts(dt);
-    if (t >= WK_END && !c.hold) endWalkIn();
+    if (t >= c.end && !c.hold) endWalkIn();
   }
-  // where the camera wants to be: mostly on the door (its sign at the top of the view), leaning toward the girl
+  // where the camera wants to be: on the girl (and Simmy) while they talk; once the shop is there mostly on the door (its sign at the top
+  // of the view), leaning toward the girl
   function wkCam(c) {
-    const D = c.D, fx = lerp(D.x - 120, P.x, 0.4), fy = c.real ? lerp(D.y - 400, P.y - 200, 0.3) : lerp(D.y - 300, P.y - 200, 0.35);
+    const D = c.D, e = ss(c.shopAt, c.shopAt + 1.2, c.t), [gx, gy] = wkGroup(), px = lerp(gx, P.x, e), py = lerp(gy, P.y, e);
+    const fx = lerp(D.x - 120, px, lerp(1, 0.4, e)), fy = c.real ? lerp(D.y - 400, py - 200, lerp(1, 0.3, e)) : lerp(D.y - 300, py - 200, lerp(1, 0.35, e));
     return [clamp(fx - VW / 2, 0, WORLD - VW), clamp(fy - VH / 2, 0, WORLD - VH)];
+  }
+  // while they talk the camera frames the whole group (her, her sister on the other page, Simmy), as far as that keeps her well in view
+  function wkGroup() {
+    const c = G.cine, sm = (c && c.sim) || QPETE.find((e) => e.kind === "simmy"), xs = [P.x], ys = [P.y];
+    if (NET.role && Q) { xs.push(Q.x); ys.push(Q.y); }
+    if (sm) { xs.push(sm.x); ys.push(sm.y); }
+    const mx = (Math.min(...xs) + Math.max(...xs)) / 2, my = (Math.min(...ys) + Math.max(...ys)) / 2;
+    return [clamp(mx, P.x - (VW / 2 - 260), P.x + (VW / 2 - 260)), clamp(my, P.y - 250, P.y + 250)];
+  }
+  // a bubble's anchor moved inside the view, so a speaker at the edge (or past it: her sister far off) is still read
+  // (zm: the camera's zoom around the middle of the view; the top keeps clear of the HUD's level name and letters)
+  function bubbleInView(lines, x, y, fs, zm = 1) {
+    ctx.font = `800 ${fs}px Grandstander, system-ui`;
+    const w = Math.max(...lines.map((l) => ctx.measureText(l).width)) + fs * 1.6, h = lines.length * fs * 1.18 + fs * 0.8;
+    const hw = VW / 2 / zm, hh = VH / 2 / zm, cx = G.camX + VW / 2, cy = G.camY + VH / 2;
+    return [clamp(x, cx - hw + w / 2 + 24 / zm, cx + hw - w / 2 - 24 / zm), clamp(y, cy - hh + h + 34 + 150 / zm, cy + hh - 24 / zm)];
   }
   // the end of the film (or a tap on skip): the host / a solo girl opens the shop; a guest waits for the host's
   function endWalkIn() {
     const c = G.cine; if (!c || c.ph !== "walkin") return;
     P.vx = P.vy = 0; P.moving = false;
-    if (NET.role === "guest") { c.t = WK_END; c.hold = true; $("skipFilm").hidden = true; return; }
+    if (NET.role === "guest") { c.t = c.end; c.hold = true; $("skipFilm").hidden = true; return; }
     openShop(c.theme);
   }
   // the shop front, one piece at a time (each pops up with a little bounce)
@@ -4649,34 +5915,35 @@
     const c = G.cine, e = clamp((c.t - o.at) / 0.55, 0, 1); if (e <= 0) return;
     const f = FR[o.name], pop = e < 1 ? 1 + Math.sin(e * Math.PI) * 0.12 : 1, m = o.h / (f.h * f.s) * pop * (0.6 + 0.4 * e);
     if (o.name === "shop_door") {   // (the painted shop: warm light spills from its doorway)
-      glow(c.door.x, c.door.y - 120, 260, "255,206,90", (0.3 + 0.08 * Math.sin(G.t * 3)) * e + 0.45 * ss(3.4, 5.0, c.t));
+      glow(c.door.x, c.door.y - 120, 260, "255,206,90", (0.3 + 0.08 * Math.sin(G.t * 3)) * e + 0.45 * ss(3.4 + c.talk, 5.0 + c.talk, c.t));
       shadow(o.x, o.y + 4, o.h * 0.6, o.h * 0.06, 0.22 * e);
     } else if (o.name === "shop_door_gate") {
-      glow(o.x, o.y - o.h * 0.42, o.h * 0.8, "255,206,90", (0.45 + 0.12 * Math.sin(G.t * 3)) * e + 0.5 * ss(3.6, 5.0, c.t));
+      glow(o.x, o.y - o.h * 0.42, o.h * 0.8, "255,206,90", (0.45 + 0.12 * Math.sin(G.t * 3)) * e + 0.5 * ss(3.6 + c.talk, 5.0 + c.talk, c.t));
       shadow(o.x, o.y + 6, o.h * 0.3, o.h * 0.05, 0.25 * e);
     } else shadow(o.x, o.y + 4, o.h * 0.22, o.h * 0.05, 0.22 * e);
     spr(f, o.x, o.y + (o.name === "shop_door_gate" ? 14 : 0), o.flip, m, e);
-    if (o.name === "shop_door") glow(c.door.x, c.door.y - 120, 150, "255,220,140", 0.35 * ss(3.4, 5.0, c.t));   // (the doorway glows brighter as they go in)
+    if (o.name === "shop_door") glow(c.door.x, c.door.y - 120, 150, "255,220,140", 0.35 * ss(3.4 + c.talk, 5.0 + c.talk, c.t));   // (the doorway glows brighter as they go in)
     if (o.name === "lantern_on") glow(o.x + (o.flip ? -1 : 1) * o.h * 0.22, o.y - o.h * 0.62, 90, "255,190,90", 0.5 * e);
   }
-  // Simmy's line, the shop's sign, and the fade into the shop (drawn over the world)
+  // what they say, the shop's sign, and the fade into the shop (drawn over the world)
   function drawWalkTalk() {
     const c = G.cine; if (!c || c.ph !== "walkin") return;
     const D = c.D, t = c.t, sm = c.sim || QPETE.find((e) => e.kind === "simmy");
-    const sg = c.real ? 0 : ss(0.5, 1.1, t);   // (the painted shop has its own hanging sign)
+    const sg = c.real ? 0 : ss(0.5 + c.shopAt, 1.1 + c.shopAt, t);   // (the painted shop has its own hanging sign)
     if (sg > 0) {
       const y = D.y - 630 + (1 - sg) * 30;
       glow(D.x, y - 16, 300, "255,214,110", 0.35 * sg);
       ctx.save(); ctx.globalAlpha = sg; label("Cửa hàng Đồ Cướp Biển", D.x, y, 62, "#ffe9a6"); ctx.restore();
     }
-    if (sm && t >= 0.6 && t < 3.6) {
-      const k = Math.min(clamp((t - 0.6) / 0.25, 0, 1), clamp((3.6 - t) / 0.25, 0, 1));
-      talkBubble(WK_SAY, sm.x, sm.y - CHAR_H.simmy - 50, k, 44);
+    const W = SAYS.afterCandyBoss, say = sayAt(W, t, c.mul);
+    if (say) {
+      const [spk, lines] = W[say.i], at = spk === "simmy" ? (sm ? [sm.x, sm.y - CHAR_H.simmy - 50] : null) : girlSpot(spk);
+      if (at) { const [bx, by] = bubbleInView(lines, at[0], at[1], 44); talkBubble(lines, bx, by, say.k, 44); if (API.saidAt) API.saidAt.push([lines.join(" "), bx, by, G.camX, G.camY, VW, VH]); }
     }
   }
   function drawWalkFade(W, H) {
     const c = G.cine; if (!c || c.ph !== "walkin") return;
-    const f = ss(WK_FADE, WK_END, c.t); if (f <= 0) return;
+    const f = ss(WK_FADE + c.talk, c.end, c.t); if (f <= 0) return;
     ctx.fillStyle = `rgba(14,18,48,${f})`; ctx.fillRect(0, 0, W, H);
     if (c.hold) { ctx.globalAlpha = 0.85; ctx.fillStyle = "#fff6e5"; ctx.font = `800 ${Math.round(H * 0.045)}px Grandstander, system-ui, sans-serif`; ctx.textAlign = "center"; ctx.fillText("Vào cửa hàng…", W / 2, H / 2); ctx.globalAlpha = 1; }
   }
@@ -4722,6 +5989,11 @@
   }
   // who speaks a line: its speaker, or the friend standing in for one who is not in the film yet
   const opSpeaker = (l, cast) => (l[0] in OP_CAST && !cast.some((c) => c[0] === l[0]) ? l[4] || "" : l[0]);
+  // is a bubble up in the opening at t? (the lines drawOpening shows: a speaker who is in the film, or a friend standing in for her)
+  function opTalking(t) {
+    const cast = opCast();
+    return OP_SAY.some((l) => { const w = opSpeaker(l, cast); return t >= l[1] && t < l[2] && !!w && (!(w in OP_CAST) || cast.some((c) => c[0] === w)); });
+  }
   function startOpening() {
     G.cine = { ph: "opening", t: 0, lock: true };
     P.vx = P.vy = 0; P.moving = false;
@@ -4738,11 +6010,11 @@
       showBanner(LEVELS[G.level].name.split(": ")[1], LEVELS[G.level].name.split(": ")[0]);
     }
   }
-  function skipCine() { if (G.cine) { if (G.cine.ph === "walkin") endWalkIn(); else endCine(); } }
+  function skipCine() { if (onShip()) { if (G.mode === "ship" && SHIP.ph === "dock") { if (NET.role === "guest") SHIP.t = Math.max(SHIP.t, dockEnd()); else shipPhase("fish"); } return; } if (G.cine) { if (G.cine.ph === "walkin") endWalkIn(); else endCine(); } }
   $("skipFilm").addEventListener("click", skipCine);
   function updateCine(dt) {
     if (G.cine.ph === "walkin") return updateWalkIn(dt);
-    const c = G.cine, t0 = c.t; c.t += dt;
+    const c = G.cine, t0 = c.t; c.t += opTalking(c.t) ? dt / talkMul() : dt;   // (the film waits while a bubble is up, for Mochi; its sounds keep to the picture)
     const at = (x) => t0 < x && c.t >= x;
     P.inv = Math.max(P.inv, 1.5); P.vx = P.vy = 0; P.moving = false;
     if (API.autopilot) return endCine();
@@ -4903,7 +6175,7 @@
       }
       renderCoop();
     }, () => { if (NET.state === "ok") { NET.state = "none"; NET.room = null; renderCoop(); } });
-    for (const t of ["start", "hits", "ult", "shoo", "portal", "hurt", "pick", "gain", "shots", "xp", "pet", "combo", "outfit", "shop"]) room.on(t, onNet, () => {});
+    for (const t of ["start", "hits", "ult", "shoo", "portal", "hurt", "pick", "gain", "shots", "xp", "pet", "combo", "outfit", "shop", "ship"]) room.on(t, onNet, () => {});
     renderCoop();
   }
 
@@ -5029,9 +6301,10 @@
     if (NET.state === "p2p") { p2pClose(); NET.stage = null; }
   }
   function partnerLeft(lost) {
-    const wasGuest = NET.role === "guest", msg = lost ? "Mất kết nối với bạn kia" : "Bạn kia đã rời phòng";
+    const wasGuest = NET.role === "guest", msg = lost ? "Mất kết nối với bạn kia" : "Bạn kia đã rời phòng", ship = onShip();
     leaveCoop();
-    if (wasGuest && G.mode !== "title") { toTitle(); showBanner(msg, "Vào phòng lại nhé"); }
+    if (ship) shipSolo();   // (on the ship either page goes on alone: its SHIP is the whole level)
+    if (wasGuest && G.mode !== "title" && !ship) { toTitle(); showBanner(msg, "Vào phòng lại nhé"); }
     else showBanner(msg, "Bé chơi tiếp một mình");
   }
   function onNet(msg) {
@@ -5054,6 +6327,7 @@
       return;
     }
     if (msg.topic === "shop") return onShopMsg(d);
+    if (msg.topic === "ship") return onShipMsg(d);
     if (msg.topic === "shots") {   // partner's bolts: only for show, her own page reports what they hit
       const k = d.k === "s" ? "s" : "g", H = HEROES[k];
       for (const b of Array.isArray(d.s) ? d.s.slice(0, 40) : []) {
@@ -5129,7 +6403,7 @@
   function girlState() {
     const bits = (P.dead ? 1 : 0) | (P.inv > 0 ? 2 : 0) | (P.slowT > 0 ? 4 : 0) | (P.castT > 0.1 ? 8 : 0) | (P.winT ? 16 : 0) | (P.flip ? 32 : 0);
     return [P.x | 0, P.y | 0, P.face, (G.mode === "play" && P.fn) || "", bits, ELS.indexOf(P.elem), G.ult ? Math.round(G.ult.t * 10) : 0, hero, G.hearts, 0, P.vx | 0, P.vy | 0, P.pets.join(","), P.lv,
-      PETE.map((p) => [p.x | 0, p.y | 0, p.face + (p.flip ? 8 : 0) + (p.faintT > 0 ? 16 : 0)]), P.dead ? Math.round((1 - clamp(G.reviveT / FAINT_T, 0, 1)) * 100) : 0, P.helped ? 1 : 0, P.elem ? Math.ceil(P.elemT * 10) : 0, P.outfit || "base"];   // [18] = outfit id (`of`); older copies send 18 slots
+      PETE.map((p) => [p.x | 0, p.y | 0, p.face + (p.flip ? 8 : 0) + (p.faintT > 0 ? 16 : 0)]), P.dead ? Math.round((1 - clamp(G.reviveT / FAINT_T, 0, 1)) * 100) : 0, P.helped ? 1 : 0, P.elem ? Math.ceil(P.elemT * 10) : 0, P.outfit || "base", onShip() && SHIP.ph !== "dock" ? 1 : 0, lineSlot(), onShip() && NET.role === "guest" && SHIPX.mine.length ? SHIPX.mine : 0];   // [18] = outfit id (`of`); older copies send 18 slots; [19] = on the ship's deck (x, y are deck px then); [20] = her fishing line (lineSlot) or 0; [21] = a guest's last landed lines on the ship ([[id, size], ...]) or 0
   }
   function worldState() {
     const B = G.boss, near = Q ? (o) => d2(o.x, o.y, Q.x, Q.y) < 1900 * 1900 : () => true;
@@ -5148,6 +6422,7 @@
       f: G.foes.map((f) => [FTYPES.indexOf(f.type), f.x | 0, f.y | 0, f.vx | 0, f.vy | 0]),
       v: G.rings.map((w) => [w.x | 0, w.y | 0, w.r | 0, Math.round(w.life * 10), Math.round(w.delay * 10)]),
       it: bitsOf(G.items), ch: bitsOf(G.chests), cg: bitsOf(G.cages),
+      sp: onShip() ? shipState() : 0,   // the ship (host-owned), compact: see shipState
       sh: G.shopPhase || 0, po: G.portal && G.portal.open ? 1 : 0, ao: G.arena && G.arena.open ? 1 : 0, al: G.arenaLock ? 1 : 0, st: G.stars, k: G.kills, lk: G.lvKills, won: G.won ? 1 : 0, cp: G.camps.map((c) => c.st * 1000 + Math.max(0, c.left)),
     };
   }
@@ -5158,7 +6433,8 @@
     if (!gl) return;
     if (!Q) Q = { x: num(gl[0]), y: num(gl[1]), hostInv: 0, pets: [], lv: 1, flip: false };
     // dead-reckoning: carry the last report forward at its velocity, then glide toward that guess
-    if (gl !== Q.gl) { Q.gl = gl; Q.age = 0; }
+    const fresh = gl !== Q.gl;
+    if (fresh) { Q.gl = gl; Q.age = 0; }
     Q.age += dt;
     const ag = Math.min(Q.age, 0.15), x = num(gl[0]) + num(gl[10]) * ag, y = num(gl[1]) + num(gl[11]) * ag;
     const b = num(gl[4]), k = Math.min(1, dt * 20);
@@ -5179,6 +6455,9 @@
     Q.elem = ELS[num(gl[5])] || null; Q.ultT = num(gl[6]) / 10; Q.hearts = clamp(num(gl[8]), 0, 5);
     Q.pets = typeof gl[12] === "string" ? gl[12].split(",").filter((k) => PETS[k]) : [];   // their pets (shown following them)
     Q.lv = clamp(Math.floor(num(gl[13])) || 1, 1, MAX_LV);
+    Q.ship = num(gl[19]) === 1;
+    if (fresh || !("line" in Q)) Q.line = Q.ship ? readLine(gl[20], Q.hero) : null;   // (her fishing line on the deck)
+    Q.landed = Q.ship && Array.isArray(gl[21]) ? gl[21].slice(-10) : null;   // (a guest's landed lines: the host counts any it missed)
     Q.rev = clamp(num(gl[15]) / 100, 0, 1); Q.helped = !!gl[16]; Q.elemT = gl.length > 17 ? num(gl[17]) / 10 : -1;
     Q.hostInv -= dt;
   }
@@ -5404,6 +6683,7 @@
       }
       else if (G.mode === "shop") shopTick(dt);
       else if (G.mode === "runway") runwayTick(dt);
+      else if (G.mode === "ship") { if (!API.hold) shipTick(dt); }
       else if (G.mode === "photo") {
         PH.t += dt;
         // a guest also leaves the photo when the host's world is already in the next level
@@ -5436,13 +6716,16 @@
     setOutfit, hasOutfit, CHAR_H,
     OUTFITS4, openShop, buyOutfit, wearOutfit, closeShop, shop: shopInfo, simmy: SIMMY,
     skipCine, startOpening, startAllyRescue, updateSksp, lightLetter, endLevel, startShopWalk, shopDoor, opCast, drawFilmActor, WK_END,
+    talkMul, lineTime, SAYS, sayAt, seqTime, said: null, saidAt: null,   // (said: an array -> talkBubble records each drawn bubble's text; saidAt: an array -> the walk-in's bubbles as [text, x, y, camX, camY, VW, VH])
+    ship: () => SHIP, SIM_HOME, startShip, shipAct, stationAt, buttonAction, deckToScreen, screenScale, DECK, drawn: null, newLine, fishStep, BITE_WIN, NET_WIN, panStep, DONE, BURN, BURN2, SOLO_RATE,   // (drawn: an array -> drawShip records who / which icon it draws: [name, deck x, deck y, frame])
+    scene, SCENE_RETRY,
     refreshFrames: () => DIRN.clear(),   // call after adding frames to FR at run time
     audio: () => ({ ctx: AC && AC.state, samples: Object.keys(SAMPLE).length, music: !!musicSrc, track: musicNow, want: musicWanted() }),
     heroFrame4, monFrame, guideTarget, heroStats, xpNeed, gainXp, addEnergy, startUlt, rescuePet, ultBlast, startBoss, pets: () => PETE,
     spawnMon: (kind, x, y) => spawnMon(kind, x === undefined ? P.x + 400 : x, y === undefined ? P.y : y),
     damageBoss: (n) => damageBoss(n, 0, 0, false, true),
     // with hold = true the world only moves on step(): exact moments for screenshots
-    hold: false, step: (n = 1, dt = 1 / 30) => { for (let i = 0; i < n; i++) update(dt); render(); },
+    hold: false, step: (n = 1, dt = 1 / 30) => { for (let i = 0; i < n; i++) { if (G.mode === "ship") shipTick(dt); else update(dt); } render(); },
     killAll: () => { for (const m of G.mons) if (m.alive) killMon(m, true, "p"); },
     openGate: () => { G.lvKills = Math.max(G.lvKills, G.quota); checkGate(); },
     teleport: (x, y) => { P.x = x; P.y = y; },
