@@ -242,7 +242,7 @@
     <div class="heroes" id="heroes"></div>
     <div class="help"><span>Cần trái: <b>đi khắp nơi</b></span><span>Bé <b>tự bắn</b> quái gần nhất</span><span>Đầy năng lượng: <b>Tuyệt chiêu</b></span></div>
     <p id="loading">Đang tải hình ảnh…</p>
-    <div class="startsel" id="startSel" role="group" aria-label="Bản thử: chọn màn"><span>Bản thử: chọn màn</span><button id="selMan1">Màn 1</button><button id="selShip">Màn 2: Trên tàu</button><button id="selMan2">Màn 3: Đảo</button></div>
+    <div class="startsel" id="startSel" role="group" aria-label="Bản thử: chọn màn"><span>Bản thử: chọn màn</span><button id="selMan1">Màn 1</button><button id="selShip">Màn 2: Cửa hàng &amp; tàu</button><button id="selMan2">Màn 3: Đảo</button></div>
     <div class="row"><button class="btn" id="startBtn" hidden>Chơi một mình</button><button class="btn ghost" id="coopBtn" hidden>Chơi 2 người</button></div>
   </div>
   <div class="ver"><span id="verNum"></span><button id="verBtn">Kiểm tra bản mới</button></div>
@@ -339,7 +339,7 @@
   let META = null, ready = false;
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261026.1814", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261026.1845", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -967,7 +967,7 @@
     }
     // reset the play state
     G.nextId = 1; G.mons = []; G.shots = []; G.pshots = []; G.foes = []; G.parts = []; G.drops = []; G.gems = []; G.rings = []; G.quakes = [];
-    G.shopDone = false; G.shopPhase = 0;   // (a new level has no shop phase left over from the last one)
+    G.shopDone = false; G.shopPhase = 0; G.m2 = false;   // (a new level has no shop phase left over from the last one)
     G.boss = null; G.ult = null; G.quiz = null; G.bcut = null; G.bcutSeen = null; G.rescue = null; G.leaps = 0; G.qzN = 0; $("quiz").hidden = true; G.arenaLock = false; G.lt = 0; G.lvKills = 0; G.spawnAcc = 0; G.surgeT = 35; G.gateMsg = false; G.tierMsg = false; TIER_FR.clear();
     chunkCache.clear(); miniBase = null;
     $("lvlName").textContent = L.name;
@@ -4245,7 +4245,7 @@
     SH.open = false; $("shop").hidden = true; $("photo").hidden = true; G.cine = null; G.rescue = null; $("skipFilm").hidden = true;
   }
   // (starting straight at a later level gives the girl a head start in experience)
-  // (ship = true: the beta shortcut to the ship, as after the team photo: Màn 1 behind her, Màn 2 ahead)
+  // (ship = true: the beta shortcut to Màn 2, as after the candy boss: Màn 1 behind her, the walk-in to the shop ahead; G.level stays 0 until the island)
   function startGame(i, ship) {
     i = clamp(Math.floor(i) || 0, 0, LEVELS.length - 1);
     const lvl = ship ? 0 : i; i = ship ? 1 : i;   // (lvl: the level G.level shows; i: how far along she is, for the head start)
@@ -4266,14 +4266,22 @@
     for (const id of ["titleScreen", "winScreen", "pauseScreen", "bossbar", "shop", "photo"]) $(id).hidden = true;
     SH.open = false;
     // (starting straight at a later level: Simmy already wears the outfit she put on at the last shop)
-    { const so = i > 0 && LEVELS[i - 1].shop ? OUTFITS4.find((o) => o.char === "simmy" && o.theme === LEVELS[i - 1].shop) : null; SIMMY.outfit = so ? outKey(so) : "base"; }
+    { const so = !ship && i > 0 && LEVELS[i - 1].shop ? OUTFITS4.find((o) => o.char === "simmy" && o.theme === LEVELS[i - 1].shop) : null; SIMMY.outfit = so ? outKey(so) : "base"; }
     $("hud").hidden = false; $("controls").hidden = false; $("skipFilm").hidden = true;
-    if (ship) startShip();
+    if (ship) startM2();   // (beta: Màn 2 = the shop, the runway, the photo, the dock, the ship)
     else if (i === 0) startOpening();   // Màn 1 opens with the film (skippable)
     else {
       showBanner(LEVELS[i].name.split(": ")[1], LEVELS[i].name.split(": ")[0]);
       if (i === 1) G.say = { seq: SAYS.level2Start, t: NET.role === "guest" ? -2.2 : -0.8 };   // (Màn 2 as from the ship: Simmy's line 13)
     }
+  }
+  // Màn 2 from the home screen: the team stands in the candy boss's arena (as when he has fallen) and Simmy leads them to the shop;
+  // G.m2 tells a guest's syncShop (no boss fell on her page) to follow the host's shop phases, and the `start` event to repeat this choice
+  function startM2() {
+    G.m2 = true; G.mons = []; G.stars = 100;   // (100 stars to shop with; in co-op the host's pool is the one that counts and the guest mirrors it)
+    const A = G.arena;
+    if (A) { P.x = A.x + (NET.role === "guest" ? 110 : 0); P.y = A.y + 150; P.prog = 0; makePetEnts(); G.camX = clamp(P.x - VW / 2, 0, WORLD - VW); G.camY = clamp(P.y - VH / 2, 0, WORLD - VH); }
+    startShopWalk(LEVELS[0].shop || "pirate");
   }
   // beta: pick where to start from the home screen (kept in localStorage `sksp-start`); in co-op the host's choice goes to both pages
   const STARTS = { man1: "selMan1", ship: "selShip", man2: "selMan2" };
@@ -4554,7 +4562,7 @@
     if (!G.lvl || !G.lvl.shop) return;   // only a level that ends in a shop has a shop phase to follow (Màn 2 never does)
     const w = NET.pp && NET.pp.w, ph = w && w.sh;
     if (!ph) return;
-    const inGame = G.mode === "play" || G.mode === "pause", dead = G.boss && !G.boss.alive;
+    const inGame = G.mode === "play" || G.mode === "pause", dead = G.m2 || (G.boss && !G.boss.alive);
     if (ph === "walk" && G.mode === "play" && dead && !SH.open && !G.cine && !G.shopDone) { startShopWalk(G.lvl.shop, true); return; }
     if (ph === "open" && inGame && dead && !SH.open) { G.stars = Math.max(0, Math.floor(num(w.st))); $("pauseScreen").hidden = true; openShop(G.lvl.shop || "pirate", true); }
     else if (ph === "closed" && (SH.open || (inGame && dead && !G.shopDone))) closeShop(true);
@@ -4596,7 +4604,14 @@
     G.mode = "runway"; RW.t = 0;
     play("portal");
   }
+  // who is in the runway, the photo and the boarding film: the girls who are playing (one alone; both together) and Simmy;
+  // teamAll() is the whole team whoever is playing (the opening film)
   function teamMembers() {
+    const all = teamAll(), other = hero === "g" ? "s" : "g";
+    if (NET.role && Q && Q.hero === other) return all;
+    return all.filter((m) => m.char === hero || m.char === "simmy").sort((a, b) => (a.char === "simmy") - (b.char === "simmy"));   // (the girl on the left, Simmy on the right)
+  }
+  function teamAll() {
     const other = hero === "g" ? "s" : "g";
     let oo = "base";
     if (NET.role && Q && Q.hero === other) oo = Q.outfit || "base";
@@ -4605,6 +4620,27 @@
     const sim = { char: "simmy", outfit: SIMMY.outfit, name: "Simmy" };
     return hero === "g" ? [mine, sim, sis] : [sis, sim, mine];
   }
+  // Coca (Mochi's dog) and Cafe (Matcha's cat) come along in their sailor outfits (atlas4 `<name>_sail_w0..w3 / sit / joy`, facing right):
+  // of each girl who is in the team: her pet, if she has it (a sister on the other page: from her presence)
+  const PET_ART = { dog: "coca", cat: "cafe" };
+  function teamPets() {
+    const out = [];
+    for (const m of teamMembers()) {
+      if (m.char === "simmy") continue;
+      const kind = Object.keys(PET_ART).find((k) => PETS[k] && PETS[k].owner === m.char);
+      if (!kind || !FR[PET_ART[kind] + "_sail_sit"]) continue;
+      const has = m.char === hero ? P.pets.includes(kind) : !!(NET.role && Q && (Q.pets || []).includes(kind));
+      if (has) out.push({ kind, char: m.char, art: PET_ART[kind] });
+    }
+    return out;
+  }
+  // a pet's frame at its feet (x, gy); th = a grown-up's height (400 units) on this screen, so the pet is as big as in the world (Coca ~110, Cafe ~95)
+  function drawPetAt(g, art, pose, x, gy, th) {
+    const f = FR[art + "_sail_" + pose]; if (!f) return false;
+    const k = f.s * th / 400;
+    g.drawImage(f.img, f.sx, f.sy, f.w, f.h, x - f.ax * k, gy - f.ay * k, f.w * k, f.h * k);
+    return true;
+  }
   // the whole team on a stage: walking in one after the other (t seconds), then cheering; `final` = already standing in their places
   function drawTeamScene(g, W, H, t, final) {
     const th = SHOP_THEMES[SH.theme] || SHOP_THEMES.pirate;
@@ -4612,7 +4648,8 @@
     // the painted show stage (its three spotlit spots at 80 % of the picture; the floor end of it kept in view on a wide screen)
     const bg = scene("stage");
     g.fillStyle = th.bg[2]; g.fillRect(0, 0, W, H);   // (only until the picture is in)
-    const team = teamMembers(), fx = [0.27, 0.5, 0.73], ht = H * 0.55, gy = bg ? cover(g, bg, W, H, 0.5, 0.8)(0, STAGE_FEET)[1] : H * 0.86;
+    const team = teamMembers(), fx = team.length > 2 ? [0.27, 0.5, 0.73] : [0.36, 0.64], ht = H * 0.55, gy = bg ? cover(g, bg, W, H, 0.5, 0.8)(0, STAGE_FEET)[1] : H * 0.86;
+    const pets = teamPets(), poff = Math.min(ht * 0.3, W * 0.11);
     team.forEach((m, i) => {
       const s = final ? 0 : i * 0.95, p = final ? 1 : Math.max(0, Math.min(1, (t - s) / 2.3)), e = 1 - (1 - p) * (1 - p);
       if (!final && t < s) return;
@@ -4625,6 +4662,16 @@
       const hm = ht * (CHAR_H[m.char] || 400) / 400;   // (ht = a grown-up's height: Simmy 400, Matcha 330, Mochi 275, as in the world)
       if (m.char === "simmy") drawSimmyAt(g, x, gy - hop, hm, t, m.outfit, o); else drawHeroAt(g, m.char, m.outfit, o, x, gy - hop, hm, false);
       g.fillStyle = "#fff6e5"; g.font = `800 ${Math.round(H * 0.05)}px Grandstander, system-ui, sans-serif`; g.textAlign = "center"; g.fillText(m.name, x, gy + H * 0.075);
+      // her pet: walks in beside her (a little in front, on her right), hops for joy when she arrives, then sits in her spotlight
+      const pt = pets.find((q) => q.char === m.char);
+      if (pt) {
+        const px = x + poff, py = gy + H * 0.035, jt = (t - s) - 2.3, joy = !final && cheer && jt < 1.6;
+        const pose = walking ? "w" + (Math.floor((t - s) * 9) % 4) : joy ? "joy" : "sit", ph = joy ? Math.abs(Math.sin(jt * 6)) * ht * 0.05 : 0;
+        g.fillStyle = "rgba(0,0,0,.3)"; g.beginPath(); g.ellipse(px, py, ht * 0.1, ht * 0.02, 0, 0, TAU); g.fill();
+        drawPetAt(g, pt.art, pose, px, py - ph, ht);
+        if (API.drawn) API.drawn.push(["teamPet", pt.art, pose, px, py, x, gy]);
+      }
+      if (API.drawn) API.drawn.push(["team", m.char, x, gy]);
     });
     if (final) {
       g.fillStyle = "#fff6e5"; g.font = `800 ${Math.round(H * 0.085)}px Grandstander, system-ui, sans-serif`; g.textAlign = "center";
@@ -4703,7 +4750,10 @@
   const DECK_VIEW = [0.05, 0, 0.97, 1];   // the part of the picture always on screen: the whole ship with its fishing ledges and the water past them (the floats)
   const DECK_START = { g: [0.36, 0.7], s: [0.6, 0.7] };   // where each girl steps onto the deck
   const SIM_HOME = [0.44, 0.6];   // Simmy's spot: left of the mast, below the table (deck.json's \`simmy\` spot stood her in front of the mast)
-  const DOCK_WALK = 6, DOCK_GAP = 0.7, ARR_SAIL = 4.5;
+  const DOCK_WALK = 6, DOCK_GAP = 0.7, DOCK_LAG = 0.5, ARR_SAIL = 4.5;
+  // where each of them stands on the painted ship's deck when the walk is over (picture fractions: the deck floor between the bulwark and the cabin,
+  // the first to arrive furthest in), spaced out
+  const DOCK_PARK = [[0.905, 0.607], [0.86, 0.609], [0.815, 0.609], [0.77, 0.6], [0.725, 0.59]];
   // the dock picture: the pier top runs along y 0.745, the gangplank goes up from (0.47, 0.745) to (0.64, 0.60), then onto the ship
   const DOCK_PATH = [[-0.08, 0.745], [0.47, 0.745], [0.64, 0.6], [0.7, 0.585]];
   const SHIP_PH = ["dock", "fish", "cook", "arrive"];
@@ -4713,7 +4763,7 @@
   const SHIP = { ph: "dock", t: 0, fish: 0, dishes: 0, tub: 0, carry: { g: null, s: null }, pans: [newPan(), newPan()], bucketAt: "spot", big: null, hint: null, lines: { g: null, s: null } };
   let shipFrom = null, shownAct;   // (her world position while she is on the ship; the action the button shows now)
   const onShip = () => G.mode === "ship" || (G.mode === "pause" && G.pmode === "ship");
-  const dockEnd = () => Math.max(0.3 + seqTime(SAYS.afterPhoto) + 0.6, 0.4 + 2 * DOCK_GAP + DOCK_WALK + 0.3);
+  const dockEnd = () => Math.max(0.3 + seqTime(SAYS.afterPhoto) + 0.6, 0.4 + 2 * DOCK_GAP + DOCK_LAG + DOCK_WALK + 0.9);
   const arrTalk = () => seqTime(SAYS.cookDone) + 0.4, arriveEnd = () => arrTalk() + ARR_SAIL;
   const SAY_ON = { fish: ["shipStart", 0.5], cook: ["fishDone", 0], arrive: ["cookDone", 0] };   // the line Simmy says as each phase starts (and when)
 
@@ -4732,7 +4782,6 @@
     SHIP.ph = ph; SHIP.t = 0; IN.ultPressed = false; dropHeld(); castWind = null;
     if (from === "dock" && ph !== "dock") {   // onto the deck
       const s = DECK_START[hero]; P.x = s[0] * DECK.size[0]; P.y = s[1] * DECK.size[1]; P.vx = P.vy = 0; P.face = 0; P.flip = false;
-      showBanner("Chuyến Tàu Ra Đảo", "Màn 2");   // (the ship is Màn 2 for Dad and the girls; the island is Màn 3 — LEVELS[1])
     }
     if (ph === "arrive") { P.vx = P.vy = 0; P.moving = false; play("win"); }
     shipUi();
@@ -5777,22 +5826,40 @@
     let map = (u, v) => [u * W, v * H];
     if (img) map = cover(g, img, W, H, 0.5, 0.75);
     const ph = map(0, 1)[1] - map(0, 0)[1];
-    const team = teamMembers(), walkers = [team.find((m) => m.char === "simmy"), ...team.filter((m) => m.char !== "simmy")];
-    // the path in picture fractions, by length (the picture is 1.5 times wider than tall)
-    const seg = DOCK_PATH.slice(1).map((p, i) => Math.hypot((p[0] - DOCK_PATH[i][0]) * 1.5, p[1] - DOCK_PATH[i][1])), tot = seg.reduce((a, b) => a + b, 0);
-    const at = (p) => { let d = p * tot; for (let i = 0; i < seg.length; i++) { if (d <= seg[i] || i === seg.length - 1) { const f = Math.min(1, d / seg[i]); return [lerp(DOCK_PATH[i][0], DOCK_PATH[i + 1][0], f), lerp(DOCK_PATH[i][1], DOCK_PATH[i + 1][1], f)]; } d -= seg[i]; } };
-    let sim = null;
-    walkers.forEach((m, i) => {
-      const t0 = 0.4 + i * DOCK_GAP, p = clamp((t - t0) / DOCK_WALK, 0, 1), [u, v] = at(p), [x, y] = map(u, v);
-      const hm = ph * 0.2 * (CHAR_H[m.char] || 400) / 400, a = 1 - ss(0.9, 1, p);
-      if (m.char === "simmy") sim = [x, y - hm - 16];
-      if (a <= 0.01) return;
-      const o = { face: 2, flip: false, moving: p > 0 && p < 1, dist: Math.max(0, t - t0) * 250 };
-      g.save(); g.globalAlpha = a;
-      g.fillStyle = "rgba(0,0,0,.25)"; g.beginPath(); g.ellipse(x, y, hm * 0.2, hm * 0.05, 0, 0, TAU); g.fill();
-      if (m.char === "simmy") drawSimmyAt(g, x, y, hm, t, m.outfit, o, false); else drawHeroAt(g, m.char, m.outfit, o, x, y, hm, true);
-      g.restore();
+    const team = teamMembers(), walkers = [team.find((m) => m.char === "simmy"), ...team.filter((m) => m.char !== "simmy")], pets = teamPets();
+    // everyone: each girl followed by her pet; they walk the path and then stand on the ship's deck (DOCK_PARK, one spot each) until the film ends
+    const cast = [];
+    walkers.forEach((m, i) => { const t0 = 0.4 + i * DOCK_GAP; cast.push({ m, t0 }); const pt = pets.find((q) => q.char === m.char); if (pt) cast.push({ pt, t0: t0 + DOCK_LAG }); });
+    let sim = null; const draws = [];
+    cast.forEach((c, i) => {
+      const px = cast.length > 1 ? lerp(DOCK_PARK[0][0], DOCK_PARK[DOCK_PARK.length - 1][0], i / (cast.length - 1)) : 0.86;   // (spread over the deck, whoever is aboard)
+      let py = DOCK_PARK[0][1]; for (let j = 1; j < DOCK_PARK.length; j++) if (px <= DOCK_PARK[j - 1][0]) py = lerp(DOCK_PARK[j - 1][1], DOCK_PARK[j][1], clamp((DOCK_PARK[j - 1][0] - px) / (DOCK_PARK[j - 1][0] - DOCK_PARK[j][0]), 0, 1));
+      const park = [px, py], pts = [...DOCK_PATH, park];
+      // the path in picture fractions, by length (the picture is 1.5 times wider than tall)
+      const seg = pts.slice(1).map((q, j) => Math.hypot((q[0] - pts[j][0]) * 1.5, q[1] - pts[j][1])), tot = seg.reduce((a, b) => a + b, 0);
+      const p = clamp((t - c.t0) / DOCK_WALK, 0, 1);
+      let d = p * tot, u = park[0], v = park[1];
+      for (let j = 0; j < seg.length; j++) { if (d <= seg[j] || j === seg.length - 1) { const f = Math.min(1, d / seg[j]); u = lerp(pts[j][0], pts[j + 1][0], f); v = lerp(pts[j][1], pts[j + 1][1], f); break; } d -= seg[j]; }
+      const [x, y] = map(u, v), moving = p > 0 && p < 1;
+      if (c.m) {
+        const m = c.m, hm = ph * 0.2 * (CHAR_H[m.char] || 400) / 400;
+        if (m.char === "simmy") sim = [x, y - hm - 16];
+        draws.push([y, () => {
+          const o = { face: 2, flip: false, moving, dist: Math.max(0, t - c.t0) * 250 };
+          g.fillStyle = "rgba(0,0,0,.25)"; g.beginPath(); g.ellipse(x, y, hm * 0.2, hm * 0.05, 0, 0, TAU); g.fill();
+          if (m.char === "simmy") drawSimmyAt(g, x, y, hm, t, m.outfit, o, false); else drawHeroAt(g, m.char, m.outfit, o, x, y, hm, true);
+          if (API.drawn) API.drawn.push(["dock", m.char, x, y, u, v]);
+        }]);
+      } else {
+        const th = ph * 0.2, pose = moving ? "w" + (Math.floor(Math.max(0, t - c.t0) * 9) % 4) : "sit";
+        draws.push([y, () => {
+          g.fillStyle = "rgba(0,0,0,.25)"; g.beginPath(); g.ellipse(x, y, th * 0.1, th * 0.025, 0, 0, TAU); g.fill();
+          drawPetAt(g, c.pt.art, pose, x, y, th);
+          if (API.drawn) API.drawn.push(["dock", c.pt.art, x, y, u, v]);
+        }]);
+      }
     });
+    draws.sort((a, b) => a[0] - b[0]).forEach((e) => e[1]());
     const say = sayAt(SAYS.afterPhoto, t - 0.3);
     if (say && sim) talkBubble(SAYS.afterPhoto[say.i][1], sim[0], sim[1], say.k, Math.round(H * 0.035));
     const f = ss(dockEnd() - 0.7, dockEnd(), t);
@@ -5894,6 +5961,7 @@
     if (!c.hold) c.t = Math.min(c.end, c.t + dt);
     const t = c.t, D = c.D, S = c.talk;
     if (t0 < c.shopAt && t >= c.shopAt) wkShopPops(D);
+    if (t0 < S && t >= S) showBanner("Chuyến Tàu Ra Đảo", "Màn 2");   // (Màn 2 starts here: the lines are done and Simmy walks to the shop; Màn 3 is the island, LEVELS[1])
     G.ult = null;   // (no blinking: nothing can hurt her while the world waits)
     // (while they talk she stands where she is, by Simmy; then the walk)
     const [vx, vy] = wkWalk(P, c.pp, 1.5 + S, 3.8 + S, 4.1 + S, 5.2 + S, t, dt); P.vx = vx; P.vy = vy;
@@ -6101,7 +6169,7 @@
       for (let i = 0; i < 26; i++) { const u = ((t * 0.7 + i * 0.137) % 1), a = i * 2.4 + t * 1.5, rr = (1 - u) * rx * 1.7; g.fillStyle = `rgba(210,210,230,${0.8 * u * po})`; g.beginPath(); g.arc(px + Math.cos(a) * rr, py + Math.sin(a) * rr * ry / rx, H * 0.006 * (1 + u), 0, TAU); g.fill(); }
     }
     // the cast
-    const mem = teamMembers(), outOf = (ch) => (mem.find((m) => m.char === ch) || {}).outfit || "base";
+    const mem = teamAll(), outOf = (ch) => (mem.find((m) => m.char === ch) || {}).outfit || "base";
     const pull = (x0, y0, s, jump) => {   // dragged to the portal from second s: [x, y, scale, spin, gone]
       const u = clamp((t - s) / (jump ? 1.1 : 1.9), 0, 1), e = u * u * (3 - 2 * u);
       return [lerp(x0, px, e), lerp(y0, py, e) - Math.sin(Math.PI * u) * H * (jump ? 0.28 : 0.16), 1 - 0.88 * e, u * (jump ? 5 : 9), u >= 1];
@@ -6325,7 +6393,7 @@
     startChosen();
     sendStart();
   }
-  function sendStart() { NET.startT = 1; netEmit("start", { to: NET.partner, lv: G.level, ship: onShip() }); }
+  function sendStart() { NET.startT = 1; netEmit("start", { to: NET.partner, lv: G.level, ship: !!G.m2 }); }
   function leaveCoop() {
     if (NET.room) NET.room.presence({ co: null, gl: null, sh: null, w: null }).catch(() => {});
     NET.role = null; NET.partner = null; NET.pp = null; NET.co = null; Q = null; QPETE = []; NET.hq.length = 0; NET.sq.length = 0; NET.fq.length = 0;
