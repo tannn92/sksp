@@ -332,7 +332,7 @@
   let META = null, ready = false;
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261026.1557", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261026.1600", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -4678,6 +4678,7 @@
   const REACH = 90, PAN_R = 80, FOOT = 14;   // (deck px) a station within REACH of her feet is in reach; a pan counts from PAN_R off its middle; her feet keep FOOT off objects
   const DECK_K = 0.45;   // deck px per world unit: the girls at their usual size against the stations (Mochi ~124 px tall on the 832 px picture)
   const SHIP_SP = 360 * DECK_K;   // her walking speed on deck: as many body lengths a second as in the world
+  const SEA_STRIP = 0.025;   // the open water past the bow at the right edge of the deck picture (its last 2.5 %, evenly lit), used to fill wide screens
   const DECK_VIEW = [0.05, 0, 0.97, 1];   // the part of the picture always on screen: the whole ship with its fishing ledges and the water past them (the floats)
   const DECK_START = { g: [0.36, 0.7], s: [0.6, 0.7] };   // where each girl steps onto the deck
   const SIM_HOME = [0.44, 0.6];   // Simmy's spot: left of the mast, below the table (deck.json's \`simmy\` spot stood her in front of the mast)
@@ -5479,7 +5480,15 @@
     const img = scene("deck"), v = deckView(), [SW, SH] = DECK.size;
     g.fillStyle = "#1d8fa0"; g.fillRect(0, 0, W, H);
     if (img) {
-      cover(g, img, W, H);   // the painted sea around the ship, a little darker, under the whole picture
+      // the margins left and right of the picture: its own painted sea (the open-water strip past the bow, SEA_STRIP),
+      // laid side by side and mirrored every other time so it joins up, a little darker (never a second copy of the ship)
+      const sw = SEA_STRIP * SW, sx0 = SW - sw, dw = sw * (H / SH);
+      for (let i = 0, x = 0; x < W; i++, x += dw) {   // (the whole screen, under the picture: also covers thin bands above / below it)
+        g.save();
+        if (i % 2) { g.translate(x + dw, 0); g.scale(-1, 1); g.drawImage(img, sx0, 0, sw, SH, 0, 0, dw, H); }
+        else g.drawImage(img, sx0, 0, sw, SH, x, 0, dw, H);
+        g.restore();
+      }
       g.fillStyle = "rgba(6,30,48,.35)"; g.fillRect(0, 0, W, H);
       g.drawImage(img, v.ox, v.oy, SW * v.s, SH * v.s);
     }
