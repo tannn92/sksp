@@ -242,7 +242,7 @@
     <div class="heroes" id="heroes"></div>
     <div class="help"><span>Cần trái: <b>đi khắp nơi</b></span><span>Bé <b>tự bắn</b> quái gần nhất</span><span>Đầy năng lượng: <b>Tuyệt chiêu</b></span></div>
     <p id="loading">Đang tải hình ảnh…</p>
-    <div class="startsel" id="startSel" role="group" aria-label="Bản thử: chọn màn"><span>Bản thử: chọn màn</span><button id="selMan1">Màn 1</button><button id="selShip">Trên tàu</button><button id="selMan2">Màn 2</button></div>
+    <div class="startsel" id="startSel" role="group" aria-label="Bản thử: chọn màn"><span>Bản thử: chọn màn</span><button id="selMan1">Màn 1</button><button id="selShip">Màn 2: Trên tàu</button><button id="selMan2">Màn 3: Đảo</button></div>
     <div class="row"><button class="btn" id="startBtn" hidden>Chơi một mình</button><button class="btn ghost" id="coopBtn" hidden>Chơi 2 người</button></div>
   </div>
   <div class="ver"><span id="verNum"></span><button id="verBtn">Kiểm tra bản mới</button></div>
@@ -339,7 +339,7 @@
   let META = null, ready = false;
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261026.1812", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261026.1814", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -615,7 +615,7 @@
         stone: ["#fff1d6", "#ffe3c2", "#f7d2a8"], gap: "#d3a07c", edge: "#8b5236" } },
     // Màn 2: a sand-and-sea island. The boss is a ghost captain who charges, swings his anchor (cracks along the ground), and calls parrots.
     // Props are drawn about 12% smaller than the candy ones, so each deco entry carries a scale: [sprite, weight, scale].
-    { name: "Màn 2: Đảo Cướp Biển", seed: 2207, path: "river", arena: true, last: true,
+    { name: "Màn 3: Đảo Cướp Biển", seed: 2207, path: "river", arena: true, last: true,
       intro: "Phù thủy Xám Xịt đã đưa cả nhóm tới Đảo Cướp Biển! Mặc đồ cướp biển, đi theo lối cát vàng, đánh bại <b>Thuyền Trưởng Ma</b> và cứu chị Sammy nhé.",
       end: "Thuyền Trưởng Ma đã bị đánh bại và Sammy đã được cứu! Phù thủy Xám Xịt vẫn giữ các bạn còn lại. Sắp tới: cứu Kairon và Phong Cận!",
       boss: { art: "pirate_boss", name: "Thuyền Trưởng Ma", hp: 60, tip: "Thuyền trưởng lao tới và quét mỏ neo xuống cát, đàn vẹt bay tới!", summon: "pirate_bat", style: "captain", fence: "pr_rope_fence",
@@ -4732,6 +4732,7 @@
     SHIP.ph = ph; SHIP.t = 0; IN.ultPressed = false; dropHeld(); castWind = null;
     if (from === "dock" && ph !== "dock") {   // onto the deck
       const s = DECK_START[hero]; P.x = s[0] * DECK.size[0]; P.y = s[1] * DECK.size[1]; P.vx = P.vy = 0; P.face = 0; P.flip = false;
+      showBanner("Chuyến Tàu Ra Đảo", "Màn 2");   // (the ship is Màn 2 for Dad and the girls; the island is Màn 3 — LEVELS[1])
     }
     if (ph === "arrive") { P.vx = P.vy = 0; P.moving = false; play("win"); }
     shipUi();
