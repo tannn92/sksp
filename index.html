@@ -360,7 +360,7 @@
   let META = null, ready = false;
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261027.1945", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261027.1950", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -636,7 +636,7 @@
       // the boss leaps twice (at 2/3 and 1/3 of his health), each leap asks quiz.n[i] questions in a row
       boss: { art: "candy_boss", name: "Bánh Kem Khổng Lồ", hp: 45, tip: "Bánh kem đập đất nứt, đàn kẹo mút bay tới!", summon: "candy_lolli", style: "furrow", fence: "cd_wafer_fence", quiz: { op: "+", lim: 10, T: 3, n: [2, 2], hz: "qk_bomb" },
       laugh: "laugh0", ha: "Hô hô hô!", say: ["Ta là Bánh Kem Khổng Lồ,", "chủ nhân Rừng Kẹo Ngọt!", "Không ai qua được đâu!"], morph: ["Grừừ! Ta nổi giận rồi!"], bye:["Ôi... kem của ta...", "chảy hết rồi...", "Phù thủy Xám Xịt sẽ trả thù!"] }, quota: 120, spawn: [0.7, 1.6], camps: 9, pets: ["cat", "dog", "simmy"],
-      kinds: [["candy_gummy", 3, 0], ["candy_lolli", 2, 0], ["candy_corn", 2, 0.15], ["candy_cupcake", 2, 0.35]],
+      kinds: [["candy_gummy", 3, 0], ["candy_lolli", 2, 0], ["candy_corn", 2, 0.1], ["candy_cupcake", 2, 0.2]],
       deco: [["cd_lolly_tree", 3], ["cd_gumdrop_bush", 3], ["cd_marsh_bush", 2], ["cd_candy_cane", 2], ["cd_cupcake_shroom", 2], ["cd_cookie_rock", 1], ["cd_choc_rock", 1]], arenaFloor: "arena_candy",
       gr: { base: "#f7d3e2", patch: ["#fde7d0", "#c9efdd", "#f2b9d2", "#fff1b8"], blade: ["#ffffff", "#ff9fc4", "#a8e6cf"], dot: ["#ff6fa8", "#7cf2c6", "#ffe066", "#ffffff", "#b9a4ff", "#ff9a5c"], nDot: 110,
         stone: ["#fff1d6", "#ffe3c2", "#f7d2a8"], gap: "#d3a07c", edge: "#8b5236" } },
@@ -650,7 +650,7 @@
         quiz: { op: "-", lim: 10, T: 3, n: [2, 2], hz: "qk_bomb" },
         laugh: "laugh0", ha: "Ha ha ha!", say: ["Ta là Thuyền Trưởng Ma!", "Biển cả nghe lệnh ta!"], morph: ["Grừừ! Biển cả, nổi giận đi!"], bye:["Ôi... mỏ neo của ta...", "Nhưng Phù thủy Xám Xịt vẫn", "giữ các bạn còn lại đấy!"] },
       quota: 130, spawn: [0.8, 1.7], camps: 10, pets: ["kairon"], chest: "pr_chest", arenaFloor: "arena_pirate",
-      kinds: [["pirate_zombie", 3, 0], ["pirate_skeleton", 2, 0], ["pirate_mummy", 2, 0.15], ["pirate_bat", 2, 0.35]],
+      kinds: [["pirate_zombie", 3, 0], ["pirate_skeleton", 2, 0], ["pirate_mummy", 2, 0.05], ["pirate_bat", 2, 0.12]],
       deco: [["pr_palm", 4, 1.15], ["pr_barrels", 2, 1.12], ["pr_boat", 1, 1.12], ["pr_anchor", 1, 1.12], ["pr_rope_fence", 1, 1.12], ["pr_shell_rock", 2, 1.12], ["pr_skull_flag", 1, 1.12]],
       gr: { base: "#f3dfae", patch: ["#fbeccb", "#e8cf94", "#bfeee6", "#f7e3b5"], blade: ["#d9bd7c", "#fff3cf", "#b7d98a"], dot: ["#fff6e5", "#ffb8a1", "#ffd9a8", "#ffffff", "#8fd6e8", "#f7a8b8"], nDot: 70,
         stone: ["#f6e7c4", "#e9d3a2", "#dcc08a"], gap: "#ecd29c", edge: "#a9824a", sea: "#58cfd8", seaEdge: "#e9fbff", pond: "#7fdcd8", nPond: 38 } },
@@ -664,7 +664,7 @@
         quiz: { op: "+", lim: 20, T: [5, 8], n: [2, 2], hz: "qk_bomb" },
         laugh: "laugh0", ha: "Grào grào!", say: ["Grào! Ta là Yeti!", "Núi Tuyết là của ta!"], morph: ["Grào! Bão tuyết, nổi lên đi!"], bye: ["Ôi... ta tan chảy mất...", "Nhưng Phù thủy Xám Xịt vẫn", "giữ các bạn còn lại đấy!"] },
       quota: 140, spawn: [0.85, 1.8], camps: 10, pets: ["sammy"], cage: "snow_cage", arenaFloor: "arena_snow",
-      kinds: [["snow_zombie", 3, 0], ["snow_skeleton", 2, 0], ["snow_mummy", 2, 0.15], ["snow_bat", 2, 0.35]],
+      kinds: [["snow_zombie", 3, 0], ["snow_skeleton", 2, 0], ["snow_mummy", 2, 0.05], ["snow_bat", 2, 0.12]],
       deco: [["sn_pine", 4, 1.15], ["sn_ice_rock", 2, 1.12], ["sn_snowman", 1, 1.12], ["sn_sign", 1, 1.12], ["sn_crystal", 2, 1.12], ["sn_fence", 1, 1.12], ["sn_berry_bush", 2, 1.12], ["sn_sled", 1, 1.12]],
       gr: { base: "#eef6fc", patch: ["#ffffff", "#dbeefa", "#cfe6f7", "#f4f9ff"], blade: ["#ffffff", "#d6ecfa", "#b9dcf2"], dot: ["#ffffff", "#e6f4ff", "#bfe3ff", "#a9d8f5", "#ffffff", "#d0ecff"], nDot: 90,
         stone: ["#dbe9f5", "#c8dced", "#b5cfe4"], gap: "#e4f0fa", edge: "#8fb3d1", sea: "#8fcbef", seaEdge: "#ffffff", pond: "#bfe4fa", nPond: 30 } },
@@ -679,7 +679,7 @@
         quiz: { op: "-", lim: 20, T: [5, 8], n: [2, 2], hz: "qk_rock2" },
         laugh: "laugh0", ha: "Hừ hừ hừ!", say: ["Hừ hừ! Ta là Quỷ Dung Nham!", "Lửa sẽ thiêu rụi tất cả!"], morph: ["Grừừ! Núi lửa, phun trào đi!"], bye: ["Ôi... lửa của ta...", "tắt mất rồi...", "Phù thủy Xám Xịt sẽ trả thù!"] },
       quota: 140, spawn: [0.85, 1.8], camps: 10, pets: ["phong"], arenaFloor: "arena_lava",
-      kinds: [["lava_zombie", 3, 0], ["lava_skeleton", 2, 0], ["lava_mummy", 2, 0.15], ["lava_bat", 2, 0.35]],
+      kinds: [["lava_zombie", 3, 0], ["lava_skeleton", 2, 0], ["lava_mummy", 2, 0.05], ["lava_bat", 2, 0.12]],
       // (readable: the girls vanished on near-black ground among orange-cracked props, so this map has fewer, calmer props (no lava-pool
       // prop: it looked like the hazard), its own lighter fill (decoN), more gaps beside the path (decoSkip) and more room between props
       // (decoGap); a lighter ground with fewer, softer seams (seamA), dots and ponds. Màn 1-3 keep the defaults.)
@@ -830,7 +830,7 @@
 
   // ---------------------------------------------------------------- game state
   const G = { mode: "title", level: 0, t: 0, lt: 0, frame: 0, stars: 0, hearts: 5, energy: 0, camX: 0, camY: 0, shake: 0, fade: 0, fadeDir: 0, onFade: null,
-    mons: [], parts: [], shots: [], pshots: [], foes: [], items: [], drops: [], gems: [], rings: [], quakes: [], chests: [], cages: [], deco: [], lamps: [],
+    mons: [], parts: [], shots: [], pshots: [], foes: [], cps: [], blocks: 0, items: [], drops: [], gems: [], rings: [], quakes: [], chests: [], cages: [], deco: [], lamps: [],
     portal: null, arena: null, boss: null, ult: null, cine: null, rescue: null, sksp: ["", "", "", ""], leaps: 0, qzN: 0, nextId: 1, lvl: null, kills: 0, lvKills: 0, spawnAcc: 0, surgeT: 30, arenaLock: false, won: false, path: null };
   const P = { x: 0, y: 0, vx: 0, vy: 0, z: 0, face: 0, flip: false, moving: false, dist: 0, inv: 0, hurtT: 0, slowT: 0, castT: 0, shootCd: 0, dead: false, winT: 0,
     elem: null, elemT: 0, lv: 1, xp: 0, prog: 0, pets: [], outfit: "base" };
@@ -1077,7 +1077,7 @@
       addDeco(d);
     }
     // reset the play state
-    G.nextId = 1; G.mons = []; G.shots = []; G.pshots = []; G.foes = []; G.parts = []; G.drops = []; G.gems = []; G.rings = []; G.quakes = []; G.waters = []; G.lavas = [];
+    G.nextId = 1; G.mons = []; G.shots = []; G.pshots = []; G.foes = []; clearCps(); G.parts = []; G.drops = []; G.gems = []; G.rings = []; G.quakes = []; G.waters = []; G.lavas = [];
     G.shopDone = false; G.shopPhase = 0; G.m2 = false;   // (a new level has no shop phase left over from the last one)
     G.story = null; G.storyWait = 0; $("storyCard").hidden = true;   // (a story card is shown after the build, by whoever built it for an arrival)
     G.boss = null; G.ult = null; G.quiz = null; G.bcut = null; G.bcutSeen = null; G.rescue = null; G.leaps = 0; G.qzN = 0; $("quiz").hidden = true; G.arenaLock = false; G.lt = 0; G.lvKills = 0; G.spawnAcc = 0; G.surgeT = 35; G.gateMsg = false; G.tierMsg = false; TIER_FR.clear();
@@ -1305,6 +1305,7 @@
     const B = G.boss;
     let tx, ty, dx, dy, d;
     if (G.quiz && G.arena) { const [qx, qy] = quadCentre(G.quiz.ok); dx = qx - P.x; dy = qy - P.y; d = Math.hypot(dx, dy); return d < 40 ? [0, 0] : [dx / d, dy / d]; }
+    { const cd = creepDodge(); if (cd) return cd; }   // (out of the monsters' warnings first)
     if (B && B.alive && B.st !== "enter") {
       const wet = waterDodge() || lavaDodge() || quakeDodge(); if (wet) return wet;   // (out of the captain's warned water, the lava demon's warned fire, the warned cracks and landing spots first)
       dx = B.x - P.x; dy = B.y - P.y; d = Math.hypot(dx, dy) || 1;
@@ -1394,9 +1395,10 @@
       const dx = m.x - x, dy = m.y - y, d = Math.hypot(dx, dy);
       if (d > 650) continue;
       const k = (d < 1 ? 1 : 1 / d) * 420; m.x += (d < 1 ? 1 : dx) * k; m.y += dy * k; pushOut(m, m.r);
-      m.st = m.c.fly ? "back" : "rest"; m.t = 0; m.cd = 2;
+      m.st = m.c.fly ? "back" : "rest"; m.t = 0; m.cd = 2; m.cp = null;
     }
     G.foes = G.foes.filter((f) => d2(f.x, f.y, x, y) > 700 * 700);
+    for (const o of G.cps) if (d2(o.x, o.y, x, y) < 700 * 700) o.end = Math.min(o.end, o.t);   // (the monsters' warnings near her go too)
   }
   function updateHero(dt) {
     P.inv -= dt; P.hurtT -= dt; P.slowT -= dt; P.castT -= dt;
@@ -1568,6 +1570,7 @@
         if (!m.alive || (s.hit && s.hit.has(m.id))) continue;
         const rr = s.r + m.r; if (d2(s.x, s.y, m.x, aimY(m, z)) > rr * rr) continue;
         s.tgt = null;
+        if (shieldBlocks(m, s.vx, s.vy)) { s.life = 0; blockFx(m, s.x, s.y); break; }   // (the ice skeleton's shield, in front of him)
         hitMon(m, s.dmg, s.elem, s.x, s.y, s.kb); hitFx(s.x, s.y - BOLT_Z, s.hk);
         if (s.pierce) s.hit.add(m.id); else if (s.bounce > 0) bounceShot(s, m); else s.life = 0;
       }
@@ -1641,6 +1644,7 @@
   function updateMon(m, dt) {
     if (!m.alive) { m.die += dt; return; }
     m.t += dt; m.cd -= dt; m.hurt -= dt; m.flash -= dt;
+    if (m.fastT > 0) m.fastT -= dt;   // (a wolf's howl hurries it)
     // a camp monster idles at its camp until a girl steps in or the camp is attacked
     if (m.wait) {
       if (m.hp < m.max) m.camp.hit = true;
@@ -1648,16 +1652,19 @@
       m.wait = false;
     }
     const c = m.c, T = targetFor(m.x, m.y), dx = T.x - m.x, dy = T.y - m.y, d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d;
-    const ox = m.x, oy = m.y;
+    const ox = m.x, oy = m.y, inSk = SKILL_ST.has(m.st);
+    if (m.sk && !inSk) m.skCd -= dt;
     if (m.hurt > 0) { m.x += m.vx * dt; m.y += m.vy * dt; m.vx *= Math.pow(0.02, dt); m.vy *= Math.pow(0.02, dt); }
+    else if (inSk) skillStep(m, dt, T, d, ux, uy);   // (its own attack: see the creep skills below)
+    else if (m.sk && m.skCd <= 0 && !T.dead && skillStart(m, T, d, ux, uy)) {}
     else if (c.fly) updateFlyer(m, dt, T, ux, uy, d);
     else if (m.st === "prep") {
-      setFace(m, dx, dy);
+      faceTo(m, dx, dy, dt);
       if (m.t > c.prep) { m.st = "atk"; m.t = 0; m.vx = ux * c.lunge; m.vy = uy * c.lunge; if (likeOf(m) === "vampire" || likeOf(m) === "mummy") play("swoosh"); }
     } else if (m.st === "atk") {
       m.x += m.vx * dt; m.y += m.vy * dt; m.vx *= Math.pow(0.05, dt); m.vy *= Math.pow(0.05, dt);
       if (d < 70) { m.vx = m.vy = 0; }   // the lunge stops at the girl instead of passing through her
-      if (m.t > 0.06 && m.t < c.atk * 0.8) for (const g of girls()) if (d2(m.x, m.y, g.x, g.y) < (m.r + HERO_R + 20) ** 2) hurtTarget(g, m.x, m.y);
+      if (m.t > 0.06 && m.t < c.atk * 0.8) for (const g of girls()) if (d2(m.x, m.y, g.x, g.y) < (m.r + HERO_R + 20) ** 2) { if (m.sk && skillOf(m) === "grab") pinch(g, m.x, m.y); else hurtTarget(g, m.x, m.y); }
       if (m.t > c.atk) { m.st = "rest"; m.t = 0; m.cd = c.cd; }
     } else if (m.st === "web") {
       if (m.t > 0.35 && !m.shot) {
@@ -1667,10 +1674,10 @@
       if (m.t > 0.7) { m.st = "rest"; m.t = 0; m.cd = c.cd * 1.4; }
     } else {
       // walk / rest: shuffle toward the nearest girl, then wind up a lunge
-      if (m.st === "rest" && m.t > 0.45) m.st = "walk";
+      if (m.st === "rest" && m.t > restT(m)) m.st = "walk";
       if (!T.dead) {
-        if (m.st === "walk" && d > c.reach * 0.6) { m.x += ux * c.spd * dt; m.y += uy * c.spd * dt; }
-        if (m.st === "walk") setFace(m, dx, dy);
+        if (m.st === "walk") walkMove(m, dt, ux, uy, d);   // (toward her; in hops, sideways, keeping its distance, leaving fire: see walkMove)
+        if (m.st === "walk") faceTo(m, dx, dy, dt);
         if (m.cd <= 0 && d < c.reach) { m.st = "prep"; m.t = 0; m.shot = false; }
         else if (c.web && m.cd <= 0 && d > 300 && d < 620 && Math.random() < dt * 0.8) { m.st = "web"; m.t = 0; m.shot = false; }
       } else if (m.st === "walk") { m.x -= ux * c.spd * 0.4 * dt; m.y -= uy * c.spd * 0.4 * dt; }
@@ -1706,10 +1713,10 @@
       m.x -= ux * 160 * dt; m.y -= uy * 160 * dt;
       if (m.t > 0.8) { m.st = "fly"; m.t = 0; }
     } else {
-      const keep = likeOf(m) === "bat" ? 230 : 270, want = d > keep ? 1 : -0.4, s = c.spd * dt, sw = Math.sin(G.t * 1.3 + m.ph) * 0.7;
+      const SK = m.sk ? SKILL[m.kind] : null, keep = (SK && SK.keep) || (likeOf(m) === "bat" ? 230 : 270), want = d > keep ? 1 : -0.4, s = c.spd * dt, sw = Math.sin(G.t * 1.3 + m.ph) * 0.7;
       m.x += (ux * want - uy * sw) * s; m.y += (uy * want + ux * sw) * s;
       setFace(m, ux, uy);
-      if (m.cd <= 0 && d < c.reach && !T.dead) { m.st = "prep"; m.t = 0; }
+      if (m.cd <= 0 && d < c.reach && !T.dead && !SK) { m.st = "prep"; m.t = 0; }   // (a skilled flyer attacks with its skill only)
     }
   }
   // monsters keep a little apart instead of stacking into one blob
@@ -1729,6 +1736,323 @@
       }
     }
   }
+  // ---------------------------------------------------------------- the monsters' own attacks ("creeps")
+  // Each map's four breeds fight in their own way (Dad: "toàn chỉ biết lao vào như zombie nhìn chán chết"):
+  //   Màn 1 candy:  the gummy bounces along in hops | the lolli (a flyer) lobs a lollipop at her | the candy corn shakes, then charges down
+  //                 a lane | the cupcake crouches and leaps onto her spot
+  //   Màn 2 island: the pirate skeleton lobs his cutlass | the crab scuttles sideways and pinches (a heart and a slow) | the barrel rolls
+  //                 down a lane | the parrot climbs, marks her spot and dives onto it
+  //   Màn 3 snow:   the snowman lobs a snowball (it slows) | the ice skeleton holds an ice shield in front: her bolts from the front are
+  //                 blocked; from the side, or just after his stab, they hit | the wolf pounces, then howls: the wolves near it hurry |
+  //                 the ice bat breathes frost in a cone (it slows)
+  //   Màn 4 lava:   the golem pounds the ground and it cracks open under her | the fire skeleton shoots a fireball down a lane | the salamander leaves
+  //                 burning patches behind it | the fire bat glows red, then bursts (and is gone)
+  // A monster is "skilled" (m.sk) with its map's share (CREEP_LV; an elite always; the camps' and the boss's summons too); the rest lunge as
+  // before. The share, how often they use their skills (cd) and how many warnings may show at once (tele) rise map by map.
+  // Every ranged / area attack is a piece in G.cps (k: "lob" | "lane" | "ring" | "cone" | "fire"), drawn on the ground first (its warning,
+  // w >= 0.6 s; >= 0.8 s for the big ones) and hurting only inside what is drawn, one heart a hit. The thrown things are painted pieces
+  // (cpArt). The host owns the pieces; the guest's page mirrors them (world state `cz`) and is hurt by the host (hurtTarget). They are
+  // pooled (CP_POOL) and drawn only on the screen, and never more than teleCap() warnings show at once (readable for a five-year-old).
+  const CREEP_LV = [
+    { share: 0.45, cd: [6, 9], tele: 2 },      // Màn 1: gentle
+    { share: 0.6, cd: [5, 7.5], tele: 3 },
+    { share: 0.75, cd: [4.2, 6.2], tele: 3 },
+    { share: 0.9, cd: [3.2, 4.8], tele: 4 },   // Màn 4: busy
+  ];
+  const creepLv = () => CREEP_LV[clamp(G.level | 0, 0, CREEP_LV.length - 1)];
+  // (in the boss's arena his own moves fill the ground: two at most from his monsters then)
+  const teleCap = () => (G.boss && G.boss.alive ? Math.min(2, creepLv().tele) : creepLv().tele);
+  // sk: the skill. w: its warning (s); r: a ring's / a lane's half width; d: [nearest, farthest] from her it starts at; keep: how far a
+  // skilled thrower / flyer stays; art: the painted thing it throws (the first that is in the atlas; a RegExp takes the first frame whose
+  // name matches); sz: its drawn size (longest side); z0: the height it leaves the hand at; spin: turns / s; col / fx: its light and sparks
+  const SKILL = {
+    candy_gummy:     { sk: "hop" },
+    candy_lolli:     { sk: "lob", art: ["cd_lollipop"], w: 1.0, r: 110, d: [260, 760], keep: 420, sz: 120, z0: 170, spin: 9, col: "255,120,200", fx: ["#ff5fae", "#fff4fb", "#ff2a5a", "#ffd1ea"] },
+    candy_corn:      { sk: "charge", w: 0.9, L: 860, hw: 80, v: 1100, d: [200, 760], shake: 1 },
+    candy_cupcake:   { sk: "jump", w: 1.0, air: 0.5, r: 150, hz: 230, d: [180, 640], fx: ["#ffb3d9", "#fff4fb", "#ff7ab8", "#fff1b8"] },
+    pirate_zombie:   { sk: "lob", art: ["hz_sword"], w: 0.9, r: 110, d: [260, 760], keep: 400, sz: 170, z0: 130, spin: 12, col: "255,200,150", fx: ["#fff4c2", "#d9bd7c", "#ffffff"] },
+    pirate_skeleton: { sk: "grab" },
+    pirate_mummy:    { sk: "roll", w: 0.9, L: 920, hw: 85, v: 950, d: [240, 820], shake: 1 },
+    pirate_bat:      { sk: "dive", w: 0.9, air: 0.4, r: 120, d: [0, 800], keep: 300, fx: ["#5fd35f", "#ff4a3a", "#ffe066", "#3aa8ff"] },
+    snow_zombie:     { sk: "lob", art: ["fxsn_ball0", "fx_ice_chunk0"], w: 0.9, r: 115, d: [260, 760], keep: 400, sz: 110, z0: 150, spin: 4, slow: 1, col: "200,235,255", fx: ["#ffffff", "#e6f4ff", "#bfe3ff", "#a9d8f5"] },
+    snow_skeleton:   { sk: "shield", arc: 1.05, turn: 1.8, open: 1.4 },
+    snow_mummy:      { sk: "pounce", w: 0.8, air: 0.35, r: 130, hz: 150, d: [180, 600], howl: 700, fx: ["#ffffff", "#dbeefa", "#b9dcf2"] },
+    snow_bat:        { sk: "breath", w: 0.9, on: 0.6, L: 560, ha: 0.38, d: [160, 600], keep: 380, slow: 1 },
+    lava_zombie:     { sk: "slam", w: 1.0, r: 200, d: [0, 720], shake: 1 },   // (he pounds the ground: it cracks open under her marked spot)
+    lava_skeleton:   { sk: "fireball", art: ["fx_bolt_fire"], w: 0.7, L: 900, hw: 60, v: 1000, d: [240, 820], keep: 420, sz: 1.1, shake: 1 },
+    lava_mummy:      { sk: "trail", r: 62, warm: 0.6, burn: 3.0, step: 95, max: 5 },
+    lava_bat:        { sk: "boom", w: 0.9, air: 0.6, r: 170, d: [0, 640], keep: 300 },   // (it glows, then flies at her marked spot and bursts there)
+  };
+  const SKILL_ST = new Set(["skw", "sk", "howl"]);   // skw: winding up (its warning shows), sk: doing it, howl: the wolf's howl
+  const CPK = ["lob", "lane", "ring", "cone", "fire"];
+  const LOB_WIND = 0.35, HOP_HZ = 1.7, HOWL_T = 0.7, HOWL_FAST = 3, HOWL_K = 1.45, FIRE_MAX = 18;
+  const skillOf = (m) => (SKILL[m.kind] ? SKILL[m.kind].sk : null);
+  const hearIt = (x, y) => d2(x, y, P.x, P.y) < 1300 * 1300;
+  function skillRoll(m) {
+    if (!SKILL[m.kind]) return;
+    const L = creepLv(); m.sk = !!(m.elite || Math.random() < L.share); m.skCd = rnd(0.2, 1.2); m.cp = null;   // (ready soon: it shows its skill the first time it comes in range)
+  }
+  // the painted thing a breed throws (null: none)
+  const ART_C = new Map();
+  function cpArt(kind) {
+    const S = SKILL[kind]; if (!S || !S.art) return null;
+    if (ART_C.has(kind)) return ART_C.get(kind);
+    let a = null;
+    for (const c of S.art) { if (c instanceof RegExp) { const n = Object.keys(FR).filter((k) => c.test(k)).sort()[0]; if (n) { a = n; break; } } else if (FR[c]) { a = c; break; } }
+    if (Object.keys(FR).length > 200) ART_C.set(kind, a);   // (remembered once the atlas is in)
+    return a;
+  }
+  // the first of these painted frames that is in the atlas (the bosses' new snow / lava effects, else an older piece), or null
+  const frOf = (...names) => { for (const n of names) if (FR[n]) return n; return null; };
+  // a gummy's hop: where it is in its bounce (0..1: up in the air below 0.7, on the ground after), and how fast it moves then
+  const hopPh = (m) => (G.t * HOP_HZ + m.id * 0.37) % 1;
+  const hopPace = (m) => { const ph = hopPh(m); return ph < 0.7 ? 2 * Math.sin(Math.PI * ph / 0.7) : 0; };
+  const restT = (m) => (m.sk && skillOf(m) === "shield" ? SKILL[m.kind].open : 0.45);
+  // turn to her: at once, but the ice skeleton turns his shield round slowly (she can get at his side)
+  function faceTo(m, dx, dy, dt) {
+    const S = m.sk && SKILL[m.kind];
+    if (!S || S.sk !== "shield") return setFace(m, dx, dy);
+    const want = Math.atan2(dy, dx);
+    if (m.fa === undefined) m.fa = want;
+    const da = Math.atan2(Math.sin(want - m.fa), Math.cos(want - m.fa));
+    m.fa += clamp(da, -S.turn * dt, S.turn * dt);
+    setFace(m, Math.cos(m.fa), Math.sin(m.fa));
+  }
+  // the ice skeleton's shield is up (not while he stabs and just after, nor frozen)
+  const shieldUp = (m) => !!(m.alive && m.sk && skillOf(m) === "shield" && !(m.frz > 0) && m.st !== "atk" && m.st !== "rest" && m.fa !== undefined);
+  // a bolt flying at (vx, vy) meets his shield: it comes at his front
+  function shieldBlocks(m, vx, vy) {
+    if (!shieldUp(m)) return false;
+    const v = Math.hypot(vx, vy) || 1;
+    return (-vx * Math.cos(m.fa) - vy * Math.sin(m.fa)) / v > Math.cos(SKILL[m.kind].arc);
+  }
+  function blockFx(m, x, y) {
+    G.blocks = (G.blocks || 0) + 1; play("shatter");
+    const sx = m.x + Math.cos(m.fa) * 50, sy = m.y + Math.sin(m.fa) * 26 - 100;
+    if (G.parts.length < 420) { burst(sx, sy, 6, ["#ffffff", "#d8f4ff", "#7fd6ff"], 220, 0.35); G.parts.push({ type: "fx", name: "fx_twinkle", x: sx, y: sy, sc: 0.7, life: 0.25, max: 0.25, grow: 1.2 }); }
+  }
+  // a crab's pinch / a snowball / the frost: a heart and a slow (the slow first: the hurt makes her safe for a moment)
+  function pinch(g, x, y) {
+    if (g === P ? P.inv <= 0 && !P.dead : !(g.hostInv > 0) && !g.dead) hurtTarget(g, x, y, true);
+    hurtTarget(g, x, y);
+  }
+  // how she walks at the girl: in hops (the gummy), sideways (the crab), keeping her distance (a skilled thrower), leaving fire (the salamander)
+  function walkMove(m, dt, ux, uy, d) {
+    const c = m.c, S = SKILL[m.kind], sk = S ? S.sk : null;
+    let sp = c.spd * (m.fastT > 0 ? HOWL_K : 1), mx = ux, my = uy;
+    if (sk === "hop") sp *= hopPace(m);
+    if (m.sk && S.keep) { if (d < S.keep * 0.75) { mx = -ux * 0.6; my = -uy * 0.6; } else if (d < S.keep) return; }
+    else if (d <= c.reach * 0.6) return;
+    if (m.sk && sk === "grab") { const w = Math.sin(G.t * 4.5 + m.ph) * 0.9; [mx, my] = norm(ux - uy * w, uy + ux * w); }
+    m.x += mx * sp * dt; m.y += my * sp * dt;
+    if (m.sk && sk === "trail" && d > 240 && (m.trailD = (m.trailD || 0) + sp * dt) > S.step) { m.trailD = 0; dropFire(m, S, ux, uy); }
+  }
+  function dropFire(m, S, ux, uy) {
+    let own = 0, all = 0; const x = m.x - ux * 40, y = m.y - uy * 25;
+    for (const o of G.cps) if (o.k === "fire") { all++; if (o.mid === m.id) own++; if (d2(o.x, o.y, x, y) < (S.r * 1.6) ** 2) return; }   // (not on top of another: each patch reads on its own)
+    if (own >= S.max || all >= FIRE_MAX) return;
+    addCp("fire", m.kind, x, y, { mid: m.id, r: S.r, w: S.warm, on: S.burn });
+  }
+  // the warnings showing now (the fire patches are hazards of their own, not counted)
+  // (kind: those of one breed only: one breed may hold no more than half of them, so the throwers do not crowd out the others)
+  function teleCount(kind) { let n = 0; for (const o of G.cps) if (o.k !== "fire" && (!kind || o.mk === kind)) n++; return n; }
+  // a lane ends inside the world
+  function laneLen(x, y, a, L) {
+    const c = Math.cos(a), s = Math.sin(a);
+    if (c > 0.01) L = Math.min(L, (WORLD - 100 - x) / c); else if (c < -0.01) L = Math.min(L, (100 - x) / c);
+    if (s > 0.01) L = Math.min(L, (WORLD - 100 - y) / s); else if (s < -0.01) L = Math.min(L, (100 - y) / s);
+    return Math.max(120, L);
+  }
+  // start its skill at T when she is in its range and there is room for one more warning; its piece shows from now
+  function skillStart(m, T, d, ux, uy) {
+    const S = SKILL[m.kind]; if (!S || !S.d || m.wait) return false;
+    if (d < S.d[0] || d > S.d[1]) return false;
+    const cap = teleCap();
+    if (teleCount() >= cap || teleCount(m.kind) >= Math.max(1, Math.floor(cap / 2))) { m.skCd = 0.4; return false; }
+    const sk = S.sk, a = Math.atan2(T.y - m.y, T.x - m.x);
+    m.st = "skw"; m.t = 0; m.vx = m.vy = 0; m.sx = m.x; m.sy = m.y; setFace(m, ux, uy);
+    if (sk === "lob") m.cp = addCp("lob", m.kind, T.x, T.y, { m, sx: m.x, sy: m.y, r: S.r, w: S.w, t: -LOB_WIND, tie: 0 });
+    else if (sk === "charge" || sk === "roll" || sk === "fireball") m.cp = addCp("lane", m.kind, m.x, m.y, { m, a, L: laneLen(m.x, m.y, a, S.L), r: S.hw, w: S.w, v: S.v, tie: sk === "fireball" ? S.w : Infinity });
+    else if (sk === "jump" || sk === "pounce" || sk === "dive" || sk === "boom" || sk === "slam") {
+      const k = Math.min(1, S.d[1] / Math.max(d, 1));
+      m.cp = addCp("ring", m.kind, m.x + (T.x - m.x) * k, m.y + (T.y - m.y) * k, { m, sx: m.x, sy: m.y, r: S.r, w: S.w, tie: S.w });
+    }
+    else if (sk === "breath") m.cp = addCp("cone", m.kind, m.x, m.y, { m, a, L: S.L, ha: S.ha, w: S.w, on: S.on, tie: Infinity });
+    else { m.st = c0(m); return false; }
+    if (hearIt(m.x, m.y)) { if (sk === "charge" || sk === "roll" || sk === "slam") play("charge"); else if (sk === "boom") play("fire"); }
+    return true;
+  }
+  const c0 = (m) => (m.c.fly ? "fly" : "walk");
+  function endSkill(m, st) {
+    m.st = st || c0(m); m.t = 0; m.cp = null; m.vx = m.vy = 0;
+    const L = creepLv(); m.skCd = rnd(L.cd[0], L.cd[1]); m.cd = Math.max(m.cd, 0.6);
+  }
+  // the skill under way (the host's monsters; the guest's page draws them from their state and clock)
+  function skillStep(m, dt, T, d, ux, uy) {
+    const S = SKILL[m.kind], o = m.cp, t = m.t;
+    if (m.st === "howl") { if (t > HOWL_T) endSkill(m); return; }
+    if (!S || (m.st === "skw" && !o)) return endSkill(m);   // (its piece is gone: shooed away, or pushed off by a pet's guard)
+    switch (S.sk) {
+      case "lob":
+        if (m.st === "skw" && t >= LOB_WIND) { m.st = "sk"; m.t = 0; m.cp = null; if (hearIt(m.x, m.y)) play("swoosh"); }
+        else if (m.st === "sk" && t > 0.35) endSkill(m);
+        break;
+      case "charge": case "roll":
+        if (m.st === "skw") { if (t >= S.w) { m.st = "sk"; m.t = 0; if (hearIt(m.x, m.y)) play("swoosh"); } }
+        else {
+          const f = Math.min(o.L, S.v * t); m.x = o.x + Math.cos(o.a) * f; m.y = o.y + Math.sin(o.a) * f; setFace(m, Math.cos(o.a), Math.sin(o.a));
+          if (G.parts.length < 380 && Math.random() < 0.5) dust(m.x, m.y, 1);
+          if (f >= o.L) endSkill(m, "rest");
+        }
+        break;
+      case "fireball":
+        if (m.st === "skw") { if (t >= S.w) { m.st = "sk"; m.t = 0; m.cp = null; if (hearIt(m.x, m.y)) play("fire"); } }
+        else if (t > 0.3) endSkill(m);
+        break;
+      case "jump": case "pounce": case "dive": {
+        const k = clamp((t - (S.w - S.air)) / S.air, 0, 1);
+        if (k > 0) { m.x = m.sx + (o.x - m.sx) * k; m.y = m.sy + (o.y - m.sy) * k; }
+        if (t >= S.w) {
+          m.x = o.x; m.y = o.y;
+          if (S.sk === "pounce" && howl(m, S)) { m.st = "howl"; m.t = 0; m.cp = null; }
+          else endSkill(m, S.sk === "dive" ? "back" : "rest");
+        }
+        break;
+      }
+      case "slam": if (t >= S.w) endSkill(m, "rest"); break;
+      case "boom": {   // (glowing where it is, then a straight flight onto the ring; its burst is its piece's: see cpBoom)
+        const k = clamp((t - (S.w - S.air)) / S.air, 0, 1);
+        if (k > 0) { m.x = m.sx + (o.x - m.sx) * k; m.y = m.sy + (o.y - m.sy) * k; }
+        if (t >= S.w) { m.x = o.x; m.y = o.y; m.cp = null; killMon(m, false); }
+        break;
+      }
+      case "breath":
+        if (m.st === "skw") { if (t >= S.w) { m.st = "sk"; m.t = 0; if (hearIt(m.x, m.y)) play("swoosh"); } }
+        else if (t >= S.on) endSkill(m);
+        break;
+      default: endSkill(m);
+    }
+  }
+  // the wolf's howl: the wolves near it (itself too) hurry for a while; none near, no howl
+  function howl(m, S) {
+    const near = G.mons.filter((o) => o.alive && o.kind === m.kind && d2(o.x, o.y, m.x, m.y) < S.howl * S.howl);
+    if (near.length < 2) return false;
+    for (const o of near) o.fastT = HOWL_FAST;
+    if (hearIt(m.x, m.y)) { tone("sine", 420, 820, 0.45, 0.05); tone("sine", 820, 560, 0.6, 0.05, 0.42); }
+    if (G.parts.length < 440) G.parts.push({ type: "ring", x: m.x, y: m.y - 60, r: 50, vr: 900, life: 0.6, max: 0.6, col: "170,220,255" });
+    return true;
+  }
+  // ---- the pieces: pooled; the host's (o.m: the monster it belongs to, while `tie` lasts) and their copies on the guest's page
+  const CP_POOL = [], CPST = { made: 0, born: 0 };
+  function cpEnd(p) {
+    if (p.k === "lane") return p.w + p.L / Math.max(1, p.v) + 0.15;
+    if (p.k === "cone") return p.w + p.on + 0.25;
+    if (p.k === "fire") return p.w + p.on + 0.45;
+    return p.w + 0.5;   // (lob, ring: the splash / the crater fading)
+  }
+  function addCp(k, mk, x, y, o = {}) {
+    const p = CP_POOL.pop() || (CPST.made++, {});
+    CPST.born++;
+    p.id = o.id || G.nextId++; p.k = k; p.mk = mk; p.m = o.m || null; p.mid = o.mid || (o.m ? o.m.id : 0); p.x = x; p.y = y;
+    p.sx = o.sx === undefined ? x : o.sx; p.sy = o.sy === undefined ? y : o.sy; p.a = o.a || 0; p.r = o.r || 0; p.L = o.L || 0; p.w = o.w || 0;
+    p.v = o.v || 0; p.on = o.on || 0; p.ha = o.ha || 0; p.t = o.t || 0; p.tie = o.tie || 0; p.hits = 0;
+    p.end = o.end || cpEnd(p); p.boom = p.t >= p.w + 0.1;
+    G.cps.push(p); return p;
+  }
+  function clearCps() { for (const p of G.cps) { p.m = null; CP_POOL.push(p); } G.cps.length = 0; }
+  // its warning is over and it is landing / dashing / breathing / burning now: is (x, y) inside what it drew?
+  function cpHits(p, x, y) {
+    if (p.t < p.w) return false;
+    const dx = x - p.x, dy = y - p.y;
+    if (p.k === "lob" || p.k === "ring") return p.t < p.w + 0.15 && dx * dx + (dy / 0.62) ** 2 < p.r * p.r;
+    if (p.k === "fire") return p.t < p.w + p.on && dx * dx + (dy / 0.62) ** 2 < p.r * p.r;
+    if (p.k === "cone") { if (p.t >= p.w + p.on) return false; const dd = Math.hypot(dx, dy), da = Math.atan2(Math.sin(Math.atan2(dy, dx) - p.a), Math.cos(Math.atan2(dy, dx) - p.a)); return dd < p.L && Math.abs(da) < p.ha; }
+    // lane: only where the dashing body / the fireball is now
+    const al = dx * Math.cos(p.a) + dy * Math.sin(p.a), pe = -dx * Math.sin(p.a) + dy * Math.cos(p.a), f = Math.min(p.L, p.v * (p.t - p.w));
+    return Math.abs(pe) < p.r && al >= 0 && al <= p.L && al > f - 90 && al < f + 60;
+  }
+  function updateCreepPieces(dt, hurt) {
+    if (!G.cps.length) return;
+    const gs = hurt ? girls() : null;
+    let j = 0;
+    for (let i = 0; i < G.cps.length; i++) {
+      const p = G.cps[i]; p.t += dt;
+      let keep = p.t < p.end;
+      // the monster it belongs to stopped (fell, frozen, shooed, pushed away): its warning goes
+      if (keep && hurt && p.m && p.t < p.tie) { const m = p.m; if (!m.alive || m.frz > 0 || m.cp !== p || !SKILL_ST.has(m.st)) keep = false; }
+      if (keep) {
+        if (!p.boom && p.t >= p.w && (p.k === "lob" || p.k === "ring")) { p.boom = true; cpBoom(p); }
+        if (!p.boom && p.k === "lane" && p.v * (p.t - p.w) >= p.L) { p.boom = true; if (skillOf({ kind: p.mk }) === "fireball") cpBoom(p); }
+        cpSparks(p);
+        if (hurt) for (let gi = 0; gi < gs.length; gi++) {
+          const g = gs[gi]; if (g.dead || (p.k !== "fire" && p.hits & (1 << gi)) || !cpHits(p, g.x, g.y)) continue;
+          p.hits |= 1 << gi;
+          const fx = p.k === "lane" ? p.x + Math.cos(p.a) * Math.min(p.L, p.v * (p.t - p.w)) : p.x, fy = p.k === "lane" ? p.y + Math.sin(p.a) * Math.min(p.L, p.v * (p.t - p.w)) : p.y;
+          if ((SKILL[p.mk] || {}).slow) pinch(g, fx, fy); else hurtTarget(g, fx, fy);
+        }
+      }
+      if (keep) G.cps[j++] = p; else { p.m = null; CP_POOL.push(p); }
+    }
+    G.cps.length = j;
+  }
+  // a little trail of sparks behind a thrown lollipop / cutlass / snowball and a fireball (both pages, near this page's girl)
+  function cpSparks(p) {
+    if (G.parts.length > 380 || d2(p.x, p.y, P.x, P.y) > 1700 * 1700) return;
+    const S = SKILL[p.mk] || {};
+    if (p.k === "lob" && p.t >= 0 && p.t < p.w && Math.random() < 0.35) {
+      const k = p.t / p.w, x = p.sx + (p.x - p.sx) * k, y = p.sy + (p.y - p.sy) * k, z = lobZ(p, k);
+      G.parts.push({ type: "dot", x: x + rnd(-10, 10), y: y - z + rnd(-10, 10), vx: rnd(-30, 30), vy: rnd(-30, 30), life: 0.3, max: 0.3, r: rnd(3, 6), col: (S.fx || ["#ffffff"])[0] });
+    } else if (p.k === "lane" && S.sk === "fireball" && p.t >= p.w && Math.random() < 0.6) {
+      const f = p.v * (p.t - p.w); if (f > p.L) return;
+      G.parts.push({ type: "dot", x: p.x + Math.cos(p.a) * f, y: p.y + Math.sin(p.a) * f - 75, vx: rnd(-40, 40), vy: rnd(-60, 10), life: 0.35, max: 0.35, r: rnd(4, 8), col: Math.random() < 0.5 ? "#ff8a2a" : "#ffd36a" });
+    }
+  }
+  // a lob's height on its arc (k: 0..1 of its flight): from the thrower's hand up and down onto the ring
+  function lobZ(p, k) {
+    const S = SKILL[p.mk] || {}, H0 = (S.z0 || 140) + ((MON[p.mk] && MON[p.mk].hgt) || 0) * 0.6;
+    return H0 * (1 - k) + Math.sin(Math.PI * k) * (240 + Math.hypot(p.x - p.sx, p.y - p.sy) * 0.15);
+  }
+  // a piece lands / slams / bursts (both pages, near this page's girl): the look and the sound
+  function cpBoom(p) {
+    if (d2(p.x, p.y, P.x, P.y) > 1700 * 1700) return;
+    const S = SKILL[p.mk] || {}, sk = S.sk, roomy = G.parts.length < 400;
+    if (sk === "lob") {
+      if (roomy) burst(p.x, p.y - 30, 14, S.fx || ["#ffffff"], 320, 0.5); dust(p.x, p.y, 4); play("pop");
+      const sb = S.slow && frOf("fxsn_burst0", "fxsn_shards"); if (sb && roomy) G.parts.push({ type: "fx", name: sb, x: p.x, y: p.y - p.r * 0.5, sc: p.r / 150, life: 0.45, max: 0.45, grow: 0.4 });
+    }
+    else if (sk === "jump" || sk === "pounce" || sk === "dive") { dust(p.x, p.y, sk === "dive" ? 4 : 9); if (roomy && S.fx) burst(p.x, p.y - 40, 12, S.fx, 300, 0.5); G.shake = Math.max(G.shake, sk === "jump" ? 7 : 4); play(sk === "dive" ? "swoosh" : "slam"); }
+    else if (sk === "slam" || sk === "boom") {
+      G.parts.push({ type: "qboom", x: p.x, y: p.y, r: p.r * 0.75, life: 0.6, max: 0.6, bomb: sk === "boom" });
+      dust(p.x, p.y, 8); G.shake = Math.max(G.shake, 10); play(sk === "boom" ? "boom" : "slam");
+    } else if (sk === "fireball") { const ex = p.x + Math.cos(p.a) * p.L, ey = p.y + Math.sin(p.a) * p.L; if (roomy) burst(ex, ey - 70, 10, ["#ff6a1a", "#ffb03a", "#fff0b0"], 260, 0.4); }
+  }
+  // the test bot: a step out of each monster's warning it stands in or is about to walk into (none: null)
+  function creepDodge() {
+    if (!G.cps.length) return null;
+    let ex = 0, ey = 0;
+    for (const [px, py] of [[P.x, P.y], [P.x + P.vx * 0.25, P.y + P.vy * 0.25]]) for (const p of G.cps) {
+      const dx = px - p.x, dy = py - p.y, mg = 85;
+      if (p.k === "lob" || p.k === "ring") {
+        if (p.t >= p.w + 0.1) continue;
+        const e = Math.hypot(dx, dy / 0.62); if (e >= p.r + mg) continue;
+        const [nx, ny] = e > 1 ? norm(dx, dy / 0.62) : [Math.cos(p.id), Math.sin(p.id)]; ex += nx; ey += ny;
+      } else if (p.k === "fire") {
+        if (p.t >= p.w + p.on) continue;
+        const e = Math.hypot(dx, dy / 0.62); if (e >= p.r + 60) continue;
+        const [nx, ny] = e > 1 ? norm(dx, dy / 0.62) : [1, 0]; ex += nx; ey += ny;
+      } else if (p.k === "lane") {
+        const al = dx * Math.cos(p.a) + dy * Math.sin(p.a), pe = -dx * Math.sin(p.a) + dy * Math.cos(p.a), f = p.v * Math.max(0, p.t - p.w);
+        if (al < -mg || al > p.L + mg || Math.abs(pe) >= p.r + mg || f > al + 100) continue;
+        const s = pe >= 0 ? 1 : -1; ex += -Math.sin(p.a) * s * 2; ey += Math.cos(p.a) * s * 2;
+      } else if (p.k === "cone") {
+        if (p.t >= p.w + p.on) continue;
+        const d = Math.hypot(dx, dy), da = Math.atan2(Math.sin(Math.atan2(dy, dx) - p.a), Math.cos(Math.atan2(dy, dx) - p.a));
+        if (d >= p.L + mg || Math.abs(da) >= p.ha + mg / Math.max(d, 60)) continue;
+        const s = da >= 0 ? 1 : -1; ex += -Math.sin(p.a) * s * 2; ey += Math.cos(p.a) * s * 2;
+      }
+    }
+    return ex || ey ? norm(ex, ey) : null;
+  }
   // kb: knock-back push (from the shooter's level). A light hit only nudges; it never stops a monster's lunge or resets its attack.
   function damageMon(m, dmg, fx, fy, dot, by, kb = 60) {
     if (!m.alive) return;
@@ -1736,7 +2060,7 @@
     if (m.hp <= 0) return killMon(m, true, by);
     if (dot) return;
     play("hit");
-    if (m.st !== "atk" && m.st !== "prep") {
+    if (m.st !== "atk" && m.st !== "prep" && !SKILL_ST.has(m.st)) {
       m.hurt = 0.1 + Math.min(0.12, kb / 2000); if (m.elite) kb *= 0.4;
       const [nx, ny] = norm(m.x - fx, m.y - fy); m.vx = nx * kb * 2.5; m.vy = ny * kb * 2.5;
     }
@@ -1776,7 +2100,7 @@
     return [clamp(T.x + Math.cos(a || 0) * r, 100, WORLD - 100), clamp(T.y + Math.sin(a || 0) * r, 100, WORLD - 100)];
   }
   function spawnMon(kind, x, y, elite) {
-    const m = makeMon(kind, x, y, elite); pushOut(m, m.r); G.mons.push(m); return m;
+    const m = makeMon(kind, x, y, elite); skillRoll(m); pushOut(m, m.r); G.mons.push(m); return m;
   }
   // monster camps on the path: spawned while a girl is still a screen away, they wait for her.
   // st: 0 not yet there, 1 waiting, 2 awake and fighting, 3 cleared (or given up on)
@@ -2480,7 +2804,7 @@
         if (e >= lim) continue;
         const nx = e > 1 ? dx / e : 1, ny = e > 1 ? dy / e : 0;
         m.x = g.x + nx * lim; m.y = g.y + ny * lim * sq;
-        if (m.st === "atk" || m.st === "prep") { m.st = m.c.fly ? "back" : "rest"; m.t = 0; m.cd = Math.max(m.cd, 1); }
+        if (m.st === "atk" || m.st === "prep" || SKILL_ST.has(m.st)) { m.st = m.c.fly ? "back" : "rest"; m.t = 0; m.cd = Math.max(m.cd, 1); m.cp = null; }
         if (!(m.gT > G.t)) {
           m.gT = G.t + 0.6; m.hurt = 0.2; m.vx = nx * 700; m.vy = ny * 700 * GUARD_SQ;
           if (G.parts.length < 400) burst(g.x + nx * GUARD_R, g.y + ny * GUARD_R * GUARD_SQ - 40, 8, ["#fff4c2", "#ffd34d", "#ffb36b"], 240, 0.45);
@@ -2832,7 +3156,7 @@
   function startMorph(B) {
     B.st = "morph"; B.t = 0; B.vx = B.vy = 0; B.hurtPose = 0; B.move = null; B.mfx = {};
     // nothing of his first form can hurt any more: its warnings and shots go (the film's flash covers it)
-    G.quakes = G.quakes.filter((q) => q.done); G.foes = []; G.waters = []; G.lavas = [];
+    G.quakes = G.quakes.filter((q) => q.done); G.foes = []; G.waters = []; G.lavas = []; clearCps();
     G.shake = Math.min(Math.max(G.shake, 8), 10);
   }
   function updateMorph(B, dt) {
@@ -2907,7 +3231,7 @@
     G.leaps++;
     const asks = Array.isArray(cfg.n) ? Math.max(1, cfg.n[Math.min(G.leaps, cfg.n.length) - 1] | 0) : 1 + (Math.random() < 0.5 ? 1 : 0);
     G.quiz = { ph: "up", t: 0, T: quizT(cfg, q), hz: cfg.hz, ...q, drops: [], hit: false, lastSec: -1, n: (G.qzN = (G.qzN || 0) + 1), left: asks - 1 };
-    G.quakes = []; G.foes = []; G.waters = []; G.lavas = [];
+    G.quakes = []; G.foes = []; G.waters = []; G.lavas = []; clearCps();
     G.shake = 14; dust(B.x, B.y, 20);
     quizAnnounce("up");
   }
@@ -4263,7 +4587,7 @@
       B.alive = false; B.die = 0; SFX.boom(); G.shake = 26;
       burst(B.x, B.y - 200, 60, ["#ffd34d", "#ff8a3d", "#fff4c2", "#ff9ad5"], 700, 1.4);
       for (const m of G.mons) if (m.alive) killMon(m, false);
-      G.quakes = G.quakes.filter((q) => q.done); G.foes = []; G.waters = []; G.lavas = [];
+      G.quakes = G.quakes.filter((q) => q.done); G.foes = []; G.waters = []; G.lavas = []; clearCps();
       startBossCut("die");
     }
   }
@@ -4680,6 +5004,7 @@
       for (const s of G.shots) if (s.life > 0 && f.life > 0 && d2(s.x, s.y, f.x, f.y) < 50 * 50) { s.life = 0; f.life = 0; burst(f.x, f.y - 90, 10, ["#9dff6a", "#fff"], 200, 0.4); play("hit"); }
     }
     G.foes = G.foes.filter((f) => f.life > 0);
+    updateCreepPieces(dt, true);   // (the monsters' own attacks)
     updateRings(dt, true); updateQuakes(dt, true); updateWaters(dt, true); updateLavas(dt, true); updateLavaPools(dt, true);
     // portal / arena
     if (G.portal) {
@@ -4925,25 +5250,188 @@
     t = { img: c, sx: 0, sy: 0, w, h, s: 1, ax: f.ax * f.s, ay: f.ay * f.s };
     TIER_FR.set(key, t); return t;
   }
+  // ---- the monsters' attacks, drawn (see the creep skills): the warnings on the ground (a ring / lane / cone in warning pink-red edged in
+  // white, filling up as the moment comes: it reads on the candy, sand, snow and rock floors alike), the fire patches, and in the air the
+  // painted things they throw. Only what is on the screen is drawn.
+  const CP_FILL = "255,40,110";
+  function cpOnView(p, L, R, T, B) {
+    let x0 = p.x, x1 = p.x, y0 = p.y, y1 = p.y;
+    if (p.k === "lane" || p.k === "cone") { const ex = p.x + Math.cos(p.a) * p.L, ey = p.y + Math.sin(p.a) * p.L; x0 = Math.min(x0, ex); x1 = Math.max(x1, ex); y0 = Math.min(y0, ey); y1 = Math.max(y1, ey); }
+    const r = p.k === "cone" ? p.L * Math.sin(p.ha) + 40 : p.r + 40;
+    if (p.k === "lob") { x0 = Math.min(x0, p.sx); x1 = Math.max(x1, p.sx); y0 = Math.min(y0, p.sy - 400); y1 = Math.max(y1, p.sy); }
+    return x1 + r > L && x0 - r < R && y1 + r > T - 60 && y0 - r < B + 120;
+  }
+  // a warning ellipse at (x, y), radius r (flattened like the ground), k: how far its warning has run (0..1)
+  function warnEllipse(x, y, r, k, pulse) {
+    ctx.globalAlpha = 0.16 + 0.12 * pulse; ctx.fillStyle = `rgb(${CP_FILL})`; ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.62, 0, 0, TAU); ctx.fill();
+    ctx.globalAlpha = 0.32 + 0.2 * k; ctx.beginPath(); ctx.ellipse(x, y, r * k, r * 0.62 * k, 0, 0, TAU); ctx.fill();   // (fills up to the edge as it comes)
+    ctx.globalAlpha = 0.5; ctx.lineWidth = 9; ctx.strokeStyle = "rgba(90,0,30,1)"; ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.62, 0, 0, TAU); ctx.stroke();
+    ctx.globalAlpha = 0.95; ctx.lineWidth = 5; ctx.setLineDash([20, 12]); ctx.lineDashOffset = -G.t * 40; ctx.strokeStyle = "#ffffff"; ctx.stroke(); ctx.setLineDash([]);
+  }
+  function drawCreepGround(L, R, T, B) {
+    if (!G.cps.length) return;
+    const pulse = 0.5 + 0.5 * Math.sin(G.t * 14);
+    for (const p of G.cps) {
+      if (p.t < 0 || !cpOnView(p, L, R, T, B)) continue;
+      const warn = p.t < p.w, k = clamp(p.t / Math.max(0.01, p.w), 0, 1), fade = clamp((p.end - p.t) / 0.35, 0, 1);
+      if (API.drawn) API.drawn.push(["creep", p.k, p.id, warn ? "warn" : "on", p.mk]);
+      ctx.save();
+      if (p.k === "lob" || p.k === "ring") {
+        if (warn) {
+          warnEllipse(p.x, p.y, p.r, k, pulse);
+          if (skillOf({ kind: p.mk }) === "slam") { ctx.globalAlpha = 1; sprW(k < 0.4 ? "qk_crack1" : k < 0.75 ? "qk_crack2" : "qk_crack3", p.x, p.y, p.r * 2.1 * (0.45 + 0.55 * k), Math.min(1, k * 4)); glow(p.x, p.y - 10, p.r * (0.6 + 0.6 * k), "255,120,40", 0.25 + 0.35 * k * pulse); }
+        } else { const a = clamp(1 - (p.t - p.w) / 0.5, 0, 1); ctx.globalAlpha = 0.35 * a; ctx.fillStyle = "#ffffff"; ctx.beginPath(); ctx.ellipse(p.x, p.y, p.r * (1 + (1 - a) * 0.3), p.r * 0.62 * (1 + (1 - a) * 0.3), 0, 0, TAU); ctx.fill(); }
+      } else if (p.k === "lane") {
+        // a lane from where it stands, the way it will go: chevrons running along it; once it goes, the lane stays (fading) while it is on it
+        ctx.translate(p.x, p.y); ctx.rotate(p.a);
+        ctx.globalAlpha = (warn ? 0.16 + 0.12 * pulse : 0.14 * fade); ctx.fillStyle = `rgb(${CP_FILL})`; ctx.fillRect(0, -p.r, p.L, 2 * p.r);
+        if (warn) { ctx.globalAlpha = 0.3 + 0.2 * k; ctx.fillRect(0, -p.r, p.L * k, 2 * p.r); }
+        ctx.globalAlpha = (warn ? 0.5 : 0.3 * fade); ctx.lineWidth = 9; ctx.strokeStyle = "rgba(90,0,30,1)"; ctx.strokeRect(0, -p.r, p.L, 2 * p.r);
+        ctx.globalAlpha = (warn ? 0.95 : 0.5 * fade); ctx.lineWidth = 5; ctx.setLineDash([20, 12]); ctx.lineDashOffset = -G.t * 40; ctx.strokeStyle = "#ffffff"; ctx.strokeRect(0, -p.r, p.L, 2 * p.r); ctx.setLineDash([]);
+        if (warn) {
+          ctx.globalAlpha = 0.85; ctx.lineWidth = 8; ctx.lineCap = "round"; ctx.lineJoin = "round"; const h = Math.min(p.r * 0.55, 40), step = 130, off = (G.t * 260) % step;
+          for (let x = off + 40; x < p.L - 20; x += step) { ctx.beginPath(); ctx.moveTo(x - h * 0.7, -h); ctx.lineTo(x, 0); ctx.lineTo(x - h * 0.7, h); ctx.stroke(); }
+        }
+      } else if (p.k === "cone") {
+        ctx.translate(p.x, p.y);
+        const wedge = (r) => { ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, r, p.a - p.ha, p.a + p.ha); ctx.closePath(); };
+        ctx.globalAlpha = warn ? 0.16 + 0.12 * pulse : 0.22 * fade; ctx.fillStyle = warn ? `rgb(${CP_FILL})` : "rgb(190,235,255)"; wedge(p.L); ctx.fill();
+        if (warn) { ctx.globalAlpha = 0.3 + 0.2 * k; wedge(p.L * k); ctx.fill(); }
+        ctx.globalAlpha = warn ? 0.5 : 0.3 * fade; ctx.lineWidth = 9; ctx.strokeStyle = "rgba(90,0,30,1)"; wedge(p.L); ctx.stroke();
+        ctx.globalAlpha = warn ? 0.95 : 0.5 * fade; ctx.lineWidth = 5; ctx.setLineDash([20, 12]); ctx.lineDashOffset = -G.t * 40; ctx.strokeStyle = "#ffffff"; wedge(p.L); ctx.stroke(); ctx.setLineDash([]);
+      } else if (p.k === "fire") drawFirePatch(p, pulse);
+      ctx.restore();
+    }
+  }
+  // a salamander's fire patch: scorched ground and its edge (dashed while it warms up), then painted flames; it fades out at the end
+  function drawFirePatch(p, pulse) {
+    const warm = p.t < p.w, burnK = warm ? clamp(p.t / p.w, 0, 1) : 1, out = clamp((p.t - p.w - p.on) / 0.45, 0, 1), a = 1 - out;
+    const sc = frOf("fxlv_scorch");
+    if (sc) { ctx.save(); ctx.translate(p.x, p.y); ctx.scale(1, 0.62); sprC(sc, 0, 0, p.r * 2.3, (warm ? 0.5 + 0.5 * burnK : 1) * a); ctx.restore(); }
+    else { ctx.globalAlpha = 0.45 * a; ctx.fillStyle = "#2a0d06"; ctx.beginPath(); ctx.ellipse(p.x, p.y, p.r, p.r * 0.62, 0, 0, TAU); ctx.fill(); }
+    glow(p.x, p.y - 10, p.r * (1.3 + 0.3 * burnK), "255,110,30", (warm ? 0.25 * burnK : 0.55 + 0.1 * pulse) * a);
+    ctx.globalAlpha = (warm ? 0.9 : 0.7) * a; ctx.lineWidth = 5; ctx.strokeStyle = warm ? "#ffffff" : "#ffb03a";
+    if (warm) { ctx.setLineDash([14, 10]); ctx.lineDashOffset = -G.t * 40; }
+    ctx.beginPath(); ctx.ellipse(p.x, p.y, p.r, p.r * 0.62, 0, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
+    const n = 3, fs = (warm ? 0.25 + 0.2 * burnK : 0.62) * (1 - 0.6 * out);
+    for (let i = 0; i < n; i++) {
+      const ox = (i - 1) * p.r * 0.5, oy = (i === 1 ? -0.15 : 0.18) * p.r * 0.62, fl = 1 + 0.15 * Math.sin(G.t * 17 + i * 2 + p.id);
+      fx("fx_flame", p.x + ox, p.y + oy - 40 * fs, fs * fl, (warm ? 0.5 + 0.5 * burnK : 1) * a, Math.sin(G.t * 9 + i + p.id) * 0.1, i === 1, 1.1);
+    }
+    if (API.drawn) API.drawn.push(["cpa", "fire", p.id, "fx_flame"]);
+  }
+  // a frame drawn centred at (x, y), its longest side sz world px, turned by rot
+  function sprC(name, x, y, sz, a = 1, rot = 0) {
+    const f = FR[name]; if (!f) return false;
+    const m = sz / (Math.max(f.w, f.h) * f.s), k = f.s * m;
+    ctx.save(); ctx.translate(x, y); if (rot) ctx.rotate(rot); spr(f, (f.ax - f.w / 2) * k, (f.ay - f.h / 2) * k, false, m, a); ctx.restore();
+    return true;
+  }
+  // in the air: the thrown lollipop / cutlass / snowball on its arc (with its shadow on the ground), the fireball down its lane, the frost
+  function drawCreepAir(L, R, T, B) {
+    if (!G.cps.length) return;
+    for (const p of G.cps) {
+      if (p.t < 0 || p.k === "ring" || p.k === "fire" || !cpOnView(p, L, R, T, B)) continue;
+      const S = SKILL[p.mk] || {};
+      if (p.k === "lob") {
+        if (p.t >= p.w) continue;
+        const k = clamp(p.t / p.w, 0, 1), x = p.sx + (p.x - p.sx) * k, y = p.sy + (p.y - p.sy) * k, z = lobZ(p, k), art = cpArt(p.mk);
+        shadow(x, y, 34, 11, 0.3);
+        glow(x, y - z, 80, S.col || "255,255,255", 0.45);
+        if (art) sprC(art, x, y - z, S.sz || 120, 1, G.t * (S.spin || 6) + p.id);
+        if (API.drawn) API.drawn.push(["cpa", "lob", p.id, art]);
+      } else if (p.k === "lane" && S.sk === "fireball") {
+        const f = p.v * (p.t - p.w); if (f < 0 || f > p.L) continue;
+        const x = p.x + Math.cos(p.a) * f, y = p.y + Math.sin(p.a) * f, art = cpArt(p.mk);
+        shadow(x, y, 30, 10, 0.25);
+        glow(x, y - 75, 110, "255,130,40", 0.55);
+        if (art) fxDir(art, x - Math.cos(p.a) * 30, y - 75, Math.cos(p.a), Math.sin(p.a), S.sz || 1, 1);
+        if (API.drawn) API.drawn.push(["cpa", "lane", p.id, art]);
+      } else if (p.k === "cone" && p.t >= p.w && p.t < p.w + p.on) {
+        // the frost: painted snow flakes and ice shards streaming out along the cone
+        const e = p.t - p.w, top = ((MON[p.mk] && MON[p.mk].hgt) || 150) * 0.8;
+        for (let i = 0; i < 9; i++) {
+          const u = (e * 2.4 + i / 9) % 1, sp = Math.sin(i * 12.9898 + p.id) * 0.8, an = p.a + sp * p.ha, d = 40 + u * (p.L - 40);
+          const x = p.x + Math.cos(an) * d, y = p.y + Math.sin(an) * d - top * (1 - u) - 40 * u;
+          const gust = i % 3 === 0 ? frOf("fxsn_gust0", "fx_bolt_ice") : i % 3 === 1 ? frOf("fxsn_gust1", "fx_snow") : frOf("fxsn_flakes", "fx_snow");
+          if (/gust|bolt/.test(gust)) fxDir(gust, x, y, Math.cos(an), Math.sin(an), (gust === "fx_bolt_ice" ? 0.45 : 0.3) + 0.4 * u, 1 - u * 0.6);
+          else fx(gust, x, y, (gust === "fx_snow" ? 0.5 : 0.18) + (gust === "fx_snow" ? 0.9 : 0.3) * u, 1 - u * 0.5, G.t * 3 + i);
+        }
+        glow(p.x + Math.cos(p.a) * p.L * 0.5, p.y + Math.sin(p.a) * p.L * 0.5 - 60, p.L * 0.55, "190,235,255", 0.4);
+        if (API.drawn) API.drawn.push(["cpa", "cone", p.id, frOf("fxsn_gust0", "fx_bolt_ice")]);
+      }
+    }
+  }
+  // how high a monster is lifted off its ground spot by its skill now (the gummy's hops, a leap, the parrot's climb and dive, the golem
+  // raising himself), from its state and clock (so the guest's page draws it the same)
+  function monLift(m) {
+    const S = SKILL[m.kind]; if (!S || !m.alive) return 0;
+    const sk = S.sk, t = m.t;
+    if (sk === "hop") {
+      if (m.st === "walk" && !(m.hurt > 0) && !(m.frz > 0)) { const ph = hopPh(m); return ph < 0.7 ? Math.sin(Math.PI * ph / 0.7) * 34 : 0; }
+      return m.st === "atk" ? Math.sin(Math.PI * clamp(t / m.c.atk, 0, 1)) * 70 : 0;
+    }
+    if (m.st !== "skw") return 0;
+    if (sk === "jump" || sk === "pounce") { const k = (t - (S.w - S.air)) / S.air; return k > 0 && k < 1 ? Math.sin(Math.PI * k) * S.hz : 0; }
+    if (sk === "dive") { const up = Math.min(1, t / 0.4) * 110, k = clamp((t - (S.w - S.air)) / S.air, 0, 1); return up * (1 - k) - (m.hgt - 30) * k; }
+    if (sk === "boom") return -(m.hgt - 90) * clamp((t - (S.w - S.air)) / S.air, 0, 1);
+    if (sk === "slam") return t < S.w * 0.85 ? Math.min(1, t / (S.w * 0.7)) * 26 : 0;
+    return 0;
+  }
+  // a crouch before a leap (squashed a little), the fire bat swelling before it bursts
+  function monSquash(m) {
+    const S = SKILL[m.kind]; if (!S || !m.alive || m.st !== "skw") return 1;
+    if (S.sk === "jump" || S.sk === "pounce") return m.t < S.w - S.air ? 1 - 0.13 * Math.min(1, m.t / 0.3) : 1.06;
+    if (S.sk === "boom") return 1 + 0.12 * clamp(m.t / S.w, 0, 1) * (0.6 + 0.4 * Math.sin(G.t * 30));
+    return 1;
+  }
+  // the ice skeleton's shield: a slab of painted ice in front of him (behind him when he faces away)
+  function drawShield(m, x, y, mul, front) {
+    const fa = m.fa || 0, away = Math.sin(fa) < -0.25;
+    if (away !== !front) return;
+    const sx = x + Math.cos(fa) * 52 * mul, sy = m.y + Math.sin(fa) * 26 * mul;
+    glow(sx, sy - 95 * mul, 90 * mul, "150,215,255", 0.35);
+    const f = FR.fx_iceblock; if (!f) return;
+    const k = 110 * mul / (f.w * f.s);
+    spr(f, sx, sy - 100 * mul, Math.cos(fa) < 0, k * (0.55 + 0.45 * Math.abs(Math.sin(fa))), 0.82, 0, 1.6);
+    if (API.drawn) API.drawn.push(["shield", m.id]);
+  }
   function drawMon(m) {
     const [fn, flip] = monFrame(m); if (!FR[fn]) return;
     const f = m.c.like ? candyFrame(fn, CANDY_TINT[m.kind]) : tierFrame(fn), fly = m.c.fly;
-    let y = m.y - m.hgt, a = 1, rot = 0, mul = CHAR_M * (m.elite ? 1.3 : 1);
+    let y = m.y - m.hgt, a = 1, rot = 0, mul = CHAR_M * (m.elite ? 1.3 : 1), x = m.x;
     if (fly) y += (m.frz > 0 ? 0 : Math.sin(G.t * 3 + m.ph) * 10) - (m.st === "prep" ? 30 * Math.min(1, m.t / m.c.prep) : 0);
     if (!m.alive) { const t = m.die / 0.6; a = 1 - t; mul *= 1 - 0.4 * t; rot = (flip ? 1 : -1) * t * 0.8; y -= t * 40; }
-    shadow(m.x, m.y, m.r * (fly ? 0.8 : 1.15), m.r * 0.32, (fly ? 0.18 : 0.3) * a);
-    const cy = fly ? y : m.y - 95;
-    if (m.st === "prep" && m.alive && m.hurt <= 0) glow(m.x, cy, 130, "255,60,60", 0.25 + 0.2 * Math.sin(G.t * 25));
+    // its own attack (the creep skills): lifted by a hop / leap / dive, shaking as it winds up, a barrel rolling, squashed in a crouch
+    const SK = SKILL[m.kind], lift = monLift(m), sq = monSquash(m), skw = m.alive && m.st === "skw";
+    y -= lift;
+    if (skw && SK.shake) x += Math.sin(G.t * 60) * 5 * Math.min(1, m.t / 0.3);
+    const roll = m.alive && m.st === "sk" && SK && SK.sk === "roll";
+    shadow(m.x, m.y, m.r * (fly ? 0.8 : 1.15) * (1 - Math.min(0.4, Math.max(0, lift) / 500)), m.r * 0.32, (fly ? 0.18 : 0.3) * a);
+    const cy = fly ? y : m.y - 95 - lift;
+    if ((m.st === "prep" || skw) && m.alive && m.hurt <= 0) glow(x, cy, 130, "255,60,60", 0.25 + 0.2 * Math.sin(G.t * 25));
+    if (skw && SK.sk === "boom") { const k = clamp(m.t / SK.w, 0, 1); glow(x, cy, 150 + 90 * k, "255,90,30", 0.3 + 0.55 * k); }
+    if (m.alive && m.st === "howl") { glow(x, cy - 40, 170, "170,220,255", 0.35 + 0.2 * Math.sin(G.t * 20)); }
+    if (m.alive && m.fastT > 0) glow(x, m.y - 30, 90, "170,220,255", 0.25);
+    const shield = shieldUp(m);
+    if (shield) drawShield(m, x, m.y - lift, mul, false);
     if (m.alive) statusGlow(m, m.x, cy, 120);
     if (likeOf(m) === "vampire" && m.alive && m.st !== "prep" && m.st !== "atk" && m.hurt <= 0) y -= Math.abs(Math.sin(G.t * 3 + m.ph)) * 8;
     // walkers bob a little with each step
     else if (!fly && m.alive && m.st === "walk" && likeOf(m) !== "spider") { const ph = m.dist / (WALK_DIST[m.kind] || 120) * TAU; y -= Math.abs(Math.sin(ph)) * 9; rot += Math.sin(ph) * 0.04 * (flip ? -1 : 1); }
-    if (m.elite && m.alive) glow(m.x, cy, 190, "255,205,70", 0.3 + 0.1 * Math.sin(G.t * 4 + m.ph));
-    spr(f, m.x, y, flip, mul, a, rot);
-    if (m.alive && m.slow > 0) sprFlash(f, m.x, y, flip, mul, 0.35, rot);
-    if (m.alive && m.frz > 0) drawIceBlock(f, m.x, y, flip, mul, m.frz, m.frzMax);
-    if (m.alive && m.burn > 0) drawFlames(m.x, cy, m.r * 2.4, fly ? 170 : 170, m.ph);
-    if (m.flash > 0) sprFlash(f, m.x, y, flip, mul, 0.6, rot);
+    if (m.elite && m.alive) glow(x, cy, 190, "255,205,70", 0.3 + 0.1 * Math.sin(G.t * 4 + m.ph));
+    if (roll) {
+      // the barrel rolls along its lane, turning round its middle
+      const hh = f.h * f.s * mul * 0.5, o = G.cps.find((q) => q.mid === m.id && q.k === "lane"), turn = m.t * 13 * (o && Math.cos(o.a) < 0 ? -1 : 1);
+      ctx.save(); ctx.translate(x, y - hh); ctx.rotate(turn); spr(f, 0, hh, flip, mul, a); ctx.restore();
+    } else spr(f, x, y, flip, mul, a, rot, sq);
+    if (skw && SK.sk === "boom") sprFlash(f, x, y, flip, mul, 0.6 * clamp(m.t / SK.w, 0, 1) * (0.6 + 0.4 * Math.sin(G.t * 30)), rot);
+    if (m.alive && m.slow > 0) sprFlash(f, x, y, flip, mul, 0.35, rot);
+    if (m.alive && m.frz > 0) drawIceBlock(f, x, y, flip, mul, m.frz, m.frzMax);
+    if (m.alive && m.burn > 0) drawFlames(x, cy, m.r * 2.4, fly ? 170 : 170, m.ph);
+    if (m.flash > 0) sprFlash(f, x, y, flip, mul, 0.6, rot);
+    if (shield) drawShield(m, x, m.y - lift, mul, true);
     if (m.kind === "witch" && m.st === "prep" && m.alive) glow(m.x + (flip ? -50 : 50), y - 60, 50, "130,255,90", 0.5);
     if (m.c.name && m.alive) label(m.c.name, m.x, m.y - f.ay * f.s * mul - 40, 30, "#ffb3e6");
     // health pips once hurt
@@ -6043,7 +6531,7 @@
       else { ctx.fillStyle = G.lvl.gr.base; ctx.fillRect(ix * CH, iy * CH, CH + CH_PAD, CH + CH_PAD); }
     }
     // flat things
-    drawArena(); drawLavaPools(L, R, T, B); drawRings(); drawQuizFloor(); drawGuard();
+    drawArena(); drawLavaPools(L, R, T, B); drawRings(); drawCreepGround(L, R, T, B); drawQuizFloor(); drawGuard();
     drawPickups(L, R, T, B);
     drawGuide();
     if (G.ult) drawUltFx(UFX.p, P.x, P.y, G.ult.t, G.ult.cx, G.ult.cy, 0, true);
@@ -6108,7 +6596,7 @@
       else drawBolt(s.x, s.y - BOLT_Z, s.vx, s.vy, s.elem, s.hk, s.sc);
     }
     for (const sh of G.pshots) { if (sh.candy) drawCandyStar(sh.x, sh.y - 60, G.t * 9, 1); else if (sh.wave) drawSonicWave(sh.x, sh.y - 50, Math.atan2(sh.vy, sh.vx), G.t - sh.t0, 1); else drawBolt(sh.x, sh.y - BOLT_Z, sh.vx, sh.vy, sh.elem, sh.hk, sh.sc); }
-    drawQuakesAir(); drawMeteors();
+    drawQuakesAir(); drawMeteors(); drawCreepAir(L, R, T, B);
     drawBlizzard(L, R, T, B);
     drawQuizRain();
     drawBossTalk(L, T, R, B);
@@ -9018,7 +9506,7 @@
   // target. The guest runs only its own girl, mirrors the host's world from the host's presence,
   // and reports its spell hits, ultimate and revive back as room events. Each camera follows its own girl.
   const FTYPES = ["fire", "web", "webball"];
-  const MKINDS = Object.keys(MON), MST = ["walk", "prep", "atk", "rest", "web", "fly", "back"];
+  const MKINDS = Object.keys(MON), MST = ["walk", "prep", "atk", "rest", "web", "fly", "back", "skw", "sk", "howl"];   // (skw, sk, howl: the creep skills; appended)
   const BST = ["enter", "walk", "prep", "slam", "rest", "leap", "dash", "quiz", "morph"], DTYPES = ["heart", "energy", "fire", "ice", "poison"], ELS = [null, "fire", "ice", "poison"];
   const NET = { hb: 0, room: null, state: "wait", me: null, role: null, partner: null, pp: null, applied: null, co: null,
     sendT: 0, startT: 0, goneT: 0, portalSent: false, lvBusy: false, hq: [], sq: [], fq: [] };   // hq/sq/fq: hits, shots and pet moves batched per send
@@ -9293,7 +9781,7 @@
     return {
       lv: G.level,
       m: G.mons.filter((m) => m.alive).map((m) => [m.id, MKINDS.indexOf(m.kind), m.x | 0, m.y | 0, m.face + (m.flip ? 8 : 0), MST.indexOf(m.st), m.hp,
-        (m.hurt > 0 ? 1 : 0) | (m.flash > 0 ? 2 : 0) | sb(m) | (m.summoned ? 64 : 0) | (m.elite ? 128 : 0), Math.round(m.t * 10), m.max]),
+        (m.hurt > 0 ? 1 : 0) | (m.flash > 0 ? 2 : 0) | sb(m) | (m.summoned ? 64 : 0) | (m.elite ? 128 : 0) | (m.sk ? 256 : 0), Math.round(m.t * 10), m.max, ...(m.fa !== undefined ? [Math.round(m.fa * 100)] : [])]),   // (256: skilled; [10]: the ice skeleton's shield facing)
       b: B ? [B.x | 0, B.y | 0, B.dir, BST.indexOf(B.st), B.hp, Math.round(B.t * 10), (B.flash > 0 ? 1 : 0) | (B.hurtPose > 0 ? 2 : 0) | sb(B), B.dropY | 0, B.alive ? 1 : 0, B.ix | 0, B.iy | 0, B.jz | 0, B.max, BMOVES.indexOf(B.move), Math.round((B.ax || 0) * 100), Math.round((B.ay || 0) * 100), B.phase === 2 ? 2 : 1] : 0,   // [16]: his form (older pages send 16 slots)
       qz: G.quiz ? [QPH.indexOf(G.quiz.ph), Math.round(G.quiz.t * 10), G.quiz.T, G.quiz.ok, G.quiz.a, G.quiz.b, G.quiz.op === "+" ? 0 : 1, ...G.quiz.ans, G.quiz.n || 0] : 0,
       bc: G.bcut ? [BCPH.indexOf(G.bcut.ph), Math.round(G.bcut.t * 10)] : 0,
@@ -9301,6 +9789,7 @@
       d: G.drops.map((d) => [d.id, DTYPES.indexOf(d.type), d.x | 0, d.y | 0, d.z | 0, Math.round(d.life * 10)]),
       g: G.gems.filter(near).slice(-90).map((g) => [g.id, g.x | 0, g.y | 0, g.v]),
       f: G.foes.map((f) => [FTYPES.indexOf(f.type), f.x | 0, f.y | 0, f.vx | 0, f.vy | 0]),
+      cz: G.cps.map((o) => [o.id, CPK.indexOf(o.k), MKINDS.indexOf(o.mk), o.x | 0, o.y | 0, o.sx | 0, o.sy | 0, Math.round(o.a * 1000), o.r | 0, o.L | 0, Math.round(o.t * 20), Math.round(o.w * 20), Math.round(o.end * 20), o.v | 0, Math.round(o.on * 20), Math.round(o.ha * 1000), o.mid]),   // the monsters' attacks (see updateCreepPieces)
       v: G.rings.map((w) => [w.x | 0, w.y | 0, w.r | 0, Math.round(w.life * 10), Math.round(w.delay * 10)]),
       wa: G.waters.map((w) => [w.id, WA_KINDS.indexOf(w.k), w.x | 0, w.y | 0, Math.round(w.t * 20), Math.round(w.w * 20), Math.round(w.end * 20), w.r | 0, w.ax, w.dir]),   // the captain's sea, the yeti's snow (see seaMove, snowMove)
       lz: G.lavas.map((o) => [o.id, LKINDS.indexOf(o.k), o.x | 0, o.y | 0, Math.round(o.t * 20), Math.round(o.w * 20), Math.round(o.end * 20), o.r | 0, Math.round(o.a * 1000), o.d0 | 0, o.L | 0, o.ring ? o.ring[0] | 0 : -1, o.ring ? o.ring[1] | 0 : -1, o.v | 0]),   // the lava demon's fire (see lavaMove)
@@ -9391,7 +9880,8 @@
       m.tt = now; m.tx = x; m.ty = y; m.face = clamp(fc & 7, 0, 4); m.flip = fc >= 8;
       m.st = MST[num(a[5])] || "walk"; m.t = num(a[8]) / 10; m.hp = num(a[6]); m.max = num(a[9]) || m.max;
       m.hurt = bits & 1 ? 0.1 : 0; if (bits & 2) m.flash = 0.12;
-      m.slow = bits & 4 ? 1 : 0; m.burn = bits & 8 ? 1 : 0; m.poison = bits & 16 ? 1 : 0; m.summoned = !!(bits & 64);
+      m.slow = bits & 4 ? 1 : 0; m.burn = bits & 8 ? 1 : 0; m.poison = bits & 16 ? 1 : 0; m.summoned = !!(bits & 64); m.sk = !!(bits & 256);
+      if (a.length > 10) m.fa = num(a[10]) / 100;
       if (m.frz && !(bits & 32)) iceShatter(m.x, m.y - (m.hgt || 90), (m.r || 40) * 3); m.frz = m.frzMax = bits & 32 ? 1 : 0;
     }
     for (const m of G.mons) if (m.alive && !seen.has(m.id)) {
@@ -9411,7 +9901,7 @@
       const B = G.boss, st = BST[si] || "walk";
       if (st === "slam" && B.st !== "slam") { SFX.slam(); G.shake = 24; dust(ix, iy, 26); }
       if (st === "enter" && dropY >= 0 && B.dropY < 0) { SFX.slam(); G.shake = 20; }
-      if (st === "morph" && B.st !== "morph") { B.mfx = {}; G.quakes = G.quakes.filter((q) => q.done); G.foes = []; G.waters = []; G.lavas = []; }   // (his change begins: as on the host)
+      if (st === "morph" && B.st !== "morph") { B.mfx = {}; G.quakes = G.quakes.filter((q) => q.done); G.foes = []; G.waters = []; G.lavas = []; clearCps(); }   // (his change begins: as on the host)
       B.phase = ph === 2 ? 2 : 1;
       if (B.tt) { const gap = Math.max(0.03, now - B.tt); B.evx = clamp((x - B.tx) / gap, -1500, 1500); B.evy = clamp((y - B.ty) / gap, -1500, 1500); }
       B.tt = now; B.tx = x; B.ty = y; B.dir = dir < 0 ? -1 : 1; B.st = st; B.t = t10 / 10; B.hp = hp; B.dropY = dropY; B.ix = ix; B.iy = iy;
@@ -9450,6 +9940,21 @@
     }
     G.gems = gems;
     G.foes = (Array.isArray(w.f) ? w.f : []).filter(Array.isArray).map((a) => ({ type: FTYPES[num(a[0])] || "fire", x: num(a[1]), y: num(a[2]), vx: num(a[3]), vy: num(a[4]), life: 1 }));
+    // the monsters' attacks: new ones join, known ones keep their own clock unless it drifted, gone ones go back to the pool
+    if (Array.isArray(w.cz)) {
+      const have = new Map(G.cps.map((o) => [o.id, o])), seenC = new Set();
+      for (const a of w.cz) {
+        if (!Array.isArray(a) || !CPK[num(a[1])] || !MKINDS[num(a[2])]) continue;
+        const id = num(a[0]), t = num(a[10]) / 20, end = num(a[12]) / 20; let o = have.get(id);
+        if (!o) {
+          if (t > end - 0.2) continue;
+          o = addCp(CPK[num(a[1])], MKINDS[num(a[2])], num(a[3]), num(a[4]), { id, sx: num(a[5]), sy: num(a[6]), a: num(a[7]) / 1000, r: clamp(num(a[8]), 1, 900), L: clamp(num(a[9]), 0, 2000),
+            t, w: num(a[11]) / 20, end, v: num(a[13]), on: num(a[14]) / 20, ha: num(a[15]) / 1000, mid: num(a[16]) });
+        } else if (Math.abs(o.t - t) > 0.25) o.t = t;
+        seenC.add(id);
+      }
+      let j = 0; for (const o of G.cps) { if (seenC.has(o.id)) G.cps[j++] = o; else CP_POOL.push(o); } G.cps.length = j;
+    }
     // the quiz: the host's question and phase; this page runs the clock between updates and its own rain and fainting
     if (Array.isArray(w.qz)) {
       const a = w.qz.map(num), ph = QPH[a[0]] || "ask", t = a[1] / 10;
@@ -9534,6 +10039,7 @@
       f.x += f.vx * dt; f.y += f.vy * dt;
       if (f.type === "fire" && Math.random() < 0.7) G.parts.push({ type: "dot", x: f.x, y: f.y - 90, vx: rnd(-30, 30), vy: rnd(-30, 30), life: 0.35, max: 0.35, r: rnd(4, 9), col: Math.random() < 0.5 ? "#9dff6a" : "#e6ffb0" });
     }
+    updateCreepPieces(dt, false);
     updateRings(dt, false); updateQuakes(dt, false); updateWaters(dt, false); updateLavas(dt, false); updateLavaPools(dt, false);
     if (G.quiz) { G.quiz.t += dt; quizLocal(dt); } else updateQuizHud();
     for (const c of G.chests) c.t += dt;
@@ -9665,6 +10171,7 @@
     heroFrame4, monFrame, guideTarget, heroStats, lavaMove, xpNeed, gainXp, BOSS_HIT, bossHit, hurtInv, hurtTarget, COOP_XP, COOP_HP, creepHp, spawnGem, addEnergy, startUlt, rescuePet, ultBlast, ultFx: () => UFX, ULT_DRAW_CAP, ULT_PART_CAP, UFX_E, UFX_RAIN, ultLight, viewSize: () => ({ VW, VH }), startBoss, pets: () => PETE,
     groundPaints: () => groundPaints, viewBox, saidPx: null, saidBox: null, saidRect: null, touch: undefined,   // (touch: true / false overrides the touch-screen check (COARSE); groundPaints: ground chunks painted so far; saidPx: an array -> talkBubble records [text, its drawn font size in world px])
     spawnMon: (kind, x, y) => spawnMon(kind, x === undefined ? P.x + 400 : x, y === undefined ? P.y : y),
+    SKILL, CREEP_LV, creepLv, teleCap, cps: () => G.cps, clearCps, addCp, cpArt, cpStats: () => ({ ...CPST, free: CP_POOL.length }), shieldUp, monLift, LOB_WIND,   // (the monsters' own attacks)
     damageBoss: (n) => damageBoss(n, 0, 0, false, true),
     // with hold = true the world only moves on step(): exact moments for screenshots
     hold: false, step: (n = 1, dt = 1 / 30) => { for (let i = 0; i < n; i++) { if (G.mode === "ship") shipTick(dt); else update(dt); } render(); },
