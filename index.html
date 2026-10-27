@@ -66,6 +66,7 @@
   #bossbar { position: fixed; left: 50%; transform: translateX(-50%); top: calc(env(safe-area-inset-top, 0px) + 9 * var(--u)); width: min(46vw, 60 * var(--u)); display: grid; gap: .25em; text-align: center; font-family: var(--display); font-weight: 800; font-size: calc(2.4 * var(--u)); text-shadow: 0 2px 6px #000; pointer-events: none; }
   #bossbar .bar { height: .9em; }
   #bossbar .fill { background: linear-gradient(90deg, #a3122b, #ff6a3d 70%, #ffc06a); box-shadow: 0 0 14px rgba(255,90,60,.7); }
+  #bossbar.p2 .fill { background: linear-gradient(90deg, #6a0dad, #ff2a8a 70%, #ffb3e6); box-shadow: 0 0 18px rgba(255,60,200,.85); }   /* his second form */
 
   .xp { width: 10em; display: grid; gap: .2em; }
   .xp .fill { background: linear-gradient(90deg, #3aa8ff, #7cf2c6 70%, #e8fff6); box-shadow: 0 0 12px rgba(124,242,198,.7); }
@@ -345,7 +346,7 @@
   let META = null, ready = false;
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261027.1328", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261027.1409", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -620,7 +621,7 @@
       end: "Bánh Kem Khổng Lồ đã bị đánh bại và Simmy đã được cứu! Phù thủy Xám Xịt vẫn giữ các bạn còn lại. Cuộc phiêu lưu vẫn còn tiếp!",
       // the boss leaps twice (at 2/3 and 1/3 of his health), each leap asks quiz.n[i] questions in a row
       boss: { art: "candy_boss", name: "Bánh Kem Khổng Lồ", hp: 45, tip: "Bánh kem đập đất nứt, đàn kẹo mút bay tới!", summon: "candy_lolli", style: "furrow", fence: "cd_wafer_fence", quiz: { op: "+", lim: 10, T: 3, n: [2, 2], hz: "qk_bomb" },
-      laugh: "laugh0", ha: "Hô hô hô!", say: ["Ta là Bánh Kem Khổng Lồ,", "chủ nhân Rừng Kẹo Ngọt!", "Không ai qua được đâu!"], bye: ["Ôi... kem của ta...", "chảy hết rồi...", "Phù thủy Xám Xịt sẽ trả thù!"] }, quota: 120, spawn: [0.7, 1.6], camps: 9, pets: ["cat", "dog", "simmy"],
+      laugh: "laugh0", ha: "Hô hô hô!", say: ["Ta là Bánh Kem Khổng Lồ,", "chủ nhân Rừng Kẹo Ngọt!", "Không ai qua được đâu!"], morph: ["Grừừ! Ta nổi giận rồi!"], bye:["Ôi... kem của ta...", "chảy hết rồi...", "Phù thủy Xám Xịt sẽ trả thù!"] }, quota: 120, spawn: [0.7, 1.6], camps: 9, pets: ["cat", "dog", "simmy"],
       kinds: [["candy_gummy", 3, 0], ["candy_lolli", 2, 0], ["candy_corn", 2, 0.15], ["candy_cupcake", 2, 0.35]],
       deco: [["cd_lolly_tree", 3], ["cd_gumdrop_bush", 3], ["cd_marsh_bush", 2], ["cd_candy_cane", 2], ["cd_cupcake_shroom", 2], ["cd_cookie_rock", 1], ["cd_choc_rock", 1]], arenaFloor: "arena_candy",
       gr: { base: "#f7d3e2", patch: ["#fde7d0", "#c9efdd", "#f2b9d2", "#fff1b8"], blade: ["#ffffff", "#ff9fc4", "#a8e6cf"], dot: ["#ff6fa8", "#7cf2c6", "#ffe066", "#ffffff", "#b9a4ff", "#ff9a5c"], nDot: 110,
@@ -632,7 +633,7 @@
       end: "Thuyền Trưởng Ma đã bị đánh bại và Kairon đã được cứu! Sắp tới: cứu Sammy ở Núi Tuyết!",
       boss: { art: "pirate_boss", name: "Thuyền Trưởng Ma", hp: 60, tip: "Thuyền trưởng gọi sóng thần, cột nước và xoáy nước!", summon: "pirate_bat", style: "captain", fence: "pr_rope_fence",
         quiz: { op: "-", lim: 10, T: 3, n: [2, 2], hz: "qk_bomb" },
-        laugh: "laugh0", ha: "Ha ha ha!", say: ["Ta là Thuyền Trưởng Ma!", "Biển cả nghe lệnh ta!"], bye: ["Ôi... mỏ neo của ta...", "Nhưng Phù thủy Xám Xịt vẫn", "giữ các bạn còn lại đấy!"] },
+        laugh: "laugh0", ha: "Ha ha ha!", say: ["Ta là Thuyền Trưởng Ma!", "Biển cả nghe lệnh ta!"], morph: ["Grừừ! Biển cả, nổi giận đi!"], bye:["Ôi... mỏ neo của ta...", "Nhưng Phù thủy Xám Xịt vẫn", "giữ các bạn còn lại đấy!"] },
       quota: 130, spawn: [0.8, 1.7], camps: 10, pets: ["kairon"], chest: "pr_chest", arenaFloor: "arena_pirate",
       kinds: [["pirate_zombie", 3, 0], ["pirate_skeleton", 2, 0], ["pirate_mummy", 2, 0.15], ["pirate_bat", 2, 0.35]],
       deco: [["pr_palm", 4, 1.15], ["pr_barrels", 2, 1.12], ["pr_boat", 1, 1.12], ["pr_anchor", 1, 1.12], ["pr_rope_fence", 1, 1.12], ["pr_shell_rock", 2, 1.12], ["pr_skull_flag", 1, 1.12]],
@@ -1201,7 +1202,7 @@
     let tx, ty, dx, dy, d;
     if (G.quiz && G.arena) { const [qx, qy] = quadCentre(G.quiz.ok); dx = qx - P.x; dy = qy - P.y; d = Math.hypot(dx, dy); return d < 40 ? [0, 0] : [dx / d, dy / d]; }
     if (B && B.alive && B.st !== "enter") {
-      const wet = waterDodge(); if (wet) return wet;   // (out of the captain's warned water first)
+      const wet = waterDodge() || quakeDodge(); if (wet) return wet;   // (out of the captain's warned water, the warned cracks and landing spots first)
       dx = B.x - P.x; dy = B.y - P.y; d = Math.hypot(dx, dy) || 1;
       const w = d > 560 ? 1 : d < 400 ? -1 : 0;
       return norm(dx / d * w - dy / d * 0.8, dy / d * w + dx / d * 0.8);
@@ -1335,13 +1336,16 @@
     };
   }
   // the boss can be shot only on the ground, out of his entrance and his quiz (up in the air his ground spot is empty)
-  const bossOpen = (B) => !!B && B.alive && B.st !== "enter" && B.st !== "quiz" && !(B.jz > 60);
+  // (nor while he changes into his second form: bolts fly past him then)
+  const bossOpen = (B) => !!B && B.alive && B.st !== "enter" && B.st !== "quiz" && B.st !== "morph" && !(B.jz > 60);
+  // his body's radius on the ground (the second form stands 15 % bigger)
+  const bossR = (B) => 120 * (B && B.phase === 2 ? BOSS2_K : 1);
   // where a shot flying z above the ground meets o on the ground plane: its feet, or for a flyer (drawn hgt up) the spot
   // that puts the shot on its drawn body rather than on the air under it
   const aimY = (o, z = BOLT_Z) => o.y - Math.max(0, (o.hgt || 0) - z);
   // the part of the world this page's camera shows now (as render draws it)
   function viewBox() {
-    const zm = quizZoom() * comboZoom() * bcutZoom() * rescueZoom(), hw = VW / 2 / zm, hh = VH / 2 / zm, cx = G.camX + VW / 2, cy = G.camY + VH / 2;
+    const zm = quizZoom() * comboZoom() * bcutZoom() * rescueZoom() * morphZoom(), hw = VW / 2 / zm, hh = VH / 2 / zm, cx = G.camX + VW / 2, cy = G.camY + VH / 2;
     return [cx - hw, cy - hh, cx + hw, cy + hh];
   }
   // the middle of its drawn body is on the screen
@@ -1357,7 +1361,7 @@
       if (i >= n) return; out.splice(i, 0, o); ds.splice(i, 0, d); if (out.length > n) { out.pop(); ds.pop(); }
     };
     for (const m of G.mons) { if (!m.alive) continue; const d = d2(x, y, m.x, m.y); if (d < rr && onView(V, m) && m.hp > incoming(m)) add(m, d); }
-    const B = G.boss; if (bossOpen(B) && onView(V, B)) { const d = d2(x, y, B.x, B.y) - 120 * 120; if (d < rr) add(B, d); }
+    const B = G.boss; if (bossOpen(B) && onView(V, B)) { const d = d2(x, y, B.x, B.y) - bossR(B) ** 2; if (d < rr) add(B, d); }
     return out;
   }
   // shares a volley of up to n shots of dmg out over the targets T (nearest first): one each, then round again for those
@@ -1452,7 +1456,7 @@
         if (s.pierce) s.hit.add(m.id); else if (s.bounce > 0) bounceShot(s, m); else s.life = 0;
       }
       const B = G.boss;
-      if (bossOpen(B) && s.life > 0 && d2(s.x, s.y, B.x, B.y) < (s.r + 120) ** 2) {
+      if (bossOpen(B) && s.life > 0 && d2(s.x, s.y, B.x, B.y) < (s.r + bossR(B)) ** 2) {
         s.life = 0; hitBoss(s.elem, s.x, s.y); hitFx(s.x, s.y - BOLT_Z - 60, s.hk);
       }
     }
@@ -1922,6 +1926,9 @@
   // the quiz: the camera pulls back so the whole arena and its four answers fit on screen
   let qzK = 0;
   const quizZoom = () => 1 - 0.3 * rsEase(qzK);
+  // the boss changing form: the camera leans toward him so he and his growl are in view (mzK: 0..1)
+  let mzK = 0;
+  const morphZoom = () => 1 - 0.14 * rsEase(mzK);
   function rescuePet(kind) {
     // (Simmy joins when her rescue film ends)
     if (isAlly(kind) && G.rescue && G.rescue.kind === kind) { G.rescue.mine = true; return; }
@@ -2406,7 +2413,7 @@
       return da < FIST_CONE + Math.atan2(r, d);
     };
     for (const m of G.mons) if (m.alive && inCone(m.x, m.y, m.r)) hitMon(m, dmg, null, p.x, p.y, 300);
-    const B = G.boss; if (bossOpen(B) && inCone(B.x, B.y, 120)) hitBoss(null, B.x, B.y);
+    const B = G.boss; if (bossOpen(B) && inCone(B.x, B.y, bossR(B))) hitBoss(null, B.x, B.y);
     fireFistFx(p.x, p.y, a, reach);
     if (NET.role && NET.fq.length < 10) NET.fq.push(["k", p.i, p.x | 0, p.y | 0, Math.round(a * 100), reach | 0]);
     play("fire"); G.shake = Math.max(G.shake, 5);
@@ -2449,6 +2456,13 @@
   }
 
   // ---------------------------------------------------------------- boss
+  // Harder bosses (Dad, 2026-10-27): 20 % more health than before, and in phase 1 he moves 10 % more often (his wind-up, recovery,
+  // rest and walk all PH1_TEMPO faster). The first time his health is down to half he changes, once, as soon as the move or quiz he is
+  // in has ended: a MORPH_T film (he cannot hurt or be hurt meanwhile), then phase 2 in his powered-up painting (<art>2_w*, 15 % bigger):
+  // PH2_TEMPO faster again, warnings shorter but never under WARN_MIN, one more move (the candy boss's ring of lollipops, the captain's
+  // double tsunami) and one more monster in each wave he calls.
+  const BOSS_HP_K = 1.2, PH1_TEMPO = 1.1, PH2_TEMPO = 1.3, MORPH_T = 2.0, MORPH_SWAP = 1.0, WARN_MIN = 0.8, BOSS2_K = 1.15;
+  const bossTempo = (B) => PH1_TEMPO * (B && B.phase === 2 ? PH2_TEMPO : 1);
   function startBoss() {
     const A = G.arena; G.arenaLock = true;
     if (d2(P.x, P.y, A.x, A.y) > (A.r - 80) ** 2) fadeTo(() => { const [nx, ny] = norm(P.x - A.x, P.y - A.y); P.x = A.x + nx * (A.r - 260); P.y = A.y + ny * (A.r - 260); });
@@ -2456,9 +2470,10 @@
     const [nx, ny] = norm(A.x - P.x, A.y - P.y);
     const BD = G.lvl.boss;
     $("bossName").textContent = BD.name;
-    G.boss = { x: A.x + nx * 260, y: A.y + ny * 260, dir: -1, hp: BD.hp, max: BD.hp, st: "enter", t: 0, flash: 0, hurtPose: 0, cycle: 0, alive: true, die: 0, dropY: -700, iT: 0, vx: 0, vy: 0 };
+    const hp = Math.round(BD.hp * BOSS_HP_K);
+    G.boss = { x: A.x + nx * 260, y: A.y + ny * 260, dir: -1, hp, max: hp, st: "enter", t: 0, flash: 0, hurtPose: 0, cycle: 0, alive: true, die: 0, dropY: -700, iT: 0, vx: 0, vy: 0, phase: 1 };
     // the maths quizzes: he leaps up twice, at 2/3 and 1/3 of his health (each leap asks 1 or 2 questions in a row)
-    if (BD.quiz) G.boss.quizHp = [Math.round(BD.hp * 2 / 3), Math.round(BD.hp / 3)];
+    if (BD.quiz) G.boss.quizHp = [Math.round(hp * 2 / 3), Math.round(hp / 3)];
     // (the monsters chasing the girls stay and keep fighting)
     $("bossbar").hidden = false; updateBossBar();
     SFX.roar(); G.shake = 18;
@@ -2541,6 +2556,10 @@
     } else if (c && c.ph === "die" && BD.bye && c.t >= BD_SAY && c.t < BD_FALL) {
       const k = Math.min(clamp((c.t - BD_SAY) / 0.25, 0, 1), clamp((BD_FALL - c.t) / 0.2, 0, 1));
       talkBubble(BD.bye, B.x + Math.sin(c.t * 13) * 4, head - 20, k, 46);
+    } else if (B.alive && B.st === "morph" && BD.morph && B.t >= 0.15 && B.t < MORPH_T - 0.1) {
+      // changing form: he growls his line, shaking with rage
+      const k = Math.min(clamp((B.t - 0.15) / 0.2, 0, 1), clamp((MORPH_T - 0.1 - B.t) / 0.2, 0, 1));
+      talkBubble(BD.morph, B.x + Math.sin(G.t * 40) * 5, head - 20, k, 54);
     } else if (B.alive && G.quiz && G.quiz.ph !== "down" && BD.ha) {
       // he laughs from beside the fence: the bubble over his head, leaning in toward the arena
       const sd = B.x < G.arena.x ? 1 : -1, k = G.quiz.ph === "up" ? clamp(G.quiz.t / 0.3, 0, 1) : 1;
@@ -2548,26 +2567,30 @@
       talkBubble([BD.ha], B.x + sd * 130 + Math.sin(G.t * 40) * 4, head + 10, k, 72 * big);
     }
   }
-  function updateBossBar() { if (G.boss) $("bfill").style.width = (100 * Math.max(0, G.boss.hp) / G.boss.max) + "%"; }
+  function updateBossBar() { if (G.boss) { $("bfill").style.width = (100 * Math.max(0, G.boss.hp) / G.boss.max) + "%"; $("bossbar").classList.toggle("p2", G.boss.phase === 2); } }
   function updateBoss(dt) {
     const B = G.boss; if (!B) return;
-    B.t += dt; B.flash -= dt; B.hurtPose -= dt; B.iT -= dt;
+    B.t += dt; B.flash -= dt; B.hurtPose -= dt; B.iT -= dt; B.morphFlash = (B.morphFlash || 0) - dt;
     if (!B.alive) { B.die += dt; if (!G.bcut && B.die > BD_END && G.mode === "play" && !G.won && !G.portal) endLevel(); return; }
-    const T = targetFor(B.x, B.y), dx = T.x - B.x, dy = T.y - B.y, d = Math.hypot(dx, dy) || 1, fast = B.hp < B.max / 2, A = G.arena;
+    // (fast: his second form's bigger moves; k: how much faster than before his moves come)
+    const T = targetFor(B.x, B.y), dx = T.x - B.x, dy = T.y - B.y, d = Math.hypot(dx, dy) || 1, fast = B.phase === 2, k = bossTempo(B), A = G.arena;
     if (B.st === "quiz") return updateQuiz(B, dt);
     if (B.st === "enter") {
       B.dropY = Math.min(0, B.dropY + 1800 * dt);
       if (B.dropY >= 0 && B.t > 0.5) { if (!B.landed) { B.landed = true; SFX.slam(); G.shake = 20; dust(B.x, B.y, 20); } if (B.t > 1.2 && !G.bcut) { B.st = "walk"; B.t = 0; } }
       return;
     }
+    // down to half: he changes once the move he was making (or his quiz) is over
+    if (B.phase !== 2 && B.st !== "morph" && B.hp <= B.max / 2 && (B.st === "walk" || B.st === "rest") && !G.quiz) startMorph(B);
+    if (B.st === "morph") return updateMorph(B, dt);
     const style = (G.lvl.boss && G.lvl.boss.style) || "king";
     if (B.st === "walk") {
       if (Math.abs(dx) > 30) B.dir = Math.sign(dx);
-      const sp = fast ? 210 : 150;
+      const sp = 150 * k;
       if (d > 230) { B.x += dx / d * sp * dt; B.y += dy / d * sp * dt; }
-      if (((d < 420 && B.t > 0.6) || B.t > 3.0) && !(style === "captain" && G.waters.length)) bossPrep(B, style, T, dx / d, dy / d, fast);   // (the captain's next move waits until his sea is calm)
+      if (((d < 420 && B.t > 0.6 / k) || B.t > 3.0 / k) && !(style === "captain" && G.waters.length)) bossPrep(B, style, T, dx / d, dy / d, fast);   // (the captain's next move waits until his sea is calm)
     } else if (B.st === "prep") {
-      if (B.t > (fast ? 0.6 : 0.9)) bossAct(B, T, fast);
+      if (B.t > 0.9 / k) bossAct(B, T, fast);
     } else if (B.st === "leap") {
       // the spider queen's pounce: an arc onto the cracking ground she aimed at
       const k = clamp(B.t / 0.9, 0, 1);
@@ -2579,14 +2602,49 @@
       for (const g of girls()) if (d2(g.x, g.y, B.x, B.y) < 150 * 150) hurtTarget(g, B.x, B.y);
       if (B.t > 0.85 || Math.hypot(B.x - A.x, B.y - A.y) > A.r - 170) { B.st = "slam"; B.t = 0; crossQuake(B.x, B.y, fast ? 8 : 4); SFX.slam(); G.shake = Math.max(G.shake, 16); }
     } else if (B.st === "slam") {
-      if (B.t > 0.9) { B.st = "rest"; B.t = 0; B.cycle++; if (B.cycle % 3 === 0 && style !== "furrow") summonBats(B); }
+      if (B.t > 0.9 / k) { B.st = "rest"; B.t = 0; B.cycle++; if (B.cycle % 3 === 0 && style !== "furrow") summonBats(B); }
     } else if (B.st === "rest") {
-      if (B.t > (fast ? 0.6 : 1.0)) { B.st = "walk"; B.t = 0; }
+      if (B.t > 1.0 / k) { B.st = "walk"; B.t = 0; }
     }
     const [ax, ay] = norm(B.x - A.x, B.y - A.y), ad = Math.hypot(B.x - A.x, B.y - A.y);
     if (ad > A.r - 150) { B.x = A.x + ax * (A.r - 150); B.y = A.y + ay * (A.r - 150); }
     // body contact
-    if (!(B.jz > 60)) for (const g of girls()) if (d2(g.x, g.y, B.x, B.y) < 120 * 120) hurtTarget(g, B.x, B.y);
+    const br = bossR(B);
+    if (!(B.jz > 60)) for (const g of girls()) if (d2(g.x, g.y, B.x, B.y) < br * br) hurtTarget(g, B.x, B.y);
+  }
+  // ---------------------------------------------------------------- his change into the second form (the host runs it; both pages show it)
+  function startMorph(B) {
+    B.st = "morph"; B.t = 0; B.vx = B.vy = 0; B.hurtPose = 0; B.move = null; B.mfx = {};
+    // nothing of his first form can hurt any more: its warnings and shots go (the film's flash covers it)
+    G.quakes = G.quakes.filter((q) => q.done); G.foes = []; G.waters = [];
+    G.shake = Math.min(Math.max(G.shake, 8), 10);
+  }
+  function updateMorph(B, dt) {
+    const T = targetFor(B.x, B.y); if (Math.abs(T.x - B.x) > 30) B.dir = Math.sign(T.x - B.x);
+    if (B.phase !== 2 && B.t >= MORPH_SWAP) { B.phase = 2; updateBossBar(); }
+    morphFx(B, B.t - dt, B.t);
+    if (B.t >= MORPH_T) { B.phase = 2; B.st = "rest"; B.t = 0; B.cycle0 = B.cycle; }
+  }
+  // the film's look and sound (both pages): rumbling (at most 10 px), roars, magic gathering, a flash and rings bursting as he changes
+  function morphFx(B, t0, t1) {
+    // (each moment once per film: a guest page's clock is set from the host's now and then and may step back a little)
+    const fired = B.mfx || (B.mfx = {}), at = (x) => t1 >= x && t0 < x + 0.3 && !fired[x] && (fired[x] = true), cols = G.lvl && G.lvl.boss && G.lvl.boss.style === "captain" ? ["#e9fbff", "#9fe3ff", "#58cfd8", "#4aa8ff"] : ["#fff4fb", "#ff9ad5", "#ff4fa8", "#b04dff"];
+    const rgb = G.lvl && G.lvl.boss && G.lvl.boss.style === "captain" ? "120,220,255" : "255,90,200";
+    G.shake = Math.min(Math.max(G.shake, 4 + 5 * Math.min(1, t1 / MORPH_SWAP)), 10);
+    if (at(0.05)) SFX.roar();
+    if (at(0.3) || at(0.65)) G.parts.push({ type: "ring", x: B.x, y: B.y - 40, r: 380, vr: -520, life: 0.45, max: 0.45, col: rgb });   // magic gathering in
+    if (t1 < MORPH_SWAP && Math.floor(t1 * 12) !== Math.floor(t0 * 12) && G.parts.length < 420) {
+      const a = Math.random() * TAU, r = rnd(260, 420);
+      G.parts.push({ type: "dot", x: B.x + Math.cos(a) * r, y: B.y - 200 + Math.sin(a) * r * 0.7, vx: -Math.cos(a) * r * 1.6, vy: -Math.sin(a) * r * 1.1, life: 0.6, max: 0.6, r: rnd(6, 11), col: cols[Math.floor(Math.random() * cols.length)] });
+    }
+    if (at(MORPH_SWAP)) {
+      B.morphFlash = 0.45; SFX.boom(); SFX.roar();
+      G.parts.push({ type: "ring", x: B.x, y: B.y - 40, r: 60, vr: 1500, life: 0.6, max: 0.6, col: rgb });
+      G.parts.push({ type: "ring", x: B.x, y: B.y - 40, r: 30, vr: 950, life: 0.8, max: 0.8, col: "255,255,255" });
+      burst(B.x, B.y - 230, 46, cols, 760, 1.1);
+      dust(B.x, B.y, 20);
+    }
+    if (at(1.5)) { SFX.roar(); G.parts.push({ type: "ring", x: B.x, y: B.y - 40, r: 80, vr: 1100, life: 0.5, max: 0.5, col: rgb }); }
   }
   // ---------------------------------------------------------------- the boss's maths quiz
   // He leaps out over the fence (it closes the arena) and hovers beside it, laughing; a sum shows with a countdown and the floor splits into four
@@ -2784,11 +2842,15 @@
     for (let i = 0; i < 3; i++) { const a = G.t * 4 + i * TAU / 3; fx("fx_twinkle", hx + Math.cos(a) * 55, hy - 30 + Math.sin(a) * 18, 0.8, 1, G.t * 6); }
   }
   // each boss winds up its own move (B.move), aimed where the girl stands now
-  const BMOVES = ["furrow", "crows", "leap", "spit", "charge", "meteor", "bombs", "tsunami", "geyser", "whirl"];
+  const BMOVES = ["furrow", "crows", "leap", "spit", "charge", "meteor", "bombs", "tsunami", "geyser", "whirl", "lolli", "tsunami2"];
+  const PH2_MOVES = { furrow: ["furrow", "lolli", "furrow", "crows"], captain: ["tsunami", "geyser", "whirl", "tsunami2"] };
+  const isSea = (mv) => WKINDS.includes(mv) || mv === "tsunami2";
   function bossPrep(B, style, T, ux, uy, fast) {
     B.st = "prep"; B.t = 0; B.ax = ux; B.ay = uy; SFX.roar();
-    const c = B.cycle;
-    B.move = style === "furrow" ? (c % 3 === 2 ? "crows" : "furrow") : style === "spider" ? (c % 2 ? "spit" : "leap") : style === "knight" ? "charge" : style === "captain" ? WKINDS[c % 3] : (c % 2 ? "bombs" : "meteor");
+    const c = B.cycle, c2 = B.cycle - (B.cycle0 || 0);
+    // (his second form adds a move: the candy boss's ring of lollipops, the captain's double tsunami)
+    if (B.phase === 2 && PH2_MOVES[style]) B.move = PH2_MOVES[style][c2 % PH2_MOVES[style].length];
+    else B.move = style === "furrow" ? (c % 3 === 2 ? "crows" : "furrow") : style === "spider" ? (c % 2 ? "spit" : "leap") : style === "knight" ? "charge" : style === "captain" ? WKINDS[c % 3] : (c % 2 ? "bombs" : "meteor");
     if (B.move === "leap") {
       const A = G.arena, [nx, ny] = norm(T.x - A.x, T.y - A.y), r = Math.min(Math.hypot(T.x - A.x, T.y - A.y), A.r - 200);
       B.ix = A.x + nx * r; B.iy = A.y + ny * r; addQuake(B.ix, B.iy, 210, (fast ? 0.6 : 0.9) + 0.9);
@@ -2799,15 +2861,16 @@
     if (B.move === "furrow") {
       // the rake tears a line of cracks along the ground toward her, bursting one after another
       SFX.slam(); G.shake = Math.max(G.shake, 12);
-      for (const da of fast ? [-0.42, 0, 0.42] : [0]) {
+      for (const da of fast ? [-0.55, 0, 0.55] : [0]) {
         const a = Math.atan2(B.ay, B.ax) + da, ux = Math.cos(a), uy = Math.sin(a);
         for (let i = 0; i < 8; i++) {
           const x = B.x + ux * (130 + i * 115), y = B.y + uy * (130 + i * 115);
           if (Math.hypot(x - A.x, y - A.y) > A.r - 60) break;
-          addQuake(x, y, 100, 0.3 + i * 0.11);
+          addQuake(x, y, 100, fast ? WARN_MIN + i * 0.08 : 0.3 + i * 0.11);   // (his second form's three lines: each crack warned >= 0.8 s)
         }
       }
     } else if (B.move === "crows") summonBats(B);
+    else if (B.move === "lolli") lolliRing(B, T);
     else if (B.move === "leap") { B.st = "leap"; B.lx0 = B.x; B.ly0 = B.y; if (Math.abs(B.ix - B.x) > 30) B.dir = Math.sign(B.ix - B.x); }
     else if (B.move === "spit") {
       const a0 = Math.atan2(T.y - B.y, T.x - B.x), n = fast ? 5 : 3;
@@ -2828,7 +2891,22 @@
         addQuake(x, y, 140, 0.9 + i * 0.18, "bomb", B.x + B.dir * 80, B.y - 40);
       }
       play("fire");
-    } else if (WKINDS.includes(B.move)) seaMove(B, T, fast);
+    } else if (isSea(B.move)) seaMove(B, T, fast);
+  }
+  // the candy boss's second form: he spins and flings a ring of big lollipops around himself, out to where she stands; each one's
+  // landing spot glows first (>= 0.8 s) and there is room for a girl between any two (stepping in or out of the ring is safe too)
+  const LOLLI_R = 110, LOLLI_GAP = 150;
+  function lolliRing(B, T) {
+    const A = G.arena, lim = A.r - 90;
+    let R = clamp(Math.hypot(T.x - B.x, T.y - B.y), 480, 680), cx = B.x, cy = B.y;
+    // the whole ring inside the fence: its middle moved in toward the arena's middle if he stands near the edge
+    const dc = Math.hypot(cx - A.x, cy - A.y); if (dc + R > lim) { const k = Math.max(0, lim - R) / (dc || 1); cx = A.x + (cx - A.x) * k; cy = A.y + (cy - A.y) * k; }
+    const n = clamp(Math.floor(TAU * R / (2 * LOLLI_R + LOLLI_GAP)), 8, 12), a0 = Math.atan2(T.y - cy, T.x - cx);   // (one lands where she stands)
+    for (let i = 0; i < n; i++) {
+      const a = a0 + i * TAU / n;
+      addQuake(cx + Math.cos(a) * R, cy + Math.sin(a) * R, LOLLI_R, 0.9 + i * 0.04, "lolli", B.x + B.dir * 60, B.y - 60);
+    }
+    SFX.swoosh(); play("fire");
   }
   function crossQuake(x, y, dirs) {
     for (let j = 0; j < dirs; j++) {
@@ -2844,7 +2922,7 @@
   // Each is drawn on the ground for w seconds before it can hurt, and hurts only inside what was drawn: stepping out is always safe.
   // { id, k, x, y, t, w (the warning), end, r (lane half-width / circle / pull radius), ax (tsunami: 0 sweeps along x, 1 along y), dir (+1 / -1) }
   const WKINDS = ["tsunami", "geyser", "whirl"];
-  const TSU_HW = 210, TSU_V = 1500, TSU_WALL = 110, TSU_H = 200, GEY_R = 150, GEY_ON = 0.4, WHIRL_R = 600, WHIRL_CORE = 110, WHIRL_T = 4, WHIRL_PULL = 0.33 * 360;
+  const TSU_HW = 210, TSU_GAP = 280, TSU_V = 1500, TSU_WALL = 110, TSU_H = 200, GEY_R = 150, GEY_ON = 0.4, WHIRL_R = 600, WHIRL_CORE = 110, WHIRL_T = 4, WHIRL_PULL = 0.33 * 360;
   const WATER_COLS = ["#ffffff", "#e9fbff", "#9fe3ff", "#58cfd8", "#4aa8ff"];
   function addWater(k, x, y, o) { const w = { id: G.nextId++, k, x, y, t: 0, w: 1, end: 2, r: 100, ax: 0, dir: 1, ...o }; G.waters.push(w); return w; }
   // a tsunami's frame: [along its sweep, across its lane] from the arena's middle / its lane's middle line; its front along the sweep
@@ -2852,15 +2930,21 @@
   const tsuFront = (w) => w.dir * (TSU_V * (w.t - w.w) - G.arena.r - TSU_WALL - 60);
   function seaMove(B, T, fast) {
     const A = G.arena, gs = girls().filter((g) => !g.dead), who = gs.length ? gs : [T];
-    if (B.move === "tsunami") {
+    if (B.move === "tsunami" || B.move === "tsunami2") {
       // one lane through each girl (two close together share one); along x, then along y the next time
-      const ax = Math.floor(B.cycle / 3) % 2, dir = Math.random() < 0.5 ? 1 : -1, w = fast ? 1.05 : 1.3, lanes = [];
+      // (fast: his second form, warned shorter; tsunami2: a second lane beside the first, a safe gap of TSU_GAP between them)
+      const ax = Math.floor(B.cycle / 3) % 2, dir = Math.random() < 0.5 ? 1 : -1, w = fast ? 1.0 : 1.3, lanes = [];
       for (const g of who) { const c = ax ? g.x : g.y; if (!lanes.some((l) => Math.abs(l - c) < TSU_HW)) lanes.push(c); }
+      if (B.move === "tsunami2") {
+        // beside her lane, on the side with more room (toward the arena's middle); never over another lane
+        const c0 = lanes[0], mid = ax ? A.x : A.y, s0 = mid - c0 >= 0 ? 1 : -1, off = 2 * TSU_HW + TSU_GAP;
+        for (const s of [s0, -s0]) { const c = c0 + s * off; if (Math.abs(c - mid) < A.r - TSU_HW * 0.6 && lanes.every((l) => Math.abs(l - c) >= off)) { lanes.push(c); break; } }
+      }
       for (const c of lanes) addWater("tsunami", ax ? c : A.x, ax ? A.y : c, { w, r: TSU_HW, ax, dir, end: w + 2 * (A.r + TSU_WALL + 60) / TSU_V + 0.3 });
       SFX.wave(); G.shake = Math.max(G.shake, 8);
     } else if (B.move === "geyser") {
       // one under each girl, the others around her, far enough apart that there is always room between them
-      const n = fast ? 5 : 3, w = fast ? 0.9 : 1.1, at = [], lim = A.r - 170;
+      const n = fast ? 5 : 3, w = fast ? WARN_MIN : 1.1, at = [], lim = A.r - 170;
       for (const g of who) if (at.length < n) { const [nx, ny] = norm(g.x - A.x, g.y - A.y), d = Math.min(Math.hypot(g.x - A.x, g.y - A.y), lim); at.push([A.x + nx * d, A.y + ny * d]); }
       for (let k = 0; at.length < n && k < 150; k++) {
         const g = who[k % who.length], a = Math.random() * TAU, r = rnd(330, 560), x = g.x + Math.cos(a) * r, y = g.y + Math.sin(a) * r;
@@ -2870,7 +2954,7 @@
       play("splash");
     } else {
       // just beyond her, on the side away from the arena's middle: walking toward the middle always leads out of it
-      const g = T && !T.dead ? T : who[0], far = Math.hypot(g.x - A.x, g.y - A.y) > 40, [ox, oy] = far ? norm(g.x - A.x, g.y - A.y) : norm(g.x - B.x, g.y - B.y), w = fast ? 0.9 : 1.0;
+      const g = T && !T.dead ? T : who[0], far = Math.hypot(g.x - A.x, g.y - A.y) > 40, [ox, oy] = far ? norm(g.x - A.x, g.y - A.y) : norm(g.x - B.x, g.y - B.y), w = fast ? WARN_MIN : 1.0;
       addWater("whirl", g.x + ox * 150, g.y + oy * 150, { w, r: WHIRL_R, end: w + WHIRL_T + 0.6 });
       SFX.swirl();
     }
@@ -2935,6 +3019,19 @@
       if (d >= w.r) continue;
       const s = Math.min(d, WHIRL_PULL * dt); P.x += dx / d * s; P.y += dy / d * s; fence(P);
     }
+  }
+  // the test bot: a step out of each warned crack / landing spot (the boss's quakes, lollipops) it is in or about to walk into; none: null
+  function quakeDodge() {
+    const A = G.arena; if (!A || !G.quakes.length) return null;
+    let ex = 0, ey = 0;
+    for (const [px, py] of [[P.x, P.y], [P.x + P.vx * 0.3, P.y + P.vy * 0.3]]) for (const q of G.quakes) {
+      if (q.done || q.nohurt) continue;
+      const dx = px - q.x, dy = (py - q.y) / 0.62, d = Math.hypot(dx, dy);   // (a quake hurts inside its ellipse, flattened to 0.62)
+      if (d >= q.r + 70) continue;
+      const [nx, ny] = d > 1 ? norm(dx, dy / 0.62) : norm(A.x - q.x + 1, A.y - q.y);
+      ex += nx; ey += ny;
+    }
+    return ex || ey ? norm(ex, ey) : null;
   }
   // the test bot: a step out of each warned water it is in (or about to walk into); none: null
   function waterDodge() {
@@ -3118,7 +3215,7 @@
       G.parts.push({ type: "rock", x: q.x + Math.cos(a) * q.r * 0.3, y: q.y + Math.sin(a) * q.r * 0.2, z: 20, vx: Math.cos(a) * v, vy: Math.sin(a) * v * 0.6, vz: rnd(500, 950), rot: rnd(0, 6), vr: rnd(-9, 9),
         name: Math.random() < 0.5 ? "qk_rock1" : "qk_rock2", sc: rnd(0.45, 0.9) * q.r / 120, life: 2, max: 2 });
     }
-    burst(q.x, q.y - 40, 18, q.k === "bomb" ? ["#ffb347", "#ff6a2a", "#fff4c2"] : ["#ffb347", "#ff7a2a", "#ffd34d"], 420, 0.6);
+    burst(q.x, q.y - 40, 18, q.k === "lolli" ? ["#ff5fae", "#fff4fb", "#ff2a5a", "#ffd1ea"] : q.k === "bomb" ? ["#ffb347", "#ff6a2a", "#fff4c2"] : ["#ffb347", "#ff7a2a", "#ffd34d"], 420, 0.6);
   }
   // draw a sprite scaled to a width (px in the world)
   function sprW(name, x, y, w, a = 1, rot = 0, sy = 1) { const f = FR[name]; if (f) spr(f, x, y, false, w / (f.w * f.s), a, rot, sy); return !!f; }
@@ -3126,6 +3223,7 @@
   function drawQuakes() {
     for (const q of G.quakes) {
       const w = q.r * 2.3;
+      if (API.drawn && !q.nohurt) API.drawn.push(["quake", q.k, q.id, q.done ? "on" : "warn"]);
       if (!q.done) {
         const k = clamp(q.t / Math.max(0.01, q.w), 0, 1), pulse = 0.5 + 0.5 * Math.sin(G.t * 18);
         ctx.save(); ctx.globalAlpha = (0.12 + 0.14 * pulse) * Math.min(1, k * 3 + 0.3); ctx.fillStyle = "#ff3a1a"; ctx.beginPath(); ctx.ellipse(q.x, q.y, q.r, q.r * 0.62, 0, 0, TAU); ctx.fill();
@@ -3135,8 +3233,10 @@
           sprW(nm, q.x, q.y, w * (0.45 + 0.55 * k), Math.min(1, k * 4));
           glow(q.x, q.y - 10, q.r * (0.6 + 0.6 * k), "255,120,40", 0.25 + 0.35 * k * pulse);
         } else {
-          // the bomb's landing mark shrinks onto the spot
-          ctx.save(); ctx.strokeStyle = "rgba(255,230,150,.8)"; ctx.lineWidth = 5; ctx.beginPath(); ctx.ellipse(q.x, q.y, q.r * (1.6 - 0.6 * k), q.r * 0.62 * (1.6 - 0.6 * k), 0, 0, TAU); ctx.stroke(); ctx.restore();
+          // the bomb's landing mark shrinks onto the spot (a lollipop's: bright pink and white, to read on the candy floor)
+          ctx.save();
+          if (q.k === "lolli") { ctx.globalAlpha = 0.22 + 0.12 * pulse; ctx.fillStyle = "#ff2a8a"; ctx.beginPath(); ctx.ellipse(q.x, q.y, q.r, q.r * 0.62, 0, 0, TAU); ctx.fill(); ctx.globalAlpha = 0.9; ctx.lineWidth = 7; ctx.setLineDash([22, 12]); ctx.strokeStyle = "#ffffff"; ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1; }
+          ctx.strokeStyle = q.k === "lolli" ? "rgba(255,80,170,.95)" : "rgba(255,230,150,.8)"; ctx.lineWidth = q.k === "lolli" ? 7 : 5; ctx.beginPath(); ctx.ellipse(q.x, q.y, q.r * (1.6 - 0.6 * k), q.r * 0.62 * (1.6 - 0.6 * k), 0, 0, TAU); ctx.stroke(); ctx.restore();
         }
       } else {
         const a = clamp(1 - (q.t - q.w) / 2.2, 0, 1);
@@ -3145,9 +3245,16 @@
       }
     }
   }
-  // air layer: pumpkin bombs in flight
+  // air layer: pumpkin bombs in flight, and the candy boss's lollipops (spinning, flung out over the ring they land on)
   function drawQuakesAir() {
     for (const q of G.quakes) {
+      if (q.k === "lolli" && !q.done) {
+        const k = clamp(q.t / q.w, 0, 1), x = q.sx + (q.x - q.sx) * k, y = q.sy + (q.y - q.sy) * k, z = 120 * (1 - k) + Math.sin(Math.PI * k) * 260;
+        shadow(x, y, 36, 12, 0.3);
+        glow(x, y - z, 80, "255,120,200", 0.45);
+        if (!sprW("cd_lollipop", x, y - z, 120, 1, G.t * 9 + q.id)) { ctx.fillStyle = "#ff5fae"; ctx.beginPath(); ctx.arc(x, y - z, 40, 0, TAU); ctx.fill(); }
+        continue;
+      }
       if (q.k !== "bomb" || q.done) continue;
       const k = clamp(q.t / q.w, 0, 1), x = q.sx + (q.x - q.sx) * k, y = q.sy + (q.y - q.sy) * k, z = 200 * (1 - k) + Math.sin(Math.PI * k) * 230;
       shadow(x, y, 40, 14, 0.3);
@@ -3177,13 +3284,13 @@
   }
   function summonBats(B) {
     const A = G.arena;
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0, n = B && B.phase === 2 ? 4 : 3; i < n; i++) {   // (his second form calls one more)
       const a = Math.random() * TAU, m = spawnMon((G.lvl.boss && G.lvl.boss.summon) || "bat", A.x + Math.cos(a) * (A.r - 120), A.y + Math.sin(a) * (A.r - 120));
       m.summoned = true; burst(m.x, m.y - m.hgt, 14, ["#b9a4ff", "#fff"], 220, 0.5);
     }
   }
   function damageBoss(dmg, x, y, dot, big) {
-    const B = G.boss; if (!B || !B.alive || B.st === "enter" || B.st === "quiz") return;
+    const B = G.boss; if (!B || !B.alive || B.st === "enter" || B.st === "quiz" || B.st === "morph") return;   // (nothing hurts him while he changes form)
     // the next quiz mark stops the health there and starts the quiz
     if (B.quizHp && B.quizHp.length && B.hp - dmg <= B.quizHp[0]) { B.hp = B.quizHp.shift(); updateBossBar(); startQuiz(B); return; }
     // a short guard after each hit so the fight lasts, however fast the bolts fly
@@ -3210,7 +3317,7 @@
   // how much she has turned to light at ult clock t: back to herself through the blast (t 1.45-1.6), so she is seen through it
   const ultLight = (t) => ss(0.05, 0.4, t) * (1 - ss(1.45, 1.6, t));
   function startUlt() {
-    if (G.energy < 100 || G.ult || P.dead || P.winT || G.mode !== "play") return;
+    if (G.energy < 100 || G.ult || P.dead || P.winT || G.mode !== "play" || G.quiz || (G.boss && G.boss.st === "morph")) return;   // (not during a maths question: she would stay frozen through it)
     G.energy = 0; updateHud();
     G.ult = { t: 0, fired: false, cx: G.camX + VW / 2, cy: G.camY + VH / 2 };
     P.vx = P.vy = 0; P.inv = 2.6 / ULT_PACE + 1.2;   // (1.2 s of safety after she lands: a warning that started during her ultimate can be walked out of)
@@ -3542,7 +3649,7 @@
       updateParts(dt);
       return;
     }
-    if (API.autopilot && G.energy >= 100 && !G.waters.length && (aliveCount() > 14 || (G.boss && G.boss.alive && G.boss.st !== "enter"))) IN.ultPressed = true;   // (the bot does not freeze itself in its ultimate with the captain's water warned)
+    if (API.autopilot && G.energy >= 100 && !G.waters.length && !G.quiz && (aliveCount() > 14 || (G.boss && G.boss.alive && G.boss.st !== "enter"))) IN.ultPressed = true;   // (the bot does not freeze itself in its ultimate with the captain's water warned, nor in a quiz: frozen through the next question it misses it)
     if (IN.ultPressed) { IN.ultPressed = false; startUlt(); }
     updateHero(dt); waterPull(dt);
     updateUlt(dt);
@@ -3559,7 +3666,10 @@
     updateShots(dt);
     // camera: follow the girl, a little ahead of where she walks
     qzK = clamp(qzK + (G.quiz && G.quiz.ph !== "down" ? dt : -dt) / 0.6, 0, 1);
-    const qc = qzK > 0 && G.arena ? [lerp(P.x, G.arena.x, rsEase(qzK)), lerp(P.y - 70, G.arena.y - 150, rsEase(qzK))] : null;
+    const MB = G.boss, morphing = !!(MB && MB.alive && MB.st === "morph");
+    mzK = clamp(mzK + (morphing ? dt : -dt) / 0.4, 0, 1);
+    let qc = qzK > 0 && G.arena ? [lerp(P.x, G.arena.x, rsEase(qzK)), lerp(P.y - 70, G.arena.y - 150, rsEase(qzK))] : null;
+    if (!qc && mzK > 0 && MB) { const e = 0.6 * rsEase(mzK); qc = [lerp(P.x, MB.x, e), lerp(P.y - 70, MB.y - 400, e)]; }
     const tx = clamp((qc ? qc[0] : P.x + P.vx * 0.3) - VW / 2, 0, WORLD - VW), ty = clamp((qc ? qc[1] : P.y - 70 - hangLift() + P.vy * 0.3) - VH / 2, 0, WORLD - VH), k = 1 - Math.pow(0.02, dt);
     G.camX = lerp(G.camX, tx, k); G.camY = lerp(G.camY, ty, k);
     G.shake = Math.max(0, G.shake - 40 * dt);
@@ -3846,29 +3956,41 @@
     const B = G.boss, art = (G.lvl.boss && G.lvl.boss.art) || "boss";
     let pose = "stand";
     if (!B.alive) pose = B.die < BD_FALL ? "hurt" : "dead";
-    else if (B.st === "prep" || B.st === "dash" || B.st === "quiz") pose = "prep";
+    else if (B.st === "prep" || B.st === "dash" || B.st === "quiz" || B.st === "morph") pose = "prep";
     else if (B.st === "leap") pose = B.t < 0.45 ? "prep" : "slam";
     else if (B.st === "slam") pose = B.t < 0.7 ? "slam" : "stand";
     else if (B.hurtPose > 0) pose = "hurt";
-    // the Pumpkin King's frames are named by pose; the mini bosses' come from one sheet, one row each
-    const name = art === "boss" ? "boss_" + pose : `${art}_w${["stand", "prep", "slam", "hurt", "dead"].indexOf(pose)}`;
+    // the Pumpkin King's frames are named by pose; the mini bosses' come from one sheet, one row each (their second form: <art>2_w*)
+    const wi = ["stand", "prep", "slam", "hurt", "dead"].indexOf(pose), two = B.phase === 2 && FR[`${art}2_w${wi}`];
+    const name = art === "boss" ? "boss_" + pose : `${art}${two ? "2" : ""}_w${wi}`;
     const f = FR[name], flip = B.dir < 0; if (!f) return;
-    let y = B.y + (B.dropY || 0) - (B.jz || 0), sy = 1, x = B.x, rot = 0;
+    if (API.drawn) API.drawn.push(["boss", name]);
+    let y = B.y + (B.dropY || 0) - (B.jz || 0), sy = 1, x = B.x, rot = 0, sc = 1;
     if (B.alive && B.st === "walk") y -= Math.abs(Math.sin(B.t * 6)) * 10;
     if (B.alive && B.st !== "enter") sy = 1 + Math.sin(G.t * 2) * 0.012;
+    // changing form: he swells and trembles, then bursts out in his bigger painting (which grows the last bit into its full size)
+    const morph = B.alive && B.st === "morph", aura = G.lvl.boss && G.lvl.boss.style === "captain" ? "120,220,255" : "255,90,200";
+    if (morph) {
+      const t = B.t;
+      sc = t < MORPH_SWAP ? 1 + 0.08 * rsEase(clamp(t / MORPH_SWAP, 0, 1)) : 0.93 + 0.07 * rsEase(clamp((t - MORPH_SWAP) / 0.4, 0, 1));
+      x += Math.sin(G.t * 50) * 6 * (t < MORPH_SWAP ? t / MORPH_SWAP : 0.3);
+      glow(B.x, B.y - 260, 380 + 120 * Math.sin(G.t * 9), aura, 0.35 + 0.2 * Math.sin(G.t * 17));
+    } else if (B.alive && B.phase === 2) glow(B.x, B.y - 270, 270, aura, 0.16 + 0.06 * Math.sin(G.t * 4));   // (his second form's glow)
     // laughing: he shakes and bounces
     if (bossLaughing(B)) { x += Math.sin(G.t * 45) * 7; sy *= 1 + Math.abs(Math.sin(G.t * 16)) * 0.035; }
     // dying: he staggers about, swaying, before he collapses
     const stag = !B.alive && B.die < BD_FALL;
     if (stag) { const w = clamp(B.die / 0.3, 0, 1); x += Math.sin(B.die * 15) * 12 * w; rot = Math.sin(B.die * 3.2) * 0.07 * w; }
-    B.headY = y - f.ay * f.s;
-    shadow(B.x, B.y + 3, 150 * (B.dropY < -200 || B.jz > 200 ? 0.6 : 1), 32, 0.35);
-    if (B.alive && B.st === "prep") glow(B.x, B.y - 220, 300, WKINDS.includes(B.move) ? "90,190,255" : "255,90,40", 0.25 + 0.15 * Math.sin(G.t * 20));
+    B.headY = y - f.ay * f.s * sc;
+    shadow(B.x, B.y + 3, 150 * (B.phase === 2 ? BOSS2_K : 1) * (B.dropY < -200 || B.jz > 200 ? 0.6 : 1), 32, 0.35);
+    if (B.alive && B.st === "prep") glow(B.x, B.y - 220, 300, isSea(B.move) ? "90,190,255" : "255,90,40", 0.25 + 0.15 * Math.sin(G.t * 20));
     if (B.alive) glow(B.x + (flip ? -1 : 1) * 30, y - 380, 110, "255,170,60", 0.3);
     else glow(B.x, B.y - 60, 200, "255,220,140", 0.35 * clamp(1 - Math.max(0, B.die - BD_FALL) / 2, 0, 1));
     if (stag) glow(B.x, B.y - 240, 340, "255,190,120", 0.3 + 0.2 * Math.sin(B.die * 9));
     if (B.alive) statusGlow(B, B.x, B.y - 220, 280);
-    spr(f, x, y, flip, 1, 1, rot, sy);
+    spr(f, x, y, flip, sc, 1, rot, sy);
+    if (B.morphFlash > 0) sprFlash(f, x, y, flip, sc, Math.min(1, B.morphFlash * 2.5));   // (the flash as he changes)
+    else if (morph && B.t < MORPH_SWAP) sprFlash(f, x, y, flip, sc, 0.25 * B.t / MORPH_SWAP * (0.5 + 0.5 * Math.sin(G.t * 30)));
     if (B.alive && B.slow > 0) sprFlash(f, x, y, flip, 1, 0.3);
     if (B.alive && B.frz > 0) drawIceBlock(f, x, y, flip, 1, B.frz, B.frzMax);
     if (B.alive && B.burn > 0) drawFlames(B.x, B.y - 200, 220, 360, 1);
@@ -4752,7 +4874,7 @@
     const sc = SCALE * DPR, offX = (W - VW * sc) / 2, offY = (H - VH * sc) / 2;
     const shx = G.shake ? rnd(-G.shake, G.shake) : 0, shy = G.shake ? rnd(-G.shake, G.shake) : 0;
     // zoomed in or out (the quiz, the sisters' combo, the boss films) around the middle of the view
-    const zm = quizZoom() * comboZoom() * bcutZoom() * rescueZoom(), zs = sc * zm;
+    const zm = quizZoom() * comboZoom() * bcutZoom() * rescueZoom() * morphZoom(), zs = sc * zm;
     ctx.setTransform(zs, 0, 0, zs, offX + (VW / 2 - (G.camX + VW / 2 - shx) * zm) * sc, offY + (VH / 2 - (G.camY + VH / 2 - shy) * zm) * sc);
     // what is on screen (wider when zoomed out)
     const hw = VW / 2 / zm, hh = VH / 2 / zm, L = G.camX + VW / 2 - hw, R = G.camX + VW / 2 + hw, T = G.camY + VH / 2 - hh, B = G.camY + VH / 2 + hh;
@@ -7730,7 +7852,7 @@
   // and reports its spell hits, ultimate and revive back as room events. Each camera follows its own girl.
   const FTYPES = ["fire", "web", "webball"];
   const MKINDS = Object.keys(MON), MST = ["walk", "prep", "atk", "rest", "web", "fly", "back"];
-  const BST = ["enter", "walk", "prep", "slam", "rest", "leap", "dash", "quiz"], DTYPES = ["heart", "energy", "fire", "ice", "poison"], ELS = [null, "fire", "ice", "poison"];
+  const BST = ["enter", "walk", "prep", "slam", "rest", "leap", "dash", "quiz", "morph"], DTYPES = ["heart", "energy", "fire", "ice", "poison"], ELS = [null, "fire", "ice", "poison"];
   const NET = { hb: 0, room: null, state: "wait", me: null, role: null, partner: null, pp: null, applied: null, co: null,
     sendT: 0, startT: 0, goneT: 0, portalSent: false, lvBusy: false, hq: [], sq: [], fq: [] };   // hq/sq/fq: hits, shots and pet moves batched per send
   let Q = null;   // the other girl, as last reported in their presence
@@ -8004,10 +8126,10 @@
       lv: G.level,
       m: G.mons.filter((m) => m.alive).map((m) => [m.id, MKINDS.indexOf(m.kind), m.x | 0, m.y | 0, m.face + (m.flip ? 8 : 0), MST.indexOf(m.st), m.hp,
         (m.hurt > 0 ? 1 : 0) | (m.flash > 0 ? 2 : 0) | sb(m) | (m.summoned ? 64 : 0) | (m.elite ? 128 : 0), Math.round(m.t * 10), m.max]),
-      b: B ? [B.x | 0, B.y | 0, B.dir, BST.indexOf(B.st), B.hp, Math.round(B.t * 10), (B.flash > 0 ? 1 : 0) | (B.hurtPose > 0 ? 2 : 0) | sb(B), B.dropY | 0, B.alive ? 1 : 0, B.ix | 0, B.iy | 0, B.jz | 0, B.max, BMOVES.indexOf(B.move), Math.round((B.ax || 0) * 100), Math.round((B.ay || 0) * 100)] : 0,
+      b: B ? [B.x | 0, B.y | 0, B.dir, BST.indexOf(B.st), B.hp, Math.round(B.t * 10), (B.flash > 0 ? 1 : 0) | (B.hurtPose > 0 ? 2 : 0) | sb(B), B.dropY | 0, B.alive ? 1 : 0, B.ix | 0, B.iy | 0, B.jz | 0, B.max, BMOVES.indexOf(B.move), Math.round((B.ax || 0) * 100), Math.round((B.ay || 0) * 100), B.phase === 2 ? 2 : 1] : 0,   // [16]: his form (older pages send 16 slots)
       qz: G.quiz ? [QPH.indexOf(G.quiz.ph), Math.round(G.quiz.t * 10), G.quiz.T, G.quiz.ok, G.quiz.a, G.quiz.b, G.quiz.op === "+" ? 0 : 1, ...G.quiz.ans, G.quiz.n || 0] : 0,
       bc: G.bcut ? [BCPH.indexOf(G.bcut.ph), Math.round(G.bcut.t * 10)] : 0,
-      q: G.quakes.map((q) => [q.id, q.x | 0, q.y | 0, q.r | 0, Math.round(q.t * 20), Math.round(q.w * 20), q.k === "bomb" ? 1 : q.k === "meteor" ? 2 : 0, q.sx | 0, q.sy | 0]),
+      q: G.quakes.map((q) => [q.id, q.x | 0, q.y | 0, q.r | 0, Math.round(q.t * 20), Math.round(q.w * 20), q.k === "bomb" ? 1 : q.k === "meteor" ? 2 : q.k === "lolli" ? 3 : 0, q.sx | 0, q.sy | 0]),
       d: G.drops.map((d) => [d.id, DTYPES.indexOf(d.type), d.x | 0, d.y | 0, d.z | 0, Math.round(d.life * 10)]),
       g: G.gems.filter(near).slice(-90).map((g) => [g.id, g.x | 0, g.y | 0, g.v]),
       f: G.foes.map((f) => [FTYPES.indexOf(f.type), f.x | 0, f.y | 0, f.vx | 0, f.vy | 0]),
@@ -8107,7 +8229,7 @@
     }
     // boss
     if (Array.isArray(w.b) && G.arena) {
-      const [x, y, dir, si, hp, t10, bits, dropY, alive, ix, iy, jz, bmax, mv, ax, ay] = w.b.map(num);
+      const [x, y, dir, si, hp, t10, bits, dropY, alive, ix, iy, jz, bmax, mv, ax, ay, ph] = w.b.map(num);
       if (!G.boss) {
         G.boss = { x, y, tx: x, ty: y, dir: -1, hp, max: 70, st: "enter", t: 0, flash: 0, hurtPose: 0, alive: true, die: 0, dropY };
         const BD = G.lvl.boss || { name: "Trùm", tip: "" };
@@ -8116,6 +8238,8 @@
       const B = G.boss, st = BST[si] || "walk";
       if (st === "slam" && B.st !== "slam") { SFX.slam(); G.shake = 24; dust(ix, iy, 26); }
       if (st === "enter" && dropY >= 0 && B.dropY < 0) { SFX.slam(); G.shake = 20; }
+      if (st === "morph" && B.st !== "morph") { B.mfx = {}; G.quakes = G.quakes.filter((q) => q.done); G.foes = []; G.waters = []; }   // (his change begins: as on the host)
+      B.phase = ph === 2 ? 2 : 1;
       if (B.tt) { const gap = Math.max(0.03, now - B.tt); B.evx = clamp((x - B.tx) / gap, -1500, 1500); B.evy = clamp((y - B.ty) / gap, -1500, 1500); }
       B.tt = now; B.tx = x; B.ty = y; B.dir = dir < 0 ? -1 : 1; B.st = st; B.t = t10 / 10; B.hp = hp; B.dropY = dropY; B.ix = ix; B.iy = iy;
       B.jz = jz; if (bmax > 0) B.max = bmax; B.move = BMOVES[mv]; B.ax = ax / 100; B.ay = ay / 100;
@@ -8168,7 +8292,7 @@
       for (const a of w.q) {
         if (!Array.isArray(a)) continue;
         const id = num(a[0]); if (have.has(id)) continue;
-        const q = { id, x: num(a[1]), y: num(a[2]), r: clamp(num(a[3]), 20, 400), t: num(a[4]) / 20, w: num(a[5]) / 20, k: a[6] === 2 ? "meteor" : a[6] ? "bomb" : "crack", sx: num(a[7]), sy: num(a[8]), done: false };
+        const q = { id, x: num(a[1]), y: num(a[2]), r: clamp(num(a[3]), 20, 400), t: num(a[4]) / 20, w: num(a[5]) / 20, k: a[6] === 3 ? "lolli" : a[6] === 2 ? "meteor" : a[6] ? "bomb" : "crack", sx: num(a[7]), sy: num(a[8]), done: false };
         if (q.t >= q.w) q.done = true;
         G.quakes.push(q);
       }
@@ -8210,7 +8334,10 @@
     }
     G.mons = G.mons.filter((m) => m.alive || m.die < 0.6);
     const B = G.boss;
-    if (B) { B.x += (B.tx - B.x) * k; B.y += (B.ty - B.y) * k; B.t += dt; B.flash -= dt; if (!B.alive) B.die += dt; }
+    if (B) {
+      B.x += (B.tx - B.x) * k; B.y += (B.ty - B.y) * k; B.t += dt; B.flash -= dt; B.morphFlash = (B.morphFlash || 0) - dt; if (!B.alive) B.die += dt;
+      if (B.st === "morph" && B.alive) morphFx(B, B.t - dt, B.t);   // (his change into the second form: the host's film, played along)
+    }
     for (const d of G.drops) { d.x += (d.tx - d.x) * k; d.y += (d.ty - d.y) * k; d.life -= dt; }
     for (const g of G.gems) { g.x += (g.tx - g.x) * k; g.y += (g.ty - g.y) * k; }
     for (const f of G.foes) {
@@ -8336,7 +8463,7 @@
     setOutfit, hasOutfit, CHAR_H, ART_H, CHAR_K, HERO_R, view: () => ({ VW, VH }), girlSpot, drawTeamScene, drawOpening,
     OUTFITS4, openShop, buyOutfit, wearOutfit, closeShop, shop: shopInfo, simmy: SIMMY,
     skipCine, startOpening, startAllyRescue, updateSksp, lightLetter, endLevel, startDockWalk, dockWay, opCast, drawFilmActor, WK_END, readStart,
-    talkMul, lineTime, SAYS, sayAt, seqTime, said: null, saidAt: null,   // (said: an array -> talkBubble records each drawn bubble's text; saidAt: an array -> the walk-in's bubbles as [text, x, y, camX, camY, VW, VH])
+    talkMul, lineTime, SAYS, sayAt, seqTime, said: null, saidAt: null, summonBats,   // (said: an array -> talkBubble records each drawn bubble's text; saidAt: an array -> the walk-in's bubbles as [text, x, y, camX, camY, VW, VH])
     ship: () => SHIP, ISO, ISO_K, startShip, shipAct, shipSolo, stationAt, buttonAction, shipCam, boardCam, shipBars, ctrlZones, deckFix, inPoly, navNext, floatAt, aquaBlock, boardAt, boardT, edgeCall, petJoy, shipFrameName, sim: SIM, drawn: null,
     SHIPPT: { spots: SPOTS, pans: PAN_STAND, spices: SPICE_STAND, bucket: BUCKET_STAND, table: TABLE_STAND, tank: TANK_STAND, simmy: SIM_AT, simCook: SIM_COOK, open: OPEN_DECK, panUiTop: PAN_UI_TOP, walk: WALK, blocks: BLOCKS, hull: HULL, water: WATER, mastY: MAST_Y, galleyX: GALLEY_X },   // (drawn: an array -> drawShip records who / what it draws: [name, deck x, deck y, frame], ["pet", k, art, pose, x, lift], ["board", char, frame], ...)
     rodStep, newRod, rodSlot, pickFish, castDist, fishSize, FISH_TIERS, WIND_HZ, CAST_T, APP_T, BITE_HOLD, LAND_T, BAR0, DRAIN, PULL_ADD, TUG_ADD, SIM_TUG_HZ, schoolsAt, panStep, DONE, BURN, BURN2, SOLO_RATE,
