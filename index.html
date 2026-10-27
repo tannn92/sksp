@@ -360,7 +360,7 @@
   let META = null, ready = false;
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261028.0113", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261028.0130", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -537,6 +537,7 @@
     unlock() { [784, 988, 1175, 1568].forEach((f, i) => tone("triangle", f, f, 0.4, 0.07, i * 0.1)); },
     slam() { tone("sine", 90, 30, 0.8, 0.6); noise(0.6, 0.4, 300, 0.6, 0, "lowpass"); },
     roar() { tone("sawtooth", 120, 70, 1.0, 0.12); noise(1.0, 0.12, 500, 1.5); },
+    horn() { [[0, 0.45], [0.55, 0.7]].forEach(([w, d]) => { tone("sawtooth", 196, 220, d, 0.09, w); tone("square", 294, 330, d, 0.04, w); tone("sine", 98, 110, d, 0.12, w); }); },
     win() { [523, 659, 784, 1046, 784, 1046, 1318].forEach((f, i) => tone("triangle", f, f, 0.4, 0.08, i * 0.13)); },
   };
   // v3 additions: a softer zap for the rapid auto-attack, gem pickup, level-up, treasure chest
@@ -770,28 +771,29 @@
     g: { name: "Mochi", rgb: "255,120,200", cols: ["#ffb3e0", "#ff9ad5", "#ffd3f0"], cd: 0.34, minCd: 0.12, dmg: 1, range: 680, bolt: 1500, bounce: 0, r: 30 },
     s: { name: "Matcha", rgb: "140,255,140", cols: ["#b8ffb0", "#f0fff0", "#7be04a"], cd: 0.6, minCd: 0.28, dmg: 2, range: 800, bolt: 1150, bounce: 2, r: 42 },
   };
-  // Pets: each belongs to one sister, waits in a cage on a level and follows her once rescued.
+  // Pets: each belongs to one sister, waits in a cage on a level and follows her once rescued. The SKSP friends' big cages stand about the
+  // middle of each map's path (at 0.5: Dad, "Đẩy các lồng lên khoảng giữa map"), the pets' (Coca, Cafe) before them on Màn 1.
   // Cafe (Matcha's Scottish Fold cat) runs at a monster near her girl and scratches it.
   // Coca (Mochi's toy poodle) runs at one and bites: it is knocked back and slowed. at: where its cage sits along the path.
   const PETS = {
-    cat: { name: "Cafe", owner: "s", at: 0.5, rgb: "255,190,120", col: "#ffcf8a", cd: 0.8, range: 600, tip: "Cafe sẽ đi theo và cào quái giúp Matcha" },
-    dog: { name: "Coca", owner: "g", at: 0.38, rgb: "200,130,90", col: "#c98a5e", cd: 1.0, range: 600, bite: true, tip: "Coca sẽ lao tới cắn quái, làm chúng lùi lại và chậm đi" },
+    cat: { name: "Cafe", owner: "s", at: 0.26, rgb: "255,190,120", col: "#ffcf8a", cd: 0.8, range: 600, tip: "Cafe sẽ đi theo và cào quái giúp Matcha" },
+    dog: { name: "Coca", owner: "g", at: 0.34, rgb: "200,130,90", col: "#c98a5e", cd: 1.0, range: 600, bite: true, tip: "Coca sẽ lao tới cắn quái, làm chúng lùi lại và chậm đi" },
     // Simmy (the S of SKSP), freed from her cage in Rừng Kẹo Ngọt; she joins whichever sister frees her. The four friends fight as their
     // battle classes (CLS: style = the class): Simmy a sorceress, Sammy an amazon, Kairon a paladin, Phong a barbarian
-    simmy: { name: "Mèo Simmy", owner: "any", at: 0.84, lv: 0, art: "ally_simmy", rgb: "255,140,210", col: "#ff8cd2", cd: 1.15, range: 820, style: "sorceress",
+    simmy: { name: "Mèo Simmy", owner: "any", at: 0.5, lv: 0, art: "ally_simmy", rgb: "255,140,210", col: "#ff8cd2", cd: 1.15, range: 820, style: "sorceress",
       tip: "Mèo Simmy là Pháp Sư: cầu lửa, vòng băng và tia sét dây chuyền" },
     // Sammy (the second S). She waits in the standing ice cage of Núi Tuyết
     // (Màn 3, LEVELS[2]: her `lv`), so a start past Màn 3 brings her along.
     // thanks / reply: her words when she steps out, and Simmy's answer (each up for its lineTime; her film lasts as long as they need)
-    sammy: { name: "Sammy Đào", owner: "any", at: 0.84, lv: 2, rgb: "255,179,71", col: "#ffb347", cd: 1.7, range: 760, style: "amazon",
+    sammy: { name: "Sammy Đào", owner: "any", at: 0.5, lv: 2, rgb: "255,179,71", col: "#ffb347", cd: 1.7, range: 760, style: "amazon",
       tip: "Sammy Đào là Nữ Chiến Binh: giáo liên hoàn, mưa tên, giáo sét và phóng giáo xuyên hàng",
       thanks: ["Cảm ơn các em!", "Chị là Sammy Đào, chị sinh đôi của Simmy!"], reply: ["Sammy!", "Chị em mình lại gặp nhau rồi!"] },
     // Kairon (the K), freed from the hanging cage at the end of Đảo Cướp Biển (hang: his cage hangs, `pr_cage`)
-    kairon: { name: "Kairon", owner: "any", at: 0.84, lv: 1, rgb: "255,80,60", col: "#ff503c", cd: 1.5, range: 700, style: "paladin", hang: true,
+    kairon: { name: "Kairon", owner: "any", at: 0.5, lv: 1, rgb: "255,80,60", col: "#ff503c", cd: 1.5, range: 700, style: "paladin", hang: true,
       tip: "Kairon là Hiệp Sĩ Thánh: búa liên hoàn, búa thánh xoay, khiên lao tới và hào quang hồi máu",
       thanks: ["Cảm ơn nhiều nhé!", "Để anh Kairon giúp một tay!"] },
     // Phong Cận (the P), freed from the hanging cage of black iron at the end of Núi Dung Nham (`lava_cage`)
-    phong: { name: "Phong Cận", owner: "any", at: 0.84, lv: 3, rgb: "90,170,255", col: "#5aaaff", cd: 1.5, range: 720, style: "barbarian", hang: true, cage: "lava_cage",
+    phong: { name: "Phong Cận", owner: "any", at: 0.5, lv: 3, rgb: "90,170,255", col: "#5aaaff", cd: 1.5, range: 720, style: "barbarian", hang: true, cage: "lava_cage",
       tip: "Phong Cận là Chiến Binh Rìu: rìu liên hoàn, xoáy rìu, nhảy đập đất và tiếng hét",
       thanks: ["Cảm ơn các em nhiều!", "Anh Phong sẽ giúp một tay!"] },
   };
@@ -1007,9 +1009,13 @@
     G.quota = Math.round(G.camps.reduce((a, c) => a + c.n, 0) * 0.9);
     G.cages = [];
     // a cage only when its sister plays (in co-op always, so both pages build the same level)
+    const cageSpots = [];   // (every cage's spot, whoever plays: the ambush spots keep clear of them all, the same for both sisters)
     for (const k of L.pets || []) {
-      const [x, y] = offAt(PETS[k].at * path.len, R() < 0.5 ? -1 : 1, PATH_W / 2 + 70), own = PETS[k].owner === hero || isAlly(k);
-      if (NET.role || (own && !P.pets.includes(k))) G.cages.push({ kind: k, x, y, open: false, t: 0, big: isAlly(k) });
+      const side = R() < 0.5 ? -1 : 1, [x, y] = offAt(PETS[k].at * path.len, side, PATH_W / 2 + 70), own = PETS[k].owner === hero || isAlly(k);
+      cageSpots.push({ x, y });
+      // a friend's big cage has its guardian (GUARDS): it stands on the path in front of it (home); gd 0 none yet, 1 waiting, 2 awake, 3 beaten
+      const [hx, hy] = offAt(PETS[k].at * path.len, side, 40), gd = isAlly(k) && GUARDS[i] ? 0 : undefined;
+      if (NET.role || (own && !P.pets.includes(k))) G.cages.push({ kind: k, x, y, open: false, t: 0, big: isAlly(k), gd, home: { x: hx, y: hy }, gm: null });
     }
     G.items = [];
     for (let s = 500; s < path.len - 300; s += 380 + R() * 160) {
@@ -1051,6 +1057,7 @@
     }
     // Núi Dung Nham's lava pools (levels with `lavaPools`); no star or candy left lying in lava
     G.lpools = placeLavaPools(L, path, endI); G.lpT = 0; G.lpSafe = null; G.lpSide = 0;
+    G.waves = placeWaves(i, path, endI, cageSpots); G.waveFlash = 0;   // (the ambush spots: clear of the arena, the cages, the lava pools)
     if (G.lpools.length) G.items = G.items.filter((it) => !G.lpools.some((o) => lpNear(o, it.x, it.y, 60)));
     // bucket everything the ground painter needs per chunk
     G.chunkData = new Map();
@@ -1326,6 +1333,7 @@
     let tx, ty, dx, dy, d;
     if (G.quiz && G.arena) { const [qx, qy] = quadCentre(G.quiz.ok); dx = qx - P.x; dy = qy - P.y; d = Math.hypot(dx, dy); return d < 40 ? [0, 0] : [dx / d, dy / d]; }
     { const cd = creepDodge(); if (cd) return cd; }   // (out of the monsters' warnings first)
+    { const gw = botGuardWave(); if (gw) return gw; }   // (a cage guardian awake close by / an ambush she is in)
     if (B && B.alive && B.st !== "enter") {
       const wet = waterDodge() || lavaDodge() || hexDodge() || quakeDodge(); if (wet) return wet;   // (out of the captain's warned water, the lava demon's warned fire, the warned cracks and landing spots first)
       dx = B.x - P.x; dy = B.y - P.y; d = Math.hypot(dx, dy) || 1;
@@ -1336,7 +1344,7 @@
     tx = gt.x; ty = gt.y;
     // detour to a treasure or a cage close by
     // (give up on one it cannot reach within a few seconds)
-    for (const c of [...G.chests, ...G.cages]) if (!c.open && !c.botSkip && d2(P.x, P.y, c.x, c.y) < 650 * 650) {
+    for (const c of [...G.chests, ...G.cages, ...waveBoxes()]) if (!c.open && !c.botSkip && !guardLocked(c) && d2(P.x, P.y, c.x, c.y) < 650 * 650) {
       c.botT = (c.botT || 0) + 1 / 60; if (c.botT > 4) { c.botSkip = true; continue; }
       tx = c.x; ty = c.y; break;
     }
@@ -1359,11 +1367,33 @@
   const HERO_R = 38 * CHAR_K;   // her body on the ground (as small as she is drawn)
   // everyone the monsters can hit: this girl, plus the co-op partner on the host
   function girls() { return Q && NET.role === "host" ? [P, Q] : [P]; }
-  function targetFor(x, y, mon) {
+  // who a monster goes for (Dad, "Quái nhắm cả đồng đội"): the girls and the SKSP friends standing (allyTargets; a fainted one is left
+  // alone), the nearest weighted by threat: its distance over AGGRO (the girls 1; the tanks Kairon and Phong draw it from further off,
+  // fragile Simmy only when it is right by her), and a little less for each other monster already on them (AGGRO_CROWD: a crowd spreads
+  // over the group instead of all piling on one). A monster keeps its target AGGRO_T s (then looks again) and changes only for one clearly
+  // nearer (AGGRO_SW of the distance), so it does not flip between two. Without a monster (mon): the nearest girl.
+  const AGGRO = { kairon: 1.4, phong: 1.4, sammy: 1.0, simmy: 0.7 }, AGGRO_T = [0.8, 1.3], AGGRO_SW = 0.85, AGGRO_CROWD = 0.25;
+  const aggroOf = (o, mon) => ((o && o.kind && AGGRO[o.kind]) || 1) / (1 + AGGRO_CROWD * Math.max(0, (o.aggN || 0) - (mon && mon.tg === o ? 1 : 0)));
+  // (each frame on the host: how many monsters are on each girl / friend now)
+  function aggroCount() {
+    for (const g of girls()) g.aggN = 0;
+    for (const p of allyTargets()) p.aggN = 0;
+    for (const m of G.mons) if (m.alive && m.tg) m.tg.aggN = (m.tg.aggN || 0) + 1;
+  }
+  function targetFor(x, y, mon, dt = 0) {
     let best = P, bd = Infinity;
     for (const g of girls()) { if (g.dead) continue; const d = d2(g.x, g.y, x, y); if (d < bd) { bd = d; best = g; } }
-    // a monster right beside a friend (much closer to her than to any girl) goes for the friend
-    if (mon) for (const p of allyTargets()) { const d = d2(p.x, p.y, x, y); if (d < 240 * 240 && d < bd * 0.5) { bd = d; best = p; } }
+    if (!mon) return best;
+    const allies = allyTargets(), cur = mon.tg;
+    if (best) { const w = aggroOf(best, mon); bd /= w * w; }
+    const curOk = !!cur && (isCls(cur) ? allies.includes(cur) : !cur.dead && (cur === P || cur === Q));
+    if (curOk && (mon.tgT = (mon.tgT || 0) - dt) > 0) return cur;
+    mon.tgT = rnd(AGGRO_T[0], AGGRO_T[1]);
+    let bs = bd;   // (scores: squared distance over the squared threat weight)
+    for (const g of girls()) { if (g.dead || g === best) continue; const w = aggroOf(g, mon), sc = d2(g.x, g.y, x, y) / (w * w); if (sc < bs) { bs = sc; best = g; } }
+    for (const p of allies) { const w = aggroOf(p, mon), sc = d2(p.x, p.y, x, y) / (w * w); if (sc < bs) { bs = sc; best = p; } }
+    if (curOk && best !== cur) { const w = aggroOf(cur, mon), sc = d2(cur.x, cur.y, x, y) / (w * w); if (bs > sc * AGGRO_SW * AGGRO_SW) best = cur; }
+    mon.tg = best;
     return best;
   }
   // what a hit costs (the girls have 5 hearts): a monster's 1; a boss's light hit (his body, a crack, a geyser, a whirlpool's middle,
@@ -1389,6 +1419,7 @@
   function hurtHero(fx, fy, n = 1) {
     if (P.inv > 0 || P.dead || G.ult || P.winT) return;
     G.hearts -= n; renderHearts(); SFX.hurt();
+    TALLY.hearts += n; if (waveOn()) TALLY.waveHearts += n;
     P.hurtT = 0.35; P.inv = hurtInv(n); G.shake = Math.max(G.shake, 9);
     const [nx, ny] = norm(P.x - fx, P.y - fy); P.vx = nx * 520; P.vy = ny * 520;
     burst(P.x, P.y - 110, 10, ["#ff9ab8", "#fff"], 260, 0.5);
@@ -1396,7 +1427,7 @@
   }
   function heroDown(why) {
     if (P.dead) return;
-    P.dead = true; G.hearts = 0; renderHearts(); G.reviveT = FAINT_T; P.vx = P.vy = 0; SFX.hurt();
+    P.dead = true; G.hearts = 0; renderHearts(); G.reviveT = FAINT_T; TALLY.faint++; P.vx = P.vy = 0; SFX.hurt();
     // (by lava: carried back to the nearest spot with no lava within LP_CLEAR, where she lies and gets up)
     const safe = lavaSafeSpot(P.x, P.y);
     if (safe) { burst(P.x, P.y - 80, 16, ["#fff4c2", "#ffd34d", "#ff9a5c"], 300, 0.5); P.x = safe[0]; P.y = safe[1]; burst(P.x, P.y - 80, 20, ["#fff4c2", "#ffd34d", "#ffffff"], 300, 0.6); }
@@ -1453,6 +1484,7 @@
       if (G.arenaLock && d > A.r - 60) { o.x = A.x + dx / d * (A.r - 60); o.y = A.y + dy / d * (A.r - 60); }
       else if (!A.open && d < A.r + 40) { o.x = A.x + dx / d * (A.r + 40); o.y = A.y + dy / d * (A.r + 40); }
     }
+    if (o === P) waveWall(o);   // (an ambush's fog ring: she stays inside it until it ends)
     const E = G.lvl && G.lvl.lavaPools ? 230 : 80;   // (Núi Dung Nham: the lava sea at the world's edge is a wall, never walked into)
     o.x = clamp(o.x, E, WORLD - E); o.y = clamp(o.y, E, WORLD - E);
   }
@@ -1652,36 +1684,64 @@
   const BOLT_Z = 105;   // bolts fly at chest height
   // elite: a bigger leader with a golden glow, three times the health and a shower of gems
   // a monster's health on this map (tierOf): its kind's, the map's tier, the girls' level lv (their average together), k the level's
-  // 5-minute ramp (0..1); together (coop) COOP_HP times as much, an elite three times
+  // 5-minute ramp (0..1); together (coop) COOP_HP times as much, an elite three times; party: the SKSP friends with the girls (partyHp)
   const COOP_HP = 1.5;
   // (lvHp: a little faster than straight, as Mochi's fan of hearts grows faster than straight at high levels)
   const HP_LV = 0.15, HP_LV2 = 0.04, lvHp = (lv) => 1 + HP_LV * (lv - 1) + HP_LV2 * (lv - 1) ** 2;
-  const creepHp = (kind, lv, coop, k = 0, elite = false) => Math.max(1, Math.round(MON[kind].hp * tierOf().hp * lvHp(lv) * (1 + 0.3 * k) * (coop ? COOP_HP : 1) * (elite ? 3 : 1)));
+  const creepHp = (kind, lv, coop, k = 0, elite = false, party = partyN()) => Math.max(1, Math.round(MON[kind].hp * tierOf().hp * lvHp(lv) * (1 + 0.3 * k) * (coop ? COOP_HP : 1) * (elite ? 3 : 1) * partyHp(party)));
+  // ---- the party (Dad, "Game khó hơn" 1: "Cứu thêm bạn không làm game dễ đi"): each SKSP friend travelling with the girls (with either
+  // of them; the pets Coca and Cafe do not count) gives the monsters PARTY.HP more health, brings PARTY.N more of them (the stream, the
+  // surges, the camps, the ambushes' rings) and has them attack again PARTY.ATK sooner (their lunges' and their skills' wait). Together
+  // the two girls already face COOP_HP the health and 1.4x the stream (each girl's experience 1.5x shared: COOP_XP). The cage guardians and
+  // the bosses grow in health only (their attacks keep their pace). With all four friends: x1.48 health, x1.32 monsters, x1.2 attacks.
+  const PARTY = { HP: 0.12, N: 0.08, ATK: 0.05 };
+  function partyN() {
+    let n = 0; const seen = PARTY_SEEN; seen.clear();
+    for (const k of P.pets) if (CLS[k] && !seen.has(k)) { seen.add(k); n++; }
+    if (Q && NET.role) for (const k of Q.pets || []) if (CLS[k] && !seen.has(k)) { seen.add(k); n++; }
+    return n;
+  }
+  const PARTY_SEEN = new Set();
+  const partyHp = (n = partyN()) => 1 + PARTY.HP * n, partyNum = (n = partyN()) => 1 + PARTY.N * n, partyAtk = (n = partyN()) => 1 + PARTY.ATK * n;
+  // what happened this game on this page (the balance tests read it: API.tally): her faints and hearts lost (those inside an ambush too),
+  // each friend's faints, the hits each monster took before it fell (common / champion / guardian), each guardian's time from waking to
+  // falling, the champions met and beaten by affix
+  const TALLY = {};
+  function tallyReset() {
+    Object.assign(TALLY, { faint: 0, hearts: 0, waveHearts: 0, allyFaint: {}, htk: {}, guard: [], champ: {}, champKill: {} });
+  }
+  tallyReset();
+  function tallyHits(m) {
+    const k = m.guard ? "guard" : m.champ ? "champ" : m.elite ? "elite" : m.mini ? "mini" : "common", o = TALLY.htk[k] || (TALLY.htk[k] = { n: 0, hits: 0 });
+    o.n++; o.hits += m.hits || 0;
+  }
   function makeMon(kind, x, y, elite) {
-    const T = tierOf(), base = MON[kind], k = Math.min(1, G.lt / 300);
-    const c = T.spd === 1 ? base : { ...base, spd: base.spd * T.spd };
+    const T = tierOf(), base = MON[kind], k = Math.min(1, G.lt / 300), n = partyN(), atk = partyAtk(n);
+    const c = { ...base, spd: base.spd * T.spd, cd: base.cd / atk };   // (its own copy: the party's attack rate, a champion's affix)
     const lv = Q && Q.lv ? (P.lv + Q.lv) / 2 : P.lv;
-    const hp = creepHp(kind, lv, !!Q, k, elite);
+    const hp = creepHp(kind, lv, !!Q, k, elite, n);
     const r = c.r ? c.r : (c.fly ? 46 : kind === "spider" ? 62 : 50) * (elite ? 1.25 : 1);
     return { id: G.nextId++, kind, c, x, y, vx: 0, vy: 0, face: 0, flip: false, hp, max: hp, st: c.fly ? "fly" : "walk", t: 0, cd: rnd(0.4, 1.4), dist: 0, hurt: 0, flash: 0,
-      alive: true, die: 0, ph: Math.random() * 10, r, hgt: c.hgt || 0, elite: !!elite };
+      alive: true, die: 0, ph: Math.random() * 10, r, hgt: c.hgt || 0, elite: !!elite, born: G.t, atkK: atk };
   }
   function updateMon(m, dt) {
     if (!m.alive) { m.die += dt; return; }
     m.t += dt; m.cd -= dt; m.hurt -= dt; m.flash -= dt;
     if (m.fastT > 0) m.fastT -= dt;   // (a wolf's howl hurries it)
+    if (m.guard && guardStep(m, dt)) return;   // (a cage guardian: asleep at the cage, walking back to it, or back there at once)
+    if (m.champ && m.champ.k === "summon" && !m.wait && champSummon(m, dt)) return;   // (a summoning champion stands calling)
     // a camp monster idles at its camp until a girl steps in or the camp is attacked
     if (m.wait) {
       if (m.hp < m.max) m.camp.hit = true;
       if (m.camp.st < 2) return;
       m.wait = false;
     }
-    const c = m.c, T = targetFor(m.x, m.y, m), dx = T.x - m.x, dy = T.y - m.y, d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d;
+    const c = m.c, T = targetFor(m.x, m.y, m, dt), dx = T.x - m.x, dy = T.y - m.y, d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d;
     const ox = m.x, oy = m.y, inSk = SKILL_ST.has(m.st);
     if (m.sk && !inSk) m.skCd -= dt;
     if (m.hurt > 0) { m.x += m.vx * dt; m.y += m.vy * dt; m.vx *= Math.pow(0.02, dt); m.vy *= Math.pow(0.02, dt); }
     else if (inSk) skillStep(m, dt, T, d, ux, uy);   // (its own attack: see the creep skills below)
-    else if (m.sk && m.skCd <= 0 && !T.dead && skillStart(m, T, d, ux, uy)) {}
+    else if (m.sk && m.skCd <= 0 && !T.dead && (m.guard ? guardSkill(m, T, d, ux, uy) : skillStart(m, T, d, ux, uy))) {}
     else if (c.fly) updateFlyer(m, dt, T, ux, uy, d);
     else if (m.st === "prep") {
       faceTo(m, dx, dy, dt);
@@ -1703,7 +1763,7 @@
       if (!T.dead) {
         if (m.st === "walk") walkMove(m, dt, ux, uy, d);   // (toward her; in hops, sideways, keeping its distance, leaving fire: see walkMove)
         if (m.st === "walk") faceTo(m, dx, dy, dt);
-        if (m.cd <= 0 && d < c.reach) { m.st = "prep"; m.t = 0; m.shot = false; }
+        if (m.cd <= 0 && d < c.reach && !(m.guard && m.skCd <= 0)) { m.st = "prep"; m.t = 0; m.shot = false; }   // (a guardian with an attack ready steps back to use it)
         else if (c.web && m.cd <= 0 && d > 300 && d < 620 && Math.random() < dt * 0.8) { m.st = "web"; m.t = 0; m.shot = false; }
       } else if (m.st === "walk") { m.x -= ux * c.spd * 0.4 * dt; m.y -= uy * c.spd * 0.4 * dt; }
     }
@@ -1819,6 +1879,7 @@
   const CPK = ["lob", "lane", "ring", "cone", "fire"];
   const LOB_WIND = 0.35, HOP_HZ = 1.7, HOWL_T = 0.7, HOWL_FAST = 3, HOWL_K = 1.45, FIRE_MAX = 18;
   const skillOf = (m) => (SKILL[m.kind] ? SKILL[m.kind].sk : null);
+  const skOf = (m) => SKILL[m.skk || m.kind];   // (the attack under way: a cage guardian's may be another breed's of its map)
   const hearIt = (x, y) => d2(x, y, P.x, P.y) < 1300 * 1300;
   function skillRoll(m) {
     if (!SKILL[m.kind]) return;
@@ -1873,7 +1934,8 @@
     const c = m.c, S = SKILL[m.kind], sk = S ? S.sk : null;
     let sp = c.spd * (m.fastT > 0 ? HOWL_K : 1), mx = ux, my = uy;
     if (sk === "hop") sp *= hopPace(m);
-    if (m.sk && S.keep) { if (d < S.keep * 0.75) { mx = -ux * 0.6; my = -uy * 0.6; } else if (d < S.keep) return; }
+    if (m.guard) { if (d < 280) { mx = d < 20 ? Math.cos(m.ph) : -ux; my = d < 20 ? Math.sin(m.ph) : -uy; } else if (d < 360) return; }   // (a cage guardian keeps in its attacks' range)
+    else if (m.sk && S.keep) { if (d < S.keep * 0.75) { mx = -ux * 0.6; my = -uy * 0.6; } else if (d < S.keep) return; }
     else if (d <= c.reach * 0.6) return;
     if (m.sk && sk === "grab") { const w = Math.sin(G.t * 4.5 + m.ph) * 0.9; [mx, my] = norm(ux - uy * w, uy + ux * w); }
     m.x += mx * sp * dt; m.y += my * sp * dt;
@@ -1897,19 +1959,20 @@
   }
   // start its skill at T when she is in its range and there is room for one more warning; its piece shows from now
   function skillStart(m, T, d, ux, uy) {
-    const S = SKILL[m.kind]; if (!S || !S.d || m.wait) return false;
-    if (d < S.d[0] || d > S.d[1]) return false;
-    const cap = teleCap();
-    if (teleCount() >= cap || teleCount(m.kind) >= Math.max(1, Math.floor(cap / 2))) { m.skCd = 0.4; return false; }
+    const S = skOf(m); if (!S || !S.d || m.wait) return false;
+    if (d < S.d[0] * (m.guard ? 0.4 : 1) || d > S.d[1]) return false;   // (a cage guardian uses them closer in too)
+    // (a cage guardian: one more warning allowed on the screen for it, its own not counted per breed; its warnings a little bigger)
+    const cap = teleCap() + (m.guard ? 1 : 0), mk = m.skk || m.kind, K = m.guard ? GUARD.PIECE : 1;
+    if (teleCount() >= cap || (!m.guard && teleCount(m.kind) >= Math.max(1, Math.floor(cap / 2)))) { m.skCd = 0.4; return false; }
     const sk = S.sk, a = Math.atan2(T.y - m.y, T.x - m.x);
     m.st = "skw"; m.t = 0; m.vx = m.vy = 0; m.sx = m.x; m.sy = m.y; setFace(m, ux, uy);
-    if (sk === "lob") m.cp = addCp("lob", m.kind, T.x, T.y, { m, sx: m.x, sy: m.y, r: S.r, w: S.w, t: -LOB_WIND, tie: 0 });
-    else if (sk === "charge" || sk === "roll" || sk === "fireball") m.cp = addCp("lane", m.kind, m.x, m.y, { m, a, L: laneLen(m.x, m.y, a, S.L), r: S.hw, w: S.w, v: S.v, tie: sk === "fireball" ? S.w : Infinity });
+    if (sk === "lob") m.cp = addCp("lob", mk, T.x, T.y, { m, sx: m.x, sy: m.y, r: S.r * K, w: S.w, t: -LOB_WIND, tie: 0 });
+    else if (sk === "charge" || sk === "roll" || sk === "fireball") m.cp = addCp("lane", mk, m.x, m.y, { m, a, L: laneLen(m.x, m.y, a, S.L * (m.guard ? 0.7 : 1)), r: S.hw * K, w: S.w, v: S.v, tie: sk === "fireball" ? S.w : Infinity });
     else if (sk === "jump" || sk === "pounce" || sk === "blink" || sk === "dive" || sk === "boom" || sk === "slam") {
       const k = Math.min(1, S.d[1] / Math.max(d, 1));
-      m.cp = addCp("ring", m.kind, m.x + (T.x - m.x) * k, m.y + (T.y - m.y) * k, { m, sx: m.x, sy: m.y, r: S.r, w: S.w, tie: S.w });
+      m.cp = addCp("ring", mk, m.x + (T.x - m.x) * k, m.y + (T.y - m.y) * k, { m, sx: m.x, sy: m.y, r: S.r * K, w: S.w, tie: S.w });
     }
-    else if (sk === "breath") m.cp = addCp("cone", m.kind, m.x, m.y, { m, a, L: S.L, ha: S.ha, w: S.w, on: S.on, tie: Infinity });
+    else if (sk === "breath") m.cp = addCp("cone", mk, m.x, m.y, { m, a, L: S.L * K, ha: S.ha, w: S.w, on: S.on, tie: Infinity });
     else { m.st = c0(m); return false; }
     if (hearIt(m.x, m.y)) { if (sk === "charge" || sk === "roll" || sk === "slam") play("charge"); else if (sk === "boom") play("fire"); }
     return true;
@@ -1917,11 +1980,11 @@
   const c0 = (m) => (m.c.fly ? "fly" : "walk");
   function endSkill(m, st) {
     m.st = st || c0(m); m.t = 0; m.cp = null; m.vx = m.vy = 0;
-    const L = creepLv(); m.skCd = rnd(L.cd[0], L.cd[1]); m.cd = Math.max(m.cd, 0.6);
+    const L = creepLv(); m.skCd = rnd(L.cd[0], L.cd[1]) * (m.guard ? GUARD.CD : 1) / (m.atkK || 1); m.cd = Math.max(m.cd, 0.6);   // (atkK: the party's attack rate)
   }
   // the skill under way (the host's monsters; the guest's page draws them from their state and clock)
   function skillStep(m, dt, T, d, ux, uy) {
-    const S = SKILL[m.kind], o = m.cp, t = m.t;
+    const S = skOf(m), o = m.cp, t = m.t;
     if (m.st === "howl") { if (t > HOWL_T) endSkill(m); return; }
     if (!S || (m.st === "skw" && !o)) return endSkill(m);   // (its piece is gone: shooed away, or pushed off by a pet's guard)
     switch (S.sk) {
@@ -2088,28 +2151,40 @@
   // kb: knock-back push (from the shooter's level). A light hit only nudges; it never stops a monster's lunge or resets its attack.
   function damageMon(m, dmg, fx, fy, dot, by, kb = 60) {
     if (!m.alive) return;
+    if (m.guard && !dot) dmg = Math.min(dmg, Math.max(1, Math.ceil(m.max * GUARD.HIT)));   // (a cage guardian's hide: no one hit takes more than GUARD.HIT of it)
+    if (!dot) m.hits = (m.hits || 0) + 1;
+    if (m.shd > 0 && (dmg = champShield(m, dmg)) <= 0) { if (!dot) play("hit"); return; }   // (a champion's shield takes it first)
     m.hp -= dmg; m.flash = 0.12;
     if (m.hp <= 0) return killMon(m, true, by);
     if (dot) return;
     play("hit");
-    if (m.st !== "atk" && m.st !== "prep" && !SKILL_ST.has(m.st)) {
+    if (m.st !== "atk" && m.st !== "prep" && !SKILL_ST.has(m.st) && !m.guard) {
       m.hurt = 0.1 + Math.min(0.12, kb / 2000); if (m.elite) kb *= 0.4;
       const [nx, ny] = norm(m.x - fx, m.y - fy); m.vx = nx * kb * 2.5; m.vy = ny * kb * 2.5;
     }
   }
   function killMon(m, give, by) {
     m.alive = false; m.die = 0; G.kills++; G.lvKills++;
+    if (give) tallyHits(m);
+    if (m.guard && m.guard.gd !== undefined && NET.role !== "guest") guardBeaten(m.guard, m);
     if (m.camp) { m.camp.left--; m.camp = null; }
     play("pop");
     const cy = m.y - (m.hgt || 90);
     if (G.parts.length < 380) burst(m.x, cy, 14, ["#fff4c2", "#ffd34d", "#ff9ad5", "#b9a4ff"], 380, 0.7);
-    const en = m.elite ? 12 : Math.ceil(m.c.en * 0.15);
+    const en = m.elite ? 12 : m.champ ? 8 : Math.ceil(m.c.en * 0.15);
     if (give && by === "q" && NET.role === "host") netEmit("gain", { to: NET.partner, n: en, x: m.x | 0, y: cy | 0 });
     else if (give) addEnergy(en, m.x, cy);
-    if (!m.summoned) {
-      spawnGem(m.x, m.y, 1 + Math.floor(MON[m.kind].hp / 4) + G.level);
+    if (!m.summoned && !m.wave) {   // (an ambush's monsters leave no gems: its chest is its reward, and the girls' levels keep their pace)
+      if (Math.random() * partyNum() < 1) spawnGem(m.x, m.y, 1 + Math.floor(MON[m.kind].hp / 4) + G.level);   // (the party's extra monsters bring no extra experience: the girls' levels keep their pace)
       if (m.elite) { for (let i = 0; i < 6; i++) spawnGem(m.x + rnd(-70, 70), m.y + rnd(-50, 50), 2 + G.level * 2); spawnDrop(m.x, m.y); if (Math.random() < 0.5) spawnDrop(m.x, m.y); }
       if (Math.random() < (give ? 0.1 : 0.035) && G.drops.length < 14) spawnDrop(m.x, m.y);
+    }
+    // a champion beaten (by a hit or an ultimate; not swept away by a film): its stars, gems and a drop, its burst / its halves
+    if (m.champ && (give || by === "ult") && NET.role !== "guest") {
+      TALLY.champKill[m.champ.k] = (TALLY.champKill[m.champ.k] || 0) + 1;
+      G.stars += CHAMP.STARS; updateHud(); floatText(m.x, cy - 160, "+" + CHAMP.STARS + " sao");
+      if (!m.summoned && !m.wave) { for (let i = 0; i < CHAMP.GEMS; i++) spawnGem(m.x + rnd(-70, 70), m.y + rnd(-50, 50), 1 + Math.floor(MON[m.kind].hp / 4) + G.level); if (G.drops.length < 14) spawnDrop(m.x, m.y); }
+      champDeath(m);
     }
     checkGate();
   }
@@ -2131,8 +2206,151 @@
     }
     return [clamp(T.x + Math.cos(a || 0) * r, 100, WORLD - 100), clamp(T.y + Math.sin(a || 0) * r, 100, WORLD - 100)];
   }
-  function spawnMon(kind, x, y, elite) {
-    const m = makeMon(kind, x, y, elite); skillRoll(m); pushOut(m, m.r); G.mons.push(m); return m;
+  // (roll: it may come as a champion (champRoll); pre: what it is before that, e.g. { summoned: true })
+  function spawnMon(kind, x, y, elite, roll, pre) {
+    const m = makeMon(kind, x, y, elite); if (pre) Object.assign(m, pre); skillRoll(m); if (roll) champRoll(m); pushOut(m, m.r); G.mons.push(m); return m;
+  }
+  // ---------------------------------------------------------------- champions (Dad, "Quái tinh nhuệ", Diablo's champions)
+  // A share of the monsters that come (CHAMP.SHARE by map: the stream, the surges, the camps, the ambushes' rings; never a cage guardian,
+  // a camp's elite leader, a boss's or a champion's summons, a split half, nor the fire bat, which bursts) are champions: their own painted
+  // frames drawn CHAMP.SC times as big, an aura in their affix's colour and a small name tag; CHAMP.HP times the health, always skilled;
+  // beaten: CHAMP.GEMS more gems of its kind's worth (its experience about as its health: the girls' levels keep their pace), CHAMP.STARS
+  // stars and a drop. Each has one affix (AFFIX):
+  //   Nhanh: quicker on its feet (FAST.spd) and to attack again (FAST.cd), streaks behind it
+  //   Khiên: a shield of SHIELD of its health over it (a painted bubble): hits take the shield first; it breaks ("Vỡ khiên!") with a
+  //          stagger, then its health goes
+  //   Nổ khi chết: beaten, it leaves a warned ring (BOOM.w s, BOOM.r) where it fell, then bursts: a heart off anyone inside (a monster's
+  //          ring piece: both pages draw it, the host hurts the girls and the friends in it)
+  //   Tách đôi: beaten, it splits into two small ones of its kind (SPLIT.hp of one's health each, drawn SPLIT.sc as big); they do not split
+  //   Gọi quái: with a girl within SUM.near it stops (state "csum") and its painted summon circles show round it for SUM.w s, then 2 (Màn
+  //          1-2) or 3 monsters of the map come out of them (no gems), never more than SUM.max of its own at once; then SUM.cd s
+  // The host decides; the guest's page sees bit 1024 (a champion: its affix and its shield, world state [12] / [13]), 2048 (a split half)
+  // and the summoner's state.
+  const CHAMP = { SHARE: [0.04, 0.06, 0.08, 0.1, 0.12], SC: 1.4, R: 1.3, HP: 3.5, GEMS: 3, STARS: 2,
+    FAST: { spd: 1.5, cd: 0.6, lunge: 1.15 }, SHIELD: 0.6, BOOM: { r: 210, w: 1.1, mk: "lava_bat" }, SPLIT: { hp: 0.5, sc: 0.72, r: 0.75 },
+    SUM: { cd: [7, 9.5], first: [2, 3.5], w: 1.2, r: 175, near: 950, max: 6 } };
+  const AFFIX = [
+    { k: "fast", name: "Nhanh", rgb: "255,225,70", ring: "fx_ring" },
+    { k: "shield", name: "Khiên", rgb: "110,200,255", ring: "fx_aura_ice" },
+    { k: "boom", name: "Nổ khi chết", rgb: "255,110,40", ring: "fx_aura_fire" },
+    { k: "split", name: "Tách đôi", rgb: "120,235,110", ring: "fx_aura_poison" },
+    { k: "summon", name: "Gọi quái", rgb: "200,120,255", ring: "fx_circle_s" },
+  ];
+  const AFF_K = AFFIX.map((a) => a.k), affixOf = (k) => AFFIX[AFF_K.indexOf(k)] || null;
+  const champShare = () => CHAMP.SHARE[clamp(G.level | 0, 0, CHAMP.SHARE.length - 1)];
+  const champOk = (m) => !m.guard && !m.elite && !m.summoned && !m.mini && !m.champ && !(SKILL[m.kind] && SKILL[m.kind].sk === "boom");
+  function champRoll(m) {
+    if (!champOk(m) || Math.random() >= champShare()) return m;
+    return makeChamp(m, AFF_K[Math.floor(Math.random() * AFF_K.length)]);
+  }
+  function makeChamp(m, k) {
+    const A = affixOf(k) || AFFIX[0];
+    m.champ = A; m.hp = m.max = Math.max(2, Math.round(m.max * CHAMP.HP)); m.r = Math.round(m.r * CHAMP.R);
+    m.c = { ...m.c };
+    if (A.k === "fast") { m.c.spd *= CHAMP.FAST.spd; m.c.cd *= CHAMP.FAST.cd; if (m.c.lunge) m.c.lunge *= CHAMP.FAST.lunge; }
+    if (A.k === "shield") m.shd = m.shdMax = Math.max(1, Math.round(m.max * CHAMP.SHIELD));
+    if (A.k === "summon") { m.sumCd = rnd(CHAMP.SUM.first[0], CHAMP.SUM.first[1]); m.sumN = 0; }
+    if (SKILL[m.kind]) { m.sk = true; m.skCd = rnd(0.5, 1.5); }
+    TALLY.champ[A.k] = (TALLY.champ[A.k] || 0) + 1;
+    return m;
+  }
+  // its shield takes the hit first (what is left of the hit goes on to its health)
+  function champShield(m, dmg) {
+    const a = Math.min(m.shd, dmg); m.shd -= a; m.flash = 0.12;
+    if (m.shd <= 0) { m.shd = 0; m.hurt = Math.max(m.hurt, 0.45); m.vx = m.vy = 0; shieldBreakFx(m); }
+    return dmg - a;
+  }
+  function shieldBreakFx(m) {
+    const cy = m.y - (m.hgt || 0) - 110 * CHAMP.SC * CHAR_M;
+    if (d2(m.x, m.y, P.x, P.y) > 2000 * 2000) return;
+    play("shatter"); G.shake = Math.max(G.shake, 5);
+    if (G.parts.length < 420) { burst(m.x, cy, 18, ["#ffffff", "#d8f4ff", "#7fd6ff"], 360, 0.55); G.parts.push({ type: "fx", name: "fx_twinkle", x: m.x, y: cy, sc: 1.1, life: 0.35, max: 0.35, grow: 1.4 }); }
+    floatText(m.x, cy - 120, "Vỡ khiên!");
+  }
+  // beaten (the host): the burst's ring, the two halves
+  function champDeath(m) {
+    const A = m.champ; if (!A) return;
+    if (A.k === "boom") addCp("ring", CHAMP.BOOM.mk, m.x, m.y, { mid: m.id, r: CHAMP.BOOM.r, w: CHAMP.BOOM.w });
+    else if (A.k === "split") for (let i = 0; i < 2; i++) {
+      const a = i * Math.PI + rnd(-0.5, 0.5), o = spawnMon(m.kind, m.x + Math.cos(a) * 70, m.y + Math.sin(a) * 45, false, false, { mini: true });
+      o.hp = o.max = Math.max(1, Math.round(m.max / CHAMP.HP * CHAMP.SPLIT.hp)); o.r = Math.round(o.r * CHAMP.SPLIT.r); o.wave = m.wave;
+      o.vx = Math.cos(a) * 260; o.vy = Math.sin(a) * 180; o.hurt = 0.3; o.cd = Math.max(o.cd, 0.8);
+      if (d2(m.x, m.y, P.x, P.y) < 2000 * 2000 && G.parts.length < 420) burst(o.x, o.y - 80, 10, ["#c8ff8a", "#7be04a", "#ffffff"], 260, 0.45);
+    }
+  }
+  // the summoner's turn (true: it is summoning, this frame is done)
+  const sumN = () => (G.level >= 2 ? 3 : 2);
+  function sumSpots(m) {
+    const n = sumN(), a0 = (m.id % 10) * 0.63, out = [];
+    for (let i = 0; i < n; i++) { const a = a0 + i / n * TAU; out.push([m.x + Math.cos(a) * CHAMP.SUM.r, m.y + Math.sin(a) * CHAMP.SUM.r * 0.62]); }
+    return out;
+  }
+  function champSummon(m, dt) {
+    const S = CHAMP.SUM;
+    if (m.st === "csum") {
+      m.vx = m.vy = 0;
+      if (m.t >= S.w) {
+        for (const [x, y] of sumSpots(m)) {
+          if (aliveCount() >= MAX_MONS) break;
+          const o = spawnMon(pickKind(), x, y, false, false, { summoned: true }); o.by = m; o.cd = Math.max(o.cd, 0.6);
+          if (d2(x, y, P.x, P.y) < 2000 * 2000 && G.parts.length < 420) burst(x, y - 70, 12, ["#e6c8ff", "#b98aff", "#ffffff"], 280, 0.5);
+        }
+        m.st = c0(m); m.t = 0; m.sumCd = rnd(S.cd[0], S.cd[1]); m.sumN++;
+      }
+      return true;
+    }
+    if (SKILL_ST.has(m.st) || m.st === "prep" || m.st === "atk" || m.hurt > 0 || m.wait) return false;
+    if ((m.sumCd -= dt) > 0) return false;
+    let own = 0; for (const o of G.mons) if (o.alive && o.by === m) own++;
+    const near = girls().some((g) => !g.dead && d2(g.x, g.y, m.x, m.y) < S.near * S.near);
+    if (!near || own + sumN() > S.max || aliveCount() > MAX_MONS - 4) { m.sumCd = 1; return false; }
+    m.st = "csum"; m.t = 0; m.vx = m.vy = 0;
+    if (hearIt(m.x, m.y)) tone("sine", 300, 620, 0.5, 0.05);
+    return true;
+  }
+  // ---- its looks (code light and particles over its own painted frames)
+  function champAura(m, x, cy, mul) {
+    const A = m.champ, p = 0.5 + 0.5 * Math.sin(G.t * 3.4 + m.ph), k = mul / CHAR_M;
+    glow(m.x, m.y, m.r * 2.3, A.rgb, 0.3 + 0.1 * p);
+    if (!pieceAt(A.ring, m.x, m.y, m.r * 3.1 * (1 + 0.04 * p), 0.55 + 0.25 * p, G.t * (A.k === "fast" ? 2.4 : 0.7), 0.42)) {
+      ctx.save(); ctx.translate(m.x, m.y); ctx.scale(1, 0.4); ctx.globalAlpha *= 0.6; ctx.lineWidth = 8; ctx.strokeStyle = `rgba(${A.rgb},0.9)`; ctx.beginPath(); ctx.arc(0, 0, m.r * 1.45, 0, TAU); ctx.stroke(); ctx.restore();
+    }
+    glow(x, cy - 30 * (k - 1), 150 * k, A.rgb, 0.2 + 0.1 * p);
+    const roomy = G.parts.length < 380;
+    if (A.k === "fast" && roomy && Math.hypot(m.evx || 0, m.evy || 0) > 60 && Math.random() < 0.5) G.parts.push({ type: "dot", x: m.x + rnd(-m.r, m.r) * 0.6, y: m.y - rnd(30, 200), vx: -(m.evx || 0) * 0.3, vy: -(m.evy || 0) * 0.3, life: 0.35, max: 0.35, r: rnd(4, 8), col: `rgb(${A.rgb})` });
+    else if (A.k === "boom" && roomy && Math.random() < 0.25) G.parts.push({ type: "dot", x: m.x + rnd(-m.r, m.r), y: m.y - rnd(40, 220), vx: rnd(-20, 20), vy: -110, life: 0.6, max: 0.6, r: rnd(3, 7), col: Math.random() < 0.5 ? "#ff8a2a" : "#ffd36a" });
+    else if (roomy && Math.random() < 0.2) G.parts.push({ type: "dot", x: m.x + rnd(-m.r, m.r), y: m.y - rnd(20, 260), vx: 0, vy: -70, life: 0.8, max: 0.8, r: rnd(3, 6), col: `rgb(${A.rgb})` });
+    if (API.drawn) API.drawn.push(["champ", m.id, A.name, k, A.rgb]);
+  }
+  // the shield: a painted bubble round its body with light on it, sparkles running round
+  function champBubble(m, x, cy, mul) {
+    const f = m.shdMax ? clamp(m.shd / m.shdMax, 0, 1) : 0; if (f <= 0) return;
+    const k = mul / CHAR_M, R = 120 * k * (1 + 0.03 * Math.sin(G.t * 5 + m.ph));
+    glow(x, cy, R * 1.25, "120,205,255", 0.22 + 0.18 * f);
+    if (!pieceAt("fx_bubble", x, cy, R * 2.1, 0.35 + 0.35 * f, 0, 1, true)) glow(x, cy, R, "200,235,255", 0.3);
+    for (let i = 0; i < 3; i++) { const a = G.t * 2.2 + i * TAU / 3; fx("fx_twinkle", x + Math.cos(a) * R * 0.85, cy + Math.sin(a) * R * 0.5, 0.35 + 0.15 * f, 0.5 + 0.4 * f); }
+  }
+  // its name tag (and a blue strip of shield over its health)
+  function champTag(m, top) {
+    const A = m.champ;
+    label(A.name, m.x, top, 22, `rgb(${A.rgb})`);
+    if (m.shdMax && m.shd > 0) { const w = 120, f = clamp(m.shd / m.shdMax, 0, 1); ctx.fillStyle = "rgba(0,0,0,.45)"; ctx.fillRect(m.x - w / 2, top + 8, w, 7); ctx.fillStyle = "#8fd8ff"; ctx.fillRect(m.x - w / 2, top + 8, w * f, 7); }
+    if (API.drawn) API.drawn.push(["champTag", m.id, A.name]);
+  }
+  // the summoner's circles on the ground (both pages, from its state and clock)
+  function drawChampGround(L, R, T, B) {
+    for (const m of G.mons) {
+      if (!m.alive || m.st !== "csum" || !m.champ || m.x < L - 400 || m.x > R + 400 || m.y < T - 300 || m.y > B + 300) continue;
+      if (!hexArtDone) hexArt();
+      const k = clamp(m.t / CHAMP.SUM.w, 0, 1), pulse = 0.5 + 0.5 * Math.sin(G.t * 12);
+      for (const [x, y] of sumSpots(m)) {
+        glow(x, y, 120, m.champ.rgb, 0.25 + 0.35 * k);
+        hexCircle("hx_ring", x, y, 70 + 40 * k, 0.45 + 0.45 * k, G.t * 1.4);
+        hexCircle("hx_circle", x, y, 60 + 30 * k, (0.3 + 0.4 * k) * (0.8 + 0.2 * pulse), -G.t);
+      }
+      glow(m.x, m.y - 120, 200, m.champ.rgb, 0.25 + 0.25 * pulse);
+      if (API.drawn) API.drawn.push(["csum", m.id]);
+    }
   }
   // monster camps on the path: spawned while a girl is still a screen away, they wait for her.
   // st: 0 not yet there, 1 waiting, 2 awake and fighting, 3 cleared (or given up on)
@@ -2143,10 +2361,11 @@
       if (cp.st === 0) {
         let near = false; for (const g of gs) if (d2(g.x, g.y, cp.x, cp.y) < 2300 * 2300) near = true;
         if (!near) continue;
-        cp.st = 1; cp.left = cp.n;
-        for (let i = 0; i < cp.n; i++) {
-          const a = i / cp.n * TAU + rnd(-0.3, 0.3), rr = i === 0 ? 0 : 100 + Math.sqrt(i / cp.n) * 300;
-          const m = spawnMon(i === 0 && cp.elite ? cp.boss : pickKind(), cp.x + Math.cos(a) * rr, cp.y + Math.sin(a) * rr * 0.75, i === 0 && cp.elite);
+        const cn = Math.round(cp.n * partyNum());   // (the party: a few more in a camp)
+        cp.st = 1; cp.left = cn;
+        for (let i = 0; i < cn; i++) {
+          const a = i / cn * TAU + rnd(-0.3, 0.3), rr = i === 0 ? 0 : 100 + Math.sqrt(i / cn) * 300;
+          const m = spawnMon(i === 0 && cp.elite ? cp.boss : pickKind(), cp.x + Math.cos(a) * rr, cp.y + Math.sin(a) * rr * 0.75, i === 0 && cp.elite, true);
           m.wait = true; m.camp = cp; setFace(m, -Math.cos(a), -Math.sin(a));
         }
       }
@@ -2191,25 +2410,26 @@
     updateCamps(gs, dt);
     if (!G.tierMsg && G.lt > 3.2 && tierOf().name) { G.tierMsg = true; showBanner(tierOf().name, "Quái mạnh hơn rồi, bé cố lên!"); }
     const open = (G.portal || G.arena).open, atGate = nearGate(gs);
-    const rate = (L.spawn[0] + (L.spawn[1] - L.spawn[0]) * k) * (gs.length > 1 ? 1.4 : 1) * (open ? 0.45 : 1) * (atGate ? 3 : 1);
+    const waving = waveOn();   // (an ambush brings its own rings of monsters: the stream and the surges wait meanwhile)
+    const rate = (L.spawn[0] + (L.spawn[1] - L.spawn[0]) * k) * (gs.length > 1 ? 1.4 : 1) * partyNum() * (open ? 0.45 : 1) * (atGate ? 3 : 1) * (waving ? 0 : 1);
     if (atGate && !G.gateMsg) { G.gateMsg = true; showBanner("Quái canh cổng!", "Hạ hết để mở cổng nhé"); SFX.roar(); }
     G.spawnAcc = Math.min(G.spawnAcc + rate * dt, 6);
     while (G.spawnAcc >= 1) {
       G.spawnAcc--;
       if (alive >= MAX_MONS) break;
       const T = atGate || gs[Math.floor(Math.random() * gs.length)], [x, y] = spawnPoint(T);
-      spawnMon(pickKind(), x, y, atGate && Math.random() < 0.04);
+      spawnMon(pickKind(), x, y, atGate && Math.random() < 0.04, true);
     }
     // every so often a big group rushes in from one side
-    if ((G.surgeT -= dt) <= 0 && !open) {
+    if (!waving && (G.surgeT -= dt) <= 0 && !open) {
       G.surgeT = rnd(38, 52);
-      const T = gs[0], a = Math.random() * TAU, n = Math.min(MAX_MONS - alive, 6 + Math.round(8 * k));
-      for (let i = 0; i < n; i++) { const [x, y] = spawnPoint(T, a); spawnMon(pickKind(), x, y); }
+      const T = gs[0], a = Math.random() * TAU, n = Math.min(MAX_MONS - alive, Math.round((6 + 8 * k) * partyNum()));
+      for (let i = 0; i < n; i++) { const [x, y] = spawnPoint(T, a); spawnMon(pickKind(), x, y, false, true); }
       if (n > 0) { showBanner("Quái kéo tới!", "Bé cẩn thận nhé"); SFX.roar(); }
     }
     // monsters left far behind come back around
     for (const m of G.mons) {
-      if (!m.alive || m.summoned || m.wait) continue;
+      if (!m.alive || m.summoned || m.wait || m.guard) continue;
       let near = false; for (const g of gs) if (d2(m.x, m.y, g.x, g.y) < 2700 * 2700) { near = true; break; }
       if (!near) { const T = gs[Math.floor(Math.random() * gs.length)], [x, y] = spawnPoint(T); m.x = x; m.y = y; m.st = m.c.fly ? "fly" : "walk"; }
     }
@@ -2222,6 +2442,277 @@
     showBanner(G.portal ? "Cổng phép đã mở!" : "Đấu trường đã mở!", "Đi theo mũi tên nhé");
   }
   function quotaLeft() { return Math.max(0, G.quota - G.lvKills); }
+
+  // ---------------------------------------------------------------- cage guardians (Dad, "Trùm nhỏ giữ lồng")
+  // Each SKSP friend's big cage (Màn 1 Mèo Simmy, Màn 2 Kairon, Màn 3 Sammy Đào, Màn 4 Phong Cận) is kept by a guardian: one of the map's
+  // own painted monsters drawn GUARD.SC times as big (its own frames), with an aura in its colour, its name and a health bar; GUARD.HP
+  // times the health of the map's common monster (no one hit takes more than GUARD.HIT of it: the friends' big hits are blunted); it fights with two of the map's warned attacks (sk: the breeds whose skill it uses, in
+  // turn; the second borrowed: m.skk), GUARD.CD times as long between them as the map's skilled monsters, its warnings GUARD.PIECE as big.
+  // It waits on the path in front of the cage (c.home) from when a girl comes within 2300, wakes when one comes within GUARD.WAKE (or hurts
+  // it): "<name>!" / "Hạ trùm canh lồng để cứu bạn!". The cage stays shut (drawn locked, the hint over it) until it is beaten (c.gd 3):
+  // then a burst of stars (GUARD.STARS) and the cage opens as before for a girl walking up (the rescue film). It never leaves its cage
+  // far: past GUARD.LEASH it walks back (and back with nobody near); carried past GUARD.FAR, held away for GUARD.STUCK s, or standing in
+  // lava, it is back at the cage at once (no girl is ever left with a guardian she cannot reach). An ultimate takes a bite (GUARD.ULT at
+  // most), as off a boss. The host runs it; the guest sees it among the monsters (bit 512, its attack's breed) and each cage's state (gd).
+  const GUARDS = [
+    { kind: "candy_lolli", name: "Kẹo Mút Đại Ca", rgb: "255,90,200", sk: ["candy_lolli", "candy_corn"] },        // lobs lollipops, dashes down a lane
+    { kind: "pirate_zombie", name: "Xương Cướp Biển Đại Ca", rgb: "90,220,255", sk: ["pirate_zombie", "pirate_mummy"] },   // throws his cutlass, rushes down a lane
+    { kind: "snow_mummy", name: "Sói Tuyết Đầu Đàn", rgb: "150,210,255", sk: ["snow_mummy", "snow_bat"] },        // pounces, breathes frost
+    { kind: "lava_zombie", name: "Người Đá Lửa Đại Ca", rgb: "255,120,40", sk: ["lava_zombie", "lava_skeleton"] },  // pounds the ground, shoots fireballs
+  ];
+  const GUARD = { SC: 1.9, HP: 10, R: 95, WAKE: 950, LEASH: 650, FAR: 1300, STUCK: 4, STARS: 15, CD: 0.3, PIECE: 1.2, SPD: 1.3, ULT: 0.3, HIT: 0.015 };
+  const GUARD_HINT = "Hạ trùm canh lồng để cứu bạn!";
+  const commonKind = () => G.lvl.kinds.filter((k) => !k[2]).sort((a, b) => b[1] - a[1])[0][0];
+  const guardLocked = (c) => !!c && c.gd !== undefined && c.gd < 3 && !c.open;
+  function spawnGuard(c, D) {
+    const lv = Q && Q.lv ? (P.lv + Q.lv) / 2 : P.lv, hp = Math.round(GUARD.HP * creepHp(commonKind(), lv, !!Q, 0, false));
+    const m = makeMon(D.kind, c.home.x, c.home.y, false);
+    m.c = { ...m.c, spd: m.c.spd * GUARD.SPD, cd: MON[D.kind].cd };   // (a little quicker on its feet than its kind; the party grows its health, not its pace)
+    Object.assign(m, { atkK: 1, hp, max: hp, guard: c, gd: D, home: c.home, r: GUARD.R, sk: true, skCd: 1.2, cp: null, skN: 0, skk: null, awayT: 0, back: false });
+    setFace(m, 0, 1); G.mons.push(m); return m;
+  }
+  function updateGuards(dt) {
+    const D = GUARDS[G.level]; if (!D || G.won || !G.cages.length) return;
+    const gs = girls().filter((g) => !g.dead);
+    for (const c of G.cages) {
+      if (c.gd === undefined || c.gd === 3 || c.open) continue;
+      const near = (r) => gs.some((g) => d2(g.x, g.y, c.home.x, c.home.y) < r * r);
+      let m = c.gm;
+      if (!m || !m.alive || !G.mons.includes(m)) {
+        if (!near(2300)) continue;
+        m = c.gm = spawnGuard(c, D); if (c.gd === 0) c.gd = 1;
+      }
+      if (c.gd === 1 && (m.hp < m.max || near(GUARD.WAKE))) { c.gd = 2; c.wakeT = G.t; guardWakeFx(c); }
+    }
+  }
+  // its own steps (true: this frame is done): back at the cage at once when out of reach; asleep; walking back when too far / nobody near
+  function guardStep(m, dt) {
+    const c = m.guard, h = m.home; if (!h) return false;
+    const dh = Math.hypot(m.x - h.x, m.y - h.y), lava = !!(G.lpools && G.lpools.length && lpBlocked(m.x, m.y, 0));
+    m.awayT = dh > GUARD.LEASH + 40 || lava ? (m.awayT || 0) + dt : 0;
+    if (dh > GUARD.FAR || m.awayT > (lava ? 1.5 : GUARD.STUCK)) { guardHome(m); return true; }
+    if (!(c.gd >= 2)) { m.vx = m.vy = 0; if (!SKILL_ST.has(m.st)) m.st = c0(m); return true; }   // (asleep at its cage)
+    if (SKILL_ST.has(m.st) || m.st === "prep" || m.st === "atk") return false;   // (an attack under way runs on)
+    let gd = Infinity; for (const g of girls()) if (!g.dead) gd = Math.min(gd, Math.hypot(g.x - h.x, g.y - h.y));
+    const far = gd > GUARD.LEASH + 250;
+    m.back = dh > 120 && (m.back || dh > GUARD.LEASH || far);
+    if (!m.back && !far) return false;
+    if (dh > 30) { const sp = Math.max(220, m.c.spd * 1.4) * dt, [nx, ny] = norm(h.x - m.x, h.y - m.y); m.x += nx * Math.min(sp, dh); m.y += ny * Math.min(sp, dh); setFace(m, nx, ny); m.dist += Math.min(sp, dh); }
+    m.st = c0(m); m.t = 0; m.vx = m.vy = 0; m.skCd -= dt;   // (its next attack gets ready meanwhile)
+    return true;
+  }
+  function guardHome(m) {
+    const h = m.home, seen = (x, y) => d2(x, y, P.x, P.y) < 1900 * 1900 && G.parts.length < 420;
+    if (seen(m.x, m.y)) burst(m.x, m.y - 120, 14, ["#ffffff", "#e6dcff", "#b9a4ff"], 260, 0.5);
+    m.x = h.x + rnd(-30, 30); m.y = h.y + rnd(-20, 20); m.st = c0(m); m.t = 0; m.vx = m.vy = 0; m.cp = null; m.back = false; m.awayT = 0; m.hurt = 0;
+    if (seen(m.x, m.y)) { burst(m.x, m.y - 140, 22, ["#ffffff", "#e6dcff", (m.gd && "rgb(" + m.gd.rgb + ")") || "#ff9ad5"], 320, 0.6); play("swoosh"); }
+  }
+  // its two attacks in turn (the other when the first's range does not fit now)
+  function guardSkill(m, T, d, ux, uy) {
+    const D = m.gd; if (!D) return skillStart(m, T, d, ux, uy);
+    for (let j = 0; j < 2; j++) { m.skk = D.sk[(m.skN + j) % 2]; if (skillStart(m, T, d, ux, uy)) { m.skN = (m.skN + j + 1) % 2; return true; } }
+    m.skk = null; return false;
+  }
+  function guardWakeFx(c) {
+    const D = GUARDS[G.level]; if (!D) return;
+    c.hintT = G.t;
+    if (d2(P.x, P.y, c.x, c.y) < 2400 * 2400) { showBanner(D.name + "!", GUARD_HINT); SFX.roar(); G.shake = Math.max(G.shake, 10); }
+  }
+  // beaten (the host): the stars, gems and a heart; both pages: the show (guardBeatenFx)
+  function guardBeaten(c, m) {
+    if (c.wakeT !== undefined) TALLY.guard.push(+(G.t - c.wakeT).toFixed(1));
+    c.gd = 3; c.gm = null;
+    G.stars += GUARD.STARS; updateHud();
+    for (let i = 0; i < 10; i++) spawnGem(m.x + rnd(-120, 120), m.y + rnd(-80, 80), 2 + G.level * 2);
+    spawnDrop(m.x, m.y, "heart");
+    guardBeatenFx(c, m);
+  }
+  function guardBeatenFx(c, m) {
+    const D = GUARDS[G.level] || { name: "trùm", rgb: "255,211,77" }, x = m ? m.x : c.home.x, y = m ? m.y : c.home.y;
+    SFX.unlock(); G.shake = Math.max(G.shake, 14);
+    burst(x, y - 150, 50, ["#ffd34d", "#fff4c2", "#ffffff", "rgb(" + D.rgb + ")"], 620, 1.1);
+    for (let i = 0; i < 16; i++) G.parts.push({ type: "fx", name: "fx_twinkle", x: x + rnd(-200, 200), y: y - rnd(60, 340), sc: rnd(0.5, 0.95), life: rnd(0.7, 1.1), max: 1.1, grow: 0.6 });
+    floatText(x, y - 280, "+" + GUARD.STARS + " sao");
+    burst(c.x, c.y - 80, 24, ["#ffe68a", "#c98a1c", "#ffffff"], 380, 0.7);   // (the padlock bursts)
+    showBanner("Đã hạ " + D.name + "!", "Lồng đã mở, vào cứu bạn nhé");
+  }
+  // (a test hook: the guardians beaten at once, no stars; the older tests' cages open as before)
+  function beatGuards() { for (const c of G.cages) if (c.gd !== undefined) { c.gd = 3; if (c.gm) { c.gm.alive = false; c.gm.die = 1; c.gm = null; } } }
+  // standing at a locked cage: the hint now and then (this page's girl)
+  function cageHint() {
+    const D = GUARDS[G.level]; if (!D || P.dead) return;
+    for (const c of G.cages) if (c.big && guardLocked(c) && c.gd >= 1 && d2(P.x, P.y, c.x, c.y) < (CAGE_BIG_R + 80) ** 2 && G.t - (c.hintT ?? -99) > 6) { c.hintT = G.t; showBanner(D.name + "!", GUARD_HINT); }
+  }
+
+  // ---------------------------------------------------------------- ambush waves (Dad, "Đợt tấn công")
+  // 1-2 spots on each map's path (WAVES[level].at: shares of the path, moved a little to fit): never in or by the boss arena (nor its
+  // films and quiz), never by a cage, never by Núi Dung Nham's lava pools (nobody is held inside a hazard), not on a camp when it can be
+  // helped. A girl walking in (within WAVE.TRIG of its ring) with no film, quiz, story card or boss under way starts it: "Đợt tấn công!",
+  // a horn (a synth sound: the mute button silences it) and a red flash; WAVE.WARN s later the first ring of monsters comes in from all
+  // sides, then one every WAVE.GAP s (n each, WAVE.COOP times as many together) for its `dur` s; meanwhile the stream and surges wait and
+  // a fog ring (WAVE.R) keeps the girls inside it (each page keeps its own girl in). Then "Đã trụ vững!" and a reward chest in the middle
+  // (WAVE.STARS). Its monsters left stay as any other. The host runs it; the guest follows its state and clock (world state `wv`).
+  const WAVES = [
+    { at: [0.72], dur: 20, n: 8 },
+    { at: [0.72], dur: 22, n: 10 },
+    { at: [0.28, 0.72], dur: 24, n: 12 },
+    { at: [0.28, 0.72], dur: 26, n: 14 },
+    { at: [0.28, 0.72], dur: 28, n: 16 },
+  ];
+  const WAVE = { R: 650, TRIG: 0.55, WARN: 1.5, GAP: 5, RING: 230, STARS: 10, BOX: 0.8, COOP: 1.4 };
+  function placeWaves(i, path, endI, cages) {
+    const cfg = WAVES[i], out = [], A = G.arena; if (!cfg) return out;
+    const M = WAVE.R + 320;
+    const fits = (x, y, strict) => {
+      if (x < M || y < M || x > WORLD - M || y > WORLD - M) return false;
+      if (A && d2(x, y, A.x, A.y) < (A.r + WAVE.R + 400) ** 2) return false;
+      if (G.portal && d2(x, y, G.portal.x, G.portal.y) < 2000 * 2000) return false;
+      if (d2(x, y, path.x[0], path.y[0]) < 2500 * 2500) return false;
+      if (cages.some((c) => d2(x, y, c.x, c.y) < (WAVE.R + 900) ** 2)) return false;
+      if ((G.lpools || []).some((o) => lpNear(o, x, y, WAVE.R + 200))) return false;
+      if (out.some((w) => d2(x, y, w.x, w.y) < 3200 * 3200)) return false;
+      if (strict && G.camps.some((c) => d2(x, y, c.x, c.y) < (WAVE.R + CAMP_R) ** 2)) return false;
+      return true;
+    };
+    for (const f0 of cfg.at) {
+      let spot = null;
+      for (const strict of [true, false]) for (let k = 0; k <= 30 && !spot; k++) {
+        const f = f0 + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 0.01, si = clamp(Math.round(f * path.len / STEP), 3, endI);
+        if (fits(path.x[si], path.y[si], strict)) spot = [path.x[si], path.y[si]];
+      }
+      if (!spot) continue;
+      const rings = Math.floor((cfg.dur - 4 - 1e-3) / WAVE.GAP) + 1;
+      out.push({ x: spot[0], y: spot[1], st: 0, t: 0, dur: cfg.dur, n: cfg.n, rings, ring: 0, total: rings * cfg.n, box: null, off: false, endT: 0 });
+    }
+    return out;
+  }
+  const waveOn = () => (G.waves || []).some((w) => !w.off && (w.st === 1 || w.st === 2));
+  const waveOk = () => G.mode === "play" && !G.cine && !G.rescue && !G.bcut && !G.quiz && !G.story && !G.boss && !G.combo && !G.won && !waveOn();
+  function updateWaves(dt) {
+    for (const w of G.waves || []) {
+      if (w.off) continue;
+      if (w.st === 0) { if (waveOk() && girls().some((g) => !g.dead && d2(g.x, g.y, w.x, w.y) < (WAVE.R * WAVE.TRIG) ** 2)) { w.st = 1; w.t = 0; waveStartFx(w); } }
+      else if (w.st === 1) { if ((w.t += dt) >= WAVE.WARN) { w.st = 2; w.t = 0; w.ring = 0; } }
+      else if (w.st === 2) {
+        w.t += dt;
+        while (w.ring < w.rings && w.t >= w.ring * WAVE.GAP) waveRing(w, w.ring++);
+        if (w.t >= w.dur) { w.st = 3; w.t = 0; waveEndLocal(w); }
+      } else if (w.box && !w.box.open) { w.box.t += dt; if (w.box.t > WAVE.BOX && nearestGirl(w.box.x, w.box.y, 95)) openWaveBox(w); }
+    }
+  }
+  // a ring of monsters just outside the fog, evenly round it (each ring turned half a step from the last); the last ring led by an elite
+  function waveRing(w, k) {
+    const n = Math.round(w.n * (girls().length > 1 ? WAVE.COOP : 1) * partyNum()), r = WAVE.R + WAVE.RING;
+    for (let j = 0; j < n; j++) {
+      if (aliveCount() >= MAX_MONS) break;
+      const a = (j + (k % 2) * 0.5) / n * TAU + rnd(-0.12, 0.12), rr = r + rnd(0, 120);
+      const m = spawnMon(pickKind(), clamp(w.x + Math.cos(a) * rr, 120, WORLD - 120), clamp(w.y + Math.sin(a) * rr, 120, WORLD - 120), k === w.rings - 1 && j === 0 && G.level > 0, true);
+      m.wave = w; setFace(m, -Math.cos(a), -Math.sin(a));
+    }
+    if (d2(P.x, P.y, w.x, w.y) < 2200 * 2200) { if (k === 0) SFX.roar(); G.shake = Math.max(G.shake, 6); }
+  }
+  function waveStartFx(w) {
+    showBanner("Đợt tấn công!", "Trụ vững " + w.dur + " giây nhé!");
+    SFX.horn(); G.waveFlash = 1; G.shake = Math.max(G.shake, 8);
+  }
+  function waveEndLocal(w) {
+    w.box = { x: w.x, y: w.y + 40, open: false, t: 0 }; w.endT = G.t;
+    showBanner("Đã trụ vững!", "Mở rương thưởng nhé");
+    SFX.unlock(); burst(w.x, w.y - 120, 40, ["#ffd34d", "#fff4c2", "#b9a4ff", "#7cf2c6"], 560, 1);
+  }
+  const waveBoxes = (all) => (G.waves || []).filter((w) => w.box && (all || !w.box.open)).map((w) => w.box);
+  function openWaveBox(w) {
+    const b = w.box; b.open = true; b.t = 0; G.stars += WAVE.STARS; updateHud();
+    spawnDrop(b.x, b.y, "heart"); spawnDrop(b.x, b.y, "energy");
+    for (let i = 0; i < 6; i++) spawnGem(b.x, b.y, 3 + G.level);
+    waveBoxFx(b);
+  }
+  function waveBoxFx(b) {
+    SFX.chest(); G.shake = Math.max(G.shake, 6);
+    burst(b.x, b.y - 70, 40, ["#ffd34d", "#fff4c2", "#fff", "#ffd38a"], 560, 1);
+    G.parts.push({ type: "fx", name: "fx_rays", x: b.x, y: b.y - 80, sc: 0.8, life: 1, max: 1, grow: 0.7 });
+    floatText(b.x, b.y - 170, "+" + WAVE.STARS + " sao");
+  }
+  // the fog ring: a girl inside (or reaching it from outside) stays inside while the ambush lasts
+  function waveWall(o) {
+    for (const w of G.waves || []) {
+      if (w.off || (w.st !== 1 && w.st !== 2)) continue;
+      const dx = o.x - w.x, dy = o.y - w.y, d = Math.hypot(dx, dy) || 1, R = WAVE.R - 40;
+      if (d > R && d < WAVE.R + 60) { o.x = w.x + dx / d * R; o.y = w.y + dy / d * R; }
+    }
+  }
+  // the test bot: inside an ambush it circles round the middle of the ring; near an awake guardian it circles it at a distance
+  function botGuardWave() {
+    for (const w of G.waves || []) if (!w.off && (w.st === 1 || w.st === 2) && d2(P.x, P.y, w.x, w.y) < (WAVE.R + 80) ** 2) {
+      const a = Math.atan2(P.y - w.y, P.x - w.x) + 0.5, rr = WAVE.R * 0.45;
+      return norm(w.x + Math.cos(a) * rr - P.x, w.y + Math.sin(a) * rr - P.y);
+    }
+    for (const m of G.mons) {
+      if (!m.alive || !m.guard || d2(P.x, P.y, m.x, m.y) > 1300 * 1300) continue;
+      const dx = m.x - P.x, dy = m.y - P.y, d = Math.hypot(dx, dy) || 1, w = d > 560 ? 1 : d < 400 ? -1 : 0;
+      return norm(dx / d * w - dy / d * 0.8, dy / d * w + dx / d * 0.8);
+    }
+    return null;
+  }
+  // ---- their looks (code light only: the bodies are the monsters' own painted frames)
+  function guardAura(m, x, cy, mul) {
+    const D = m.gd || GUARDS[G.level]; if (!D) return;
+    const p = 0.5 + 0.5 * Math.sin(G.t * 3 + m.ph), k = mul / CHAR_M, by = cy - 95 * (k - 1);
+    ctx.save(); ctx.translate(m.x, m.y); ctx.scale(1, 0.38); ctx.globalAlpha *= 0.5 + 0.3 * p; ctx.lineWidth = 10; ctx.strokeStyle = `rgba(${D.rgb},0.9)`;
+    ctx.beginPath(); ctx.arc(0, 0, m.r * 1.5 + 12 * p, 0, TAU); ctx.stroke(); ctx.restore();
+    glow(m.x, m.y, m.r * 2.4, D.rgb, 0.28 + 0.1 * p);
+    glow(x, by, 170 * k, D.rgb, 0.24 + 0.12 * p);
+    if (Math.random() < 0.3 && G.parts.length < 380) G.parts.push({ type: "dot", x: m.x + rnd(-m.r, m.r), y: m.y - rnd(20, 300), vx: 0, vy: -80, life: 0.8, max: 0.8, r: rnd(3, 7), col: `rgb(${D.rgb})` });
+    if (API.drawn) API.drawn.push(["guard", m.id, D.name, k, D.rgb]);
+  }
+  function guardBar(m, top) {
+    const D = m.gd || GUARDS[G.level] || { name: "", rgb: "255,90,90" }, w = 230 * WT, h = 18 * WT, k = clamp(m.hp / m.max, 0, 1), bx = m.x - w / 2;
+    ctx.save(); ctx.fillStyle = "rgba(20,10,30,.72)"; rrect(ctx, bx - 5, top - 5, w + 10, h + 10, 9); ctx.fill();
+    if (k > 0) { ctx.fillStyle = `rgb(${D.rgb})`; rrect(ctx, bx, top, Math.max(h, w * k), h, 7); ctx.fill(); ctx.fillStyle = "rgba(255,255,255,.35)"; rrect(ctx, bx, top, Math.max(h, w * k), h * 0.45, 6); ctx.fill(); }
+    ctx.restore();
+    label(D.name, m.x, top - 14, 34, "#fff3c2");
+    if (API.drawn) API.drawn.push(["guardBar", m.id, k]);
+  }
+  // the locked cage: a ring of the guardian's light round its foot, a big padlock in front, the hint over it
+  function drawCageLock(c, ly, hy) {
+    const D = GUARDS[G.level] || { rgb: "255,90,200" }, p = 0.5 + 0.5 * Math.sin(G.t * 4);
+    ctx.save(); ctx.translate(c.x, c.y); ctx.scale(1, 0.35); ctx.lineWidth = 12; ctx.strokeStyle = `rgba(${D.rgb},${(0.45 + 0.3 * p).toFixed(2)})`;
+    ctx.beginPath(); ctx.arc(0, 0, 175, 0, TAU); ctx.stroke(); ctx.restore();
+    glow(c.x, ly, 130, D.rgb, 0.35 + 0.2 * p);
+    ctx.save(); ctx.translate(c.x, ly); const s = 1 + 0.06 * p; ctx.scale(s, s);
+    ctx.lineWidth = 13; ctx.strokeStyle = "#6a4a12"; ctx.beginPath(); ctx.arc(0, -28, 26, Math.PI, 0); ctx.stroke();
+    ctx.lineWidth = 7; ctx.strokeStyle = "#ece6d4"; ctx.stroke();
+    const gr = ctx.createLinearGradient(0, -30, 0, 40); gr.addColorStop(0, "#ffe68a"); gr.addColorStop(1, "#c98a1c");
+    ctx.fillStyle = gr; rrect(ctx, -38, -30, 76, 66, 12); ctx.fill(); ctx.lineWidth = 4; ctx.strokeStyle = "#7a4a10"; ctx.stroke();
+    ctx.fillStyle = "#4a2a08"; ctx.beginPath(); ctx.arc(0, -2, 9, 0, TAU); ctx.fill(); ctx.fillRect(-4, 0, 8, 20);
+    ctx.restore();
+    label(GUARD_HINT, c.x, hy, 30, "#ffd2ec");
+    if (API.drawn) API.drawn.push(["cageLock", c.kind], ["cageHint", GUARD_HINT]);
+  }
+  // the fog ring of an ambush: soft light puffs round it and a turning dashed line, rising as it is warned, fading after
+  function drawWaveFog(L, R, T, B) {
+    const ws = G.waves || [];
+    for (let i = 0; i < ws.length; i++) {
+      const w = ws[i]; if (w.off) continue;
+      const a = w.st === 1 ? clamp(w.t / 0.5, 0, 1) : w.st === 2 ? 1 : w.st === 3 ? clamp(1 - (G.t - w.endT) / 1.2, 0, 1) : 0, M = WAVE.R + 200;
+      if (a <= 0.01 || w.x + M < L || w.x - M > R || w.y + M < T || w.y - M > B) continue;
+      if (API.drawn) API.drawn.push(["waveFog", i]);
+      ctx.save(); ctx.globalAlpha *= a;
+      ctx.beginPath(); ctx.arc(w.x, w.y, WAVE.R, 0, TAU);
+      ctx.lineWidth = 22; ctx.strokeStyle = "rgba(170,130,255,.32)"; ctx.stroke();
+      ctx.setLineDash([46, 30]); ctx.lineDashOffset = -G.t * 70; ctx.lineWidth = 6; ctx.strokeStyle = "rgba(255,255,255,.62)"; ctx.stroke(); ctx.setLineDash([]);
+      const N = 30;
+      for (let k = 0; k < N; k++) { const an = k / N * TAU + G.t * 0.15, rr = WAVE.R + Math.sin(G.t * 1.7 + k * 1.3) * 18; glow(w.x + Math.cos(an) * rr, w.y + Math.sin(an) * rr - 24, 100 + 26 * Math.sin(G.t * 2 + k), k % 3 ? "205,190,255" : "255,255,255", 0.42); }
+      ctx.restore();
+    }
+  }
+  // how long she still has to hold out, over the girls (this page's girl in the ring)
+  function drawWaveClock() {
+    for (const w of G.waves || []) {
+      if (w.off || (w.st !== 1 && w.st !== 2) || d2(P.x, P.y, w.x, w.y) > (WAVE.R + 80) ** 2) continue;
+      label(w.st === 1 ? "Chuẩn bị!" : "Trụ vững: " + Math.max(1, Math.ceil(w.dur - w.t)) + " giây", G.camX + VW / 2, G.camY + 260, 46, "#ffe9a6");
+    }
+  }
 
   // ---------------------------------------------------------------- drops, gems, elements
   function spawnDrop(x, y, type) {
@@ -2314,7 +2805,7 @@
       o.frzN = (o.frzN || 0) + 1; o.frzAt = G.t; o.frz = o.frzMax = d; return;
     }
     if (o.frzImm > 0) return;
-    o.frz = o.frzMax = o.elite ? E.frzElite : E.frz; o.vx = o.vy = 0;
+    o.frz = o.frzMax = o.elite || o.guard ? E.frzElite : E.frz; o.vx = o.vy = 0;
   }
   // the ice cracks open: its pieces fly off and fall, with a puff of frost
   function iceShatter(x, y, w) {
@@ -2368,6 +2859,7 @@
     for (const c of G.cages) {
       c.t += dt;
       if (c.open) continue;
+      if (guardLocked(c)) continue;   // (its guardian still stands: the cage stays shut)
       // (a friend's big cage stands beside the path, about 205 units from its middle: it opens for a girl walking past on the path)
       const T = nearestGirl(c.x, c.y, c.big ? CAGE_BIG_R : 140);
       if (!T) continue;
@@ -3017,7 +3509,7 @@
   function allyFaint(p) {
     p.hp = 0; p.faintT = ALLY_FAINT_T; p.rev = 0; p.act = null; p.chase = null; p.z = 0; p.moving = false;
     play("hurt"); if (G.parts.length < 420) burst(p.x, p.y - 80, 14, ["#fff4c2", "#ffd34d", "#b9a4ff"], 260, 0.6);
-    allyLog(p.kind, "faint");
+    allyLog(p.kind, "faint"); TALLY.allyFaint[p.kind] = (TALLY.allyFaint[p.kind] || 0) + 1;
   }
   function allyRevive(p, hp = 0.6) {
     p.faintT = 0; p.rev = 0; p.hp = Math.max(p.hp, Math.ceil(p.max * hp)); p.inv = 2; p.calm = 0; p.cd = Math.max(p.cd, 0.5);
@@ -3482,7 +3974,7 @@
     const [nx, ny] = norm(A.x - P.x, A.y - P.y);
     const BD = G.lvl.boss;
     $("bossName").textContent = BD.name;
-    const hp = Math.round(BD.hp * BOSS_HP_K);
+    const hp = Math.round(BD.hp * BOSS_HP_K * partyHp());   // (the party: his health grows with the friends, his pace does not)
     G.boss = { x: A.x + nx * 260, y: A.y + ny * 260, dir: -1, hp, max: hp, st: "enter", t: 0, flash: 0, hurtPose: 0, cycle: 0, alive: true, die: 0, dropY: -700, iT: 0, vx: 0, vy: 0, phase: 1 };
     // the maths quizzes: he leaps up twice, at 2/3 and 1/3 of his health (each leap asks 1 or 2 questions in a row)
     if (BD.quiz) G.boss.quizHp = [Math.round(hp * 2 / 3), Math.round(hp / 3)];
@@ -3706,11 +4198,13 @@
   // squares, each with an answer. When time is up, bombs / spikes / swords / fireballs (by level) rain on the wrong
   // squares: a girl or a friend standing there faints at once. Then he drops back in and the fight goes on.
   const QZ_UP = 1.0, QZ_DROP = 1.5, QZ_HIT = 0.7, QZ_DOWN = 1.1, QZ_NEXT = 1.2, QZ_HOV = 280, QPH = ["up", "ask", "drop", "down", "next", "wait"];
+  const carryShare = () => (hero === "g" && !NET.role ? 0.4 : 0.8);
   function makeSum(cfg) {
     let a, b, r, carry = false;
     const R = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1));
-    // 80% of all questions carry / borrow (7 + 8, 13 − 9), on every level (Dad, 2026-10-27); the rest stay within the level's limit
-    carry = Math.random() < 0.8;
+    // 80% of all questions carry / borrow (7 + 8, 13 − 9), on every level (Dad, 2026-10-27); the rest stay within the level's limit.
+    // Mochi playing alone: 40% (Dad: "Khi Mochi chơi solo thì giảm tỉ lệ câu hỏi có nhớ xuống 40%"); together the host asks for both: 80%
+    carry = Math.random() < carryShare();
     if (carry || cfg.lim > 10) {
       // within 20: with carrying / borrowing, or (on the 20 levels) without (12 + 6, 17 − 4)
       if (cfg.op === "+") {
@@ -5509,7 +6003,7 @@
     if (B.hp <= 0) {
       B.alive = false; B.die = 0; SFX.boom(); G.shake = 26;
       burst(B.x, B.y - 200, 60, ["#ffd34d", "#ff8a3d", "#fff4c2", "#ff9ad5"], 700, 1.4);
-      for (const m of G.mons) if (m.alive) killMon(m, false);
+      for (const m of G.mons) if (m.alive && !m.guard) killMon(m, false);   // (a cage guardian far off stays: it still keeps its cage)
       G.quakes = G.quakes.filter((q) => q.done); G.foes = []; G.waters = []; G.lavas = []; clearCps(); G.hexes = [];
       startBossCut("die");
     }
@@ -5691,6 +6185,7 @@
   function ultHit(cx, cy, hw, hh, all, chip = 0) {
     for (const m of G.mons) {
       if (!m.alive || (!all && !(Math.abs(m.x - cx) < hw && Math.abs(m.y - cy) < hh))) continue;
+      if (m.guard) { damageMon(m, ultCap(m, Math.ceil(m.max * (all ? 0.35 : 0.15)), all ? 0.5 : GUARD.ULT), m.x, m.y, true); continue; }   // (a cage guardian: a bite, as a boss)
       killMon(m, false);
     }
     G.foes = G.foes.filter((f) => !(Math.abs(f.x - cx) < hw && Math.abs(f.y - cy) < hh));
@@ -5948,6 +6443,7 @@
       else if (G.fadeDir < 0 && G.fade <= 0) G.fadeDir = 0;
     }
     // a story card on arrival in a new map (this page's or the partner's): the world waits
+    G.waveFlash = Math.max(0, (G.waveFlash || 0) - dt * 1.4);
     if (G.mode === "play" && storyHold(dt)) { netFrame(dt); if (NET.role === "guest") applySnapshot(); P.vx = P.vy = 0; P.moving = false; updateParts(dt); if (G.frame % 6 === 0) { updateQuest(); drawMini(); } return; }   // (the new map's quest and minimap behind the card)
     // the opening film: the world waits
     if (G.cine && G.mode === "play") { netFrame(dt); updateCine(dt); return; }
@@ -5988,7 +6484,7 @@
     }
     if (API.autopilot && G.energy >= 100 && !G.waters.length && !G.lavas.length && !(G.hexes && G.hexes.some((o) => o.k !== "sum")) && !G.quiz && (aliveCount() > 14 || (G.boss && G.boss.alive && G.boss.st !== "enter"))) IN.ultPressed = true;   // (the bot does not freeze itself in its ultimate with the captain's water warned, nor in a quiz: frozen through the next question it misses it)
     if (IN.ultPressed) { IN.ultPressed = false; startUlt(); }
-    updateHero(dt); waterPull(dt);
+    updateHero(dt); waterPull(dt); cageHint();
     updateUlt(dt);
     if (P.elem) { P.elemT -= dt; if (P.elemT <= 0) { P.elem = null; showBanner("Hết phép đặc biệt"); } updateElemHud(); }
     netFrame(dt); updateQuizHud();
@@ -6019,7 +6515,9 @@
   }
   function hostWorld(dt) {
     updateSpawns(dt);
+    updateGuards(dt); updateWaves(dt);
     const qzHold = G.quiz && G.arena;
+    aggroCount();
     for (const m of G.mons) {
       if (qzHold && m.alive && !m.wait) { quizHold(m, dt); continue; }
       let k = 1;
@@ -6409,7 +6907,7 @@
   // how high a monster is lifted off its ground spot by its skill now (the gummy's hops, a leap, the parrot's climb and dive, the golem
   // raising himself), from its state and clock (so the guest's page draws it the same)
   function monLift(m) {
-    const S = SKILL[m.kind]; if (!S || !m.alive) return 0;
+    const S = skOf(m); if (!S || !m.alive) return 0;
     const sk = S.sk, t = m.t;
     if (sk === "hop") {
       if (m.st === "walk" && !(m.hurt > 0) && !(m.frz > 0)) { const ph = hopPh(m); return ph < 0.7 ? Math.sin(Math.PI * ph / 0.7) * 34 : 0; }
@@ -6424,7 +6922,7 @@
   }
   // a crouch before a leap (squashed a little), the fire bat swelling before it bursts
   function monSquash(m) {
-    const S = SKILL[m.kind]; if (!S || !m.alive || m.st !== "skw") return 1;
+    const S = skOf(m); if (!S || !m.alive || m.st !== "skw") return 1;
     if (S.sk === "jump" || S.sk === "pounce") return m.t < S.w - S.air ? 1 - 0.13 * Math.min(1, m.t / 0.3) : 1.06;
     if (S.sk === "boom") return 1 + 0.12 * clamp(m.t / S.w, 0, 1) * (0.6 + 0.4 * Math.sin(G.t * 30));
     return 1;
@@ -6444,20 +6942,23 @@
   function drawMon(m) {
     const [fn, flip] = monFrame(m); if (!FR[fn]) return;
     const f = m.c.like ? candyFrame(fn, CANDY_TINT[m.kind]) : tierFrame(fn), fly = m.c.fly;
-    let y = m.y - m.hgt, a = 1, rot = 0, mul = CHAR_M * (m.elite ? 1.3 : 1), x = m.x;
+    let y = m.y - m.hgt, a = 1, rot = 0, mul = CHAR_M * (m.elite ? 1.3 : m.guard ? GUARD.SC : m.champ ? CHAMP.SC : m.mini ? CHAMP.SPLIT.sc : 1), x = m.x;
     if (fly) y += (m.frz > 0 ? 0 : Math.sin(G.t * 3 + m.ph) * 10) - (m.st === "prep" ? 30 * Math.min(1, m.t / m.c.prep) : 0);
     const hov = HOVER[m.kind] && m.alive && !(m.frz > 0) ? HOVER[m.kind] + Math.sin(G.t * 2.6 + m.ph) * 9 : 0; y -= hov;   // (the castle ghost floats over the floor)
     // (the ghost's blink: it fades almost away while it slips through the air to her marked spot, and comes back there)
     if (m.alive && m.st === "skw" && SKILL[m.kind] && SKILL[m.kind].sk === "blink") { const S0 = SKILL[m.kind], k = (m.t - (S0.w - S0.air)) / S0.air; if (k > 0 && k < 1) a *= 0.12 + 0.88 * Math.abs(Math.cos(Math.PI * k)); }
     if (!m.alive) { const t = m.die / 0.6; a = 1 - t; mul *= 1 - 0.4 * t; rot = (flip ? 1 : -1) * t * 0.8; y -= t * 40; }
     // its own attack (the creep skills): lifted by a hop / leap / dive, shaking as it winds up, a barrel rolling, squashed in a crouch
-    const SK = SKILL[m.kind], lift = monLift(m), sq = monSquash(m), skw = m.alive && m.st === "skw";
+    const SK = skOf(m), lift = monLift(m), sq = monSquash(m), skw = m.alive && m.st === "skw";
     y -= lift;
     if (skw && SK.shake) x += Math.sin(G.t * 60) * 5 * Math.min(1, m.t / 0.3);
-    const roll = m.alive && m.st === "sk" && SK && SK.sk === "roll";
+    const roll = m.alive && m.st === "sk" && SK && SK.sk === "roll" && skillOf(m) === "roll";   // (a borrowed roll is a dash, not a barrel's turn)
     shadow(m.x, m.y, m.r * (fly || hov ? 0.8 : 1.15) * (1 - Math.min(0.4, Math.max(0, lift) / 500)), m.r * 0.32, (fly || hov ? 0.18 : 0.3) * a);
     const cy = fly ? y : m.y - 95 - lift;
-    if ((m.st === "prep" || skw) && m.alive && m.hurt <= 0) glow(x, cy, 130, "255,60,60", 0.25 + 0.2 * Math.sin(G.t * 25));
+    if (m.guard && m.alive) guardAura(m, x, cy, mul);
+    if (m.champ && m.alive) champAura(m, x, cy, mul);
+    if (m.mini && API.drawn) API.drawn.push(["mini", m.id, mul / CHAR_M]);
+    if ((m.st === "prep" || skw) && m.alive && m.hurt <= 0) glow(x, cy, 130 * mul / CHAR_M, "255,60,60", 0.25 + 0.2 * Math.sin(G.t * 25));
     if (skw && SK.sk === "boom") { const k = clamp(m.t / SK.w, 0, 1); glow(x, cy, 150 + 90 * k, "255,90,30", 0.3 + 0.55 * k); }
     if (m.alive && m.st === "howl") { glow(x, cy - 40, 170, "170,220,255", 0.35 + 0.2 * Math.sin(G.t * 20)); }
     if (m.alive && m.fastT > 0) glow(x, m.y - 30, 90, "170,220,255", 0.25);
@@ -6479,8 +6980,11 @@
     if (m.alive && m.burn > 0) drawFlames(x, cy, m.r * 2.4, fly ? 170 : 170, m.ph);
     if (m.flash > 0) sprFlash(f, x, y, flip, mul, 0.6, rot);
     if (shield) drawShield(m, x, m.y - lift, mul, true);
+    if (m.champ && m.alive && m.shd > 0) champBubble(m, x, cy, mul);
     if (m.kind === "witch" && m.st === "prep" && m.alive) glow(m.x + (flip ? -50 : 50), y - 60, 50, "130,255,90", 0.5);
     if (m.c.name && m.alive) label(m.c.name, m.x, m.y - f.ay * f.s * mul - 40, 30, "#ffb3e6");
+    if (m.guard && m.alive) { guardBar(m, (fly ? y - f.ay * f.s * mul : m.y - lift - f.ay * f.s * mul) - 34); return; }   // (its name and its health bar)
+    if (m.champ && m.alive) champTag(m, (fly ? y - f.ay * f.s * mul : m.y - lift - f.ay * f.s * mul) - 30);   // (its affix's name over it)
     // health pips once hurt
     if (m.alive && m.hp < m.max) {
       const top = (fly ? y - f.ay * f.s * mul : m.y - f.ay * f.s * mul) - 16, n = Math.min(m.max, 12), w = 13, filled = Math.ceil(m.hp / m.max * n);
@@ -6772,6 +7276,7 @@
         ctx.drawImage(f.img, f.sx, f.sy, f.w, f.h, -f.w * f.s / 2, 0, f.w * f.s, h);   // (the top of the frame is the hook: it is the pivot)
         ctx.restore();
         if (!c.open) label("Cứu " + D.name + "!", c.x, topY - 30, 44);
+        if (!c.open && guardLocked(c)) drawCageLock(c, c.y - HANG_Z - h * 0.3, topY - 92);
         return;
       }
       if (!c.open) {
@@ -6779,6 +7284,7 @@
         drawAllyStandIn(c.kind, c.x, c.y - (FR[own] ? 70 : 14));   // (she stands on the cage's floor: the cake, the ice)
         if (cg) spr(cg, c.x, c.y); else spr(PROPS.cage, c.x, c.y, false, 1.7);
         label("Cứu " + D.name + "!", c.x, c.y - (cg ? cg.ay * cg.s : 420) - 30, 44);
+        if (guardLocked(c)) drawCageLock(c, c.y - 60, c.y - (cg ? cg.ay * cg.s : 420) - 92);
       } else if (co) spr(co, c.x, c.y); else spr(PROPS.cageOpen, c.x, c.y, false, 1.7, 0.85);
       return;
     }
@@ -7030,7 +7536,7 @@
       for (const m of G.mons) {
         if (!m.alive) continue;
         const dx = m.x - x, dy = (m.y - y) / 0.62;   // (flattened onto the ground, as the bosses' quakes)
-        if (dx * dx + dy * dy < UB_HIT * UB_HIT) { m.hp -= Math.ceil(m.max * 0.45); m.flash = 0.12; if (m.hp <= 0) killMon(m, false); }
+        if (dx * dx + dy * dy < UB_HIT * UB_HIT) { if (m.shd > 0) { m.shd = 0; shieldBreakFx(m); } m.hp -= m.guard ? ultCap(m, Math.ceil(m.max * 0.03), GUARD.ULT) : Math.ceil(m.max * 0.45); m.flash = 0.12; if (m.hp <= 0) killMon(m, false, "ult"); }
       }
       // the boss: a little each (at most 4 % of his health a show, taken out of the blast's 12 %: in all the same as before);
       // never while he changes form or asks his question (bossOpen), never past his quiz mark nor his last bit of health
@@ -7628,7 +8134,7 @@
       else { ctx.fillStyle = G.lvl.gr.base; ctx.fillRect(ix * CH, iy * CH, CH + CH_PAD, CH + CH_PAD); }
     }
     // flat things
-    drawArena(); drawLavaPools(L, R, T, B); drawRings(); drawCreepGround(L, R, T, B); drawQuizFloor(); drawGuard(); drawAfxGround();
+    drawArena(); drawLavaPools(L, R, T, B); drawWaveFog(L, R, T, B); drawRings(); drawCreepGround(L, R, T, B); drawChampGround(L, R, T, B); drawQuizFloor(); drawGuard(); drawAfxGround();
     drawPickups(L, R, T, B);
     drawGuide();
     if (G.ult) drawUltFx(UFX.p, P.x, P.y, G.ult.t, G.ult.cx, G.ult.cy, 0, true);
@@ -7653,6 +8159,7 @@
     for (const o of lavaPieces()) add(o.y, 12, o);   // (the lava demon's fire columns and his rocks coming down)
     for (const o of hexPieces()) add(o.y, 13, o);   // (the grey witch's orbs, purple fire, clones)
     for (const c of G.chests) if (c.x > L - 150 && c.x < R + 150 && c.y > T - 50 && c.y < B + 200) add(c.y, 5, c);
+    for (const c of waveBoxes(true)) if (c.x > L - 150 && c.x < R + 150 && c.y > T - 50 && c.y < B + 200) add(c.y, 5, c);
     for (const c of G.cages) if (c.x > L - 150 && c.x < R + 150 && c.y > T - 50 && c.y < B + 300) add(c.y, 6, c);
     if (G.portal && G.portal.x > L - 250 && G.portal.x < R + 250 && G.portal.y > T - 50 && G.portal.y < B + 400) add(G.portal.y, 7, G.portal);
     if (G.mode !== "title") for (const p of PETE) add(p.y, 8, p);
@@ -7714,8 +8221,10 @@
       if (goal && goal.open && !G.boss) edgeMarker(goal.x, goal.y - 100, "192,139,255", G.portal ? "Cổng phép" : "Đấu trường", L, R, T, B);
       if (Q && NET.role) edgeMarker(Q.x, Q.y - 100, HEROES[Q.hero].rgb, HEROES[Q.hero].name, L, R, T, B);
     }
+    if (G.mode === "play") drawWaveClock();
     // vignette and fade (screen space)
     ctx.setTransform(1, 0, 0, 1, 0, 0);
+    if (G.waveFlash > 0) { ctx.fillStyle = `rgba(255,70,50,${(0.32 * G.waveFlash).toFixed(3)})`; ctx.fillRect(0, 0, W, H); if (API.drawn) API.drawn.push(["waveFlash"]); }   // (an ambush's warning flash)
     const vg = ctx.createRadialGradient(W / 2, H * 0.45, Math.min(W, H) * 0.45, W / 2, H * 0.5, Math.max(W, H) * 0.75);
     vg.addColorStop(0, "rgba(10,6,20,0)"); vg.addColorStop(1, "rgba(10,6,20,0.45)");
     ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
@@ -7841,6 +8350,7 @@
     initAudio();
     // (a start past Màn 2 brings what the maps before it gave: LATER_STARS stars a map, as a girl who played them would have)
     Object.assign(G, { stars: !at && i >= 2 ? LATER_STARS * i : 0, hearts: 5, energy: 0, kills: 0, won: false, fade: 1, fadeDir: -1 });
+    tallyReset();
     P.elem = null; P.elemT = 0; P.lv = 1 + i * 4; P.xp = 0; updateElemHud(); updateXpHud();
     // a new adventure from Màn 1 starts in the school uniform for both sisters (what they bought stays theirs)
     if (i === 0) for (const c of Object.keys(HEROES)) { MEM.outfit[c] = "base"; try { localStorage.setItem("sksp-outfit-" + c, "base"); } catch (e) {} }
@@ -10609,7 +11119,7 @@
   // target. The guest runs only its own girl, mirrors the host's world from the host's presence,
   // and reports its spell hits, ultimate and revive back as room events. Each camera follows its own girl.
   const FTYPES = ["fire", "web", "webball"];
-  const MKINDS = Object.keys(MON), MST = ["walk", "prep", "atk", "rest", "web", "fly", "back", "skw", "sk", "howl"];   // (skw, sk, howl: the creep skills; appended)
+  const MKINDS = Object.keys(MON), MST = ["walk", "prep", "atk", "rest", "web", "fly", "back", "skw", "sk", "howl", "csum"];   // (skw, sk, howl: the creep skills; csum: a champion summoning; appended)
   const BST = ["enter", "walk", "prep", "slam", "rest", "leap", "dash", "quiz", "morph", "tele"], DTYPES = ["heart", "energy", "fire", "ice", "poison"], ELS = [null, "fire", "ice", "poison"];
   const NET = { hb: 0, room: null, state: "wait", me: null, role: null, partner: null, pp: null, applied: null, co: null,
     sendT: 0, startT: 0, goneT: 0, portalSent: false, lvBusy: false, hq: [], sq: [], fq: [] };   // hq/sq/fq: hits, shots and pet moves batched per send
@@ -10895,7 +11405,9 @@
     return {
       lv: G.level,
       m: G.mons.filter((m) => m.alive).map((m) => [m.id, MKINDS.indexOf(m.kind), m.x | 0, m.y | 0, m.face + (m.flip ? 8 : 0), MST.indexOf(m.st), m.hp,
-        (m.hurt > 0 ? 1 : 0) | (m.flash > 0 ? 2 : 0) | sb(m) | (m.summoned ? 64 : 0) | (m.elite ? 128 : 0) | (m.sk ? 256 : 0), Math.round(m.t * 10), m.max, ...(m.fa !== undefined ? [Math.round(m.fa * 100)] : [])]),   // (256: skilled; [10]: the ice skeleton's shield facing)
+        (m.hurt > 0 ? 1 : 0) | (m.flash > 0 ? 2 : 0) | sb(m) | (m.summoned ? 64 : 0) | (m.elite ? 128 : 0) | (m.sk ? 256 : 0) | (m.guard ? 512 : 0) | (m.champ ? 1024 : 0) | (m.mini ? 2048 : 0), Math.round(m.t * 10), m.max,
+        ...(m.fa !== undefined || m.guard || m.champ ? [m.fa !== undefined ? Math.round(m.fa * 100) : null] : []), ...(m.guard || m.champ ? [m.guard ? MKINDS.indexOf(m.skk || m.kind) : null] : []),
+        ...(m.champ ? [AFF_K.indexOf(m.champ.k), m.shdMax ? Math.ceil(100 * m.shd / m.shdMax) : 0] : [])]),   // (256: skilled; 512: a cage guardian; 1024: a champion; 2048: a split half; [10]: the ice skeleton's shield facing; [11]: a guardian's attack's breed; [12] / [13]: a champion's affix, its shield %)
       b: B ? [B.x | 0, B.y | 0, B.dir, BST.indexOf(B.st), B.hp, Math.round(B.t * 10), (B.flash > 0 ? 1 : 0) | (B.hurtPose > 0 ? 2 : 0) | sb(B), B.dropY | 0, B.alive ? 1 : 0, B.ix | 0, B.iy | 0, B.jz | 0, B.max, BMOVES.indexOf(B.move), Math.round((B.ax || 0) * 100), Math.round((B.ay || 0) * 100), B.phase === 2 ? 2 : 1] : 0,   // [16]: his form (older pages send 16 slots)
       qz: G.quiz ? [QPH.indexOf(G.quiz.ph), Math.round(G.quiz.t * 10), G.quiz.T, G.quiz.ok, G.quiz.a, G.quiz.b, G.quiz.op === "+" ? 0 : 1, ...G.quiz.ans, G.quiz.n || 0] : 0,
       bc: G.bcut ? [BCPH.indexOf(G.bcut.ph), Math.round(G.bcut.t * 10)] : 0,
@@ -10910,6 +11422,8 @@
       lp: Math.round((G.lpT || 0) * 20),   // the lava pools' clock (their pulses), in 1/20 s
       hx: (G.hexes || []).map((o) => [o.id, HKINDS.indexOf(o.k), o.x | 0, o.y | 0, Math.round(o.t * 20), Math.round(o.w * 20), Math.round(o.end * 20), o.r | 0, o.vx | 0, o.vy | 0, o.cx | 0, o.cy | 0, o.v | 0, Math.round(o.fly * 20), (o.n & 7) | ((o.m & 7) << 3) | (o.weak ? 64 : 0) | (o.mon ? 128 : 0)]),   // the grey witch's magic (see hexMove)
       it: bitsOf(G.items), ch: bitsOf(G.chests), cg: bitsOf(G.cages),
+      gd: G.cages.map((c) => (c.gd === undefined ? "-" : c.gd)).join(""),   // each cage's guardian (- none, 0 not yet, 1 waiting, 2 awake, 3 beaten)
+      wv: (G.waves || []).map((w) => [w.st, Math.round(w.t * 20), w.box && w.box.open ? 1 : 0, w.off ? 1 : 0]),   // the ambushes: state, clock, its chest
       sp: onShip() ? shipState() : 0,   // the ship (host-owned), compact: see shipState
       sc: G.story ? 1 : 0,   // (the host's page shows a story card: the guest's world waits too)
       sh: G.shopPhase || 0, po: G.portal && G.portal.open ? 1 : 0, ao: G.arena && G.arena.open ? 1 : 0, al: G.arenaLock ? 1 : 0, st: G.stars, k: G.kills, lk: G.lvKills, won: G.won ? 1 : 0, cp: G.camps.map((c) => c.st * 1000 + Math.max(0, c.left)),
@@ -10996,7 +11510,13 @@
       m.st = MST[num(a[5])] || "walk"; m.t = num(a[8]) / 10; m.hp = num(a[6]); m.max = num(a[9]) || m.max;
       m.hurt = bits & 1 ? 0.1 : 0; if (bits & 2) m.flash = 0.12;
       m.slow = bits & 4 ? 1 : 0; m.burn = bits & 8 ? 1 : 0; m.poison = bits & 16 ? 1 : 0; m.summoned = !!(bits & 64); m.sk = !!(bits & 256);
-      if (a.length > 10) m.fa = num(a[10]) / 100;
+      if (a.length > 10 && a[10] !== null) m.fa = num(a[10]) / 100;
+      if (bits & 512) { if (!m.guard) { m.guard = G.cages.find((c) => c.big) || true; m.gd = GUARDS[G.level]; m.r = GUARD.R; } m.skk = MKINDS[num(a[11])] || null; }   // (a cage guardian: drawn big, named)
+      if (bits & 1024) {   // (a champion: its affix, drawn big with its name; its shield in %, its break shown here too)
+        const A = AFFIX[num(a[12])]; if (A && !m.champ) m.r = Math.round(m.r * CHAMP.R); if (A) m.champ = A;
+        const sp = num(a[13]); if (m.shd > 0 && sp <= 0) shieldBreakFx(m); m.shd = sp; m.shdMax = 100;
+      }
+      if (bits & 2048 && !m.mini) { m.mini = true; m.r = Math.round(m.r * CHAMP.SPLIT.r); }
       if (m.frz && !(bits & 32)) iceShatter(m.x, m.y - (m.hgt || 90), (m.r || 40) * 3); m.frz = m.frzMax = bits & 32 ? 1 : 0;
     }
     for (const m of G.mons) if (m.alive && !seen.has(m.id)) {
@@ -11147,6 +11667,13 @@
     flags(w.it, G.items, null);
     flags(w.ch, G.chests, (c) => { c.t = 0; chestFx(c); });
     flags(w.cg, G.cages, (c) => openCageFx(c));
+    if (typeof w.gd === "string") G.cages.forEach((c, i) => { const v = w.gd[i]; if (v === undefined || v === "-" || c.gd === undefined) return; const n = clamp(num(+v), 0, 3); if (n === c.gd) return;
+      if (n === 2 && c.gd < 2) guardWakeFx(c); if (n === 3) guardBeatenFx(c, null); c.gd = n; });
+    if (Array.isArray(w.wv)) w.wv.forEach((a, i) => { const o = G.waves[i]; if (!o || !Array.isArray(a)) return; const st = clamp(num(a[0]), 0, 3), t = num(a[1]) / 20;
+      o.off = !!a[3];
+      if (st !== o.st) { if (st >= 1 && o.st === 0) waveStartFx(o); if (st === 3) waveEndLocal(o); o.st = st; o.t = t; }
+      else if (Math.abs(o.t - t) > 0.25) o.t = t;
+      if (a[2] && o.box && !o.box.open) { o.box.open = true; o.box.t = 0; waveBoxFx(o.box); } });
     if (w.po && !G.portal && G.arena) openPortal();
     if (G.portal && w.po && !G.portal.open) { G.portal.open = true; SFX.unlock(); showBanner("Cổng phép đã mở!", "Đi theo mũi tên nhé"); }
     G.stars = num(w.st); G.kills = num(w.k); G.lvKills = num(w.lk); updateHud();
@@ -11180,6 +11707,7 @@
     updateRings(dt, false); updateQuakes(dt, false); updateWaters(dt, false); updateLavas(dt, false); updateLavaPools(dt, false); updateHexes(dt, false);
     if (G.quiz) { G.quiz.t += dt; quizLocal(dt); } else updateQuizHud();
     for (const c of G.chests) c.t += dt;
+    for (const o of G.waves || []) { if (o.st === 1 || o.st === 2) o.t += dt; if (o.box) o.box.t += dt; }   // (the host's ambush clock, run on here between updates)
     if (G.portal) {
       G.portal.t += dt;
       if (G.portal.open && !NET.portalSent && !P.dead && d2(P.x, P.y, G.portal.x, G.portal.y - 30) < 95 * 95) { NET.portalSent = true; netEmit("portal", {}); }
@@ -11312,7 +11840,12 @@
     groundPaints: () => groundPaints, viewBox, saidPx: null, saidBox: null, saidRect: null, touch: undefined,   // (touch: true / false overrides the touch-screen check (COARSE); groundPaints: ground chunks painted so far; saidPx: an array -> talkBubble records [text, its drawn font size in world px])
     spawnMon: (kind, x, y) => spawnMon(kind, x === undefined ? P.x + 400 : x, y === undefined ? P.y : y),
     SKILL, CREEP_LV, creepLv, teleCap, cps: () => G.cps, clearCps, addCp, cpArt, cpStats: () => ({ ...CPST, free: CP_POOL.length }), shieldUp, monLift, LOB_WIND,   // (the monsters' own attacks)
-    damageBoss: (n) => damageBoss(n, 0, 0, false, true),
+    damageBoss: (n) => damageBoss(n, 0, 0, false, true), makeSum, carryShare,
+    // (party scaling, champions, who the monsters go for: Dad's "Game khó hơn" 1, 2, 5)
+    PARTY, partyN, partyHp, CHAMP, AFFIX, AGGRO, champShare, setPets: (list) => { P.pets = list.slice(); makePetEnts(); },
+    spawnChamp: (kind, x, y, k) => { const m = spawnMon(kind, x, y); makeChamp(m, k); return m; },
+    rollMon: (kind, x, y, pre) => spawnMon(kind, x, y, false, true, pre), hitMon: (m, n, by = "p") => damageMon(m, n, m.x - 50, m.y, false, by),
+    tally: TALLY, GUARDS, GUARD, WAVES, WAVE, waves: () => G.waves || [], waveOk, beatGuards, lpNear, SFX, guardLocked,   // (the cage guardians and the ambushes)
     // with hold = true the world only moves on step(): exact moments for screenshots
     hold: false, step: (n = 1, dt = 1 / 30) => { for (let i = 0; i < n; i++) { if (G.mode === "ship") shipTick(dt); else update(dt); } render(); },
     killAll: () => { for (const m of G.mons) if (m.alive) killMon(m, true, "p"); },
