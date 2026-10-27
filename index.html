@@ -320,6 +320,9 @@
   // top-down 3/4 view: VH world units are visible vertically, the world is WORLD x WORLD
   // (1720: game3 shows 1500 and its walkers are 178 tall; ours are 205, so the same share of the screen needs 1500 * 205 / 178)
   const VH = 1720, WORLD = 12000, TAU = Math.PI * 2;
+  // text drawn in the world (speech bubbles, labels, floating words) was sized for the old 1150-unit view: WT keeps it as big on the
+  // screen (the sprites are not scaled by it)
+  const WT = VH / 1150;
   let VW = 2200, SCALE = 1, DPR = 1, resDirty = true;
   const rnd = (a, b) => a + Math.random() * (b - a);
   const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
@@ -346,7 +349,7 @@
   let META = null, ready = false;
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261027.1409", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261027.1439", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -1014,14 +1017,16 @@
   // ---------------------------------------------------------------- ground painting (cached chunks)
   // The world floor is painted procedurally into CH x CH chunks, cached and drawn as images.
   const CH = 1000, CH_PAD = 4;
+  // (chunkCap: render sizes it from the chunks in view, so a wide zoomed-out view (the quiz on a wide screen) never recycles a canvas
+  // it still shows: that repainted two chunks every frame and flickered)
   const chunkCache = new Map();
-  let chunkRes = 0.7, chunkBudget = 0;
+  let chunkRes = 0.7, chunkBudget = 0, chunkCap = 16, groundPaints = 0;
   function groundChunk(ix, iy, force) {
     const k = ix + "," + iy; let e = chunkCache.get(k);
     if (e) { e.used = G.frame; return e.c; }
     if (!force && chunkBudget-- <= 0) return null;
     let c = null;
-    if (chunkCache.size >= 16) {
+    if (chunkCache.size >= chunkCap) {
       // recycle the least recently used canvas
       let ok = null, ou = Infinity; for (const [kk, v] of chunkCache) if (v.used < ou) { ou = v.used; ok = kk; }
       c = chunkCache.get(ok).c; chunkCache.delete(ok);
@@ -1035,7 +1040,7 @@
   }
   function paintGround(g, ix, iy) {
     const T = G.lvl.gr, x0 = ix * CH, y0 = iy * CH, S = CH + CH_PAD, data = G.chunkData.get(ix + "," + iy) || { blobs: [], stones: [], path: [], ponds: [] };
-    const R = mulberry(ix * 7919 + iy * 104729 + G.lvl.seed);
+    const R = mulberry(ix * 7919 + iy * 104729 + G.lvl.seed); groundPaints++;
     g.setTransform(chunkRes, 0, 0, chunkRes, -x0 * chunkRes, -y0 * chunkRes);
     g.globalAlpha = 1; g.fillStyle = T.base; g.fillRect(x0, y0, S, S);
     for (const b of data.blobs) {
@@ -1923,9 +1928,12 @@
   }
   // smoothstep ease
   const rsEase = (t) => t * t * (3 - 2 * t);
-  // the quiz: the camera pulls back so the whole arena and its four answers fit on screen
+  // the quiz: the camera pulls back a little so the whole arena (860 round, its fence at 900) and its four answers fit on screen under
+  // the quiz HUD (VH 1720 already holds the arena's 1720 across; 0.82 adds room for the fence and the HUD, centred QZ_CAM_DY above the
+  // arena's middle: the HUD covers the top eighth of the screen)
   let qzK = 0;
-  const quizZoom = () => 1 - 0.3 * rsEase(qzK);
+  const QZ_CAM_DY = 90;
+  const quizZoom = () => 1 - 0.18 * rsEase(qzK);
   // the boss changing form: the camera leans toward him so he and his growl are in view (mzK: 0..1)
   let mzK = 0;
   const morphZoom = () => 1 - 0.14 * rsEase(mzK);
@@ -2164,7 +2172,7 @@
       // (the camera is zoomed in: the font shrinks with it, so the bubble is its usual size on the screen and stays under the HUD; kept in view)
       const at = spk === r.kind ? [x, y - (CHAR_H[r.kind] || 300) - 60] : spk === "simmy" ? [sx, sy - CHAR_H.simmy - 30] : girlSpot(spk);
       // (a girl's line leans away from the one rescued beside her, so it does not cover her face)
-      const zm = rescueZoom(), fs = Math.round(46 / zm);
+      const zm = rescueZoom(), fs = Math.round(46 * WT / zm);
       ctx.font = `800 ${fs}px Grandstander, system-ui`;
       const lean = spk !== r.kind && spk !== "simmy" ? Math.sign(at[0] - x || -1) * (Math.max(...lines.map((l) => ctx.measureText(l).width)) * 0.5 + fs * 0.8 - 50) : 0;
       const [cx, by] = bubbleInView(lines, at[0] + lean, at[1], fs, zm), bx = cx - lean;   // (its body, not its tail, kept in view)
@@ -2413,10 +2421,11 @@
       return da < FIST_CONE + Math.atan2(r, d);
     };
     for (const m of G.mons) if (m.alive && inCone(m.x, m.y, m.r)) hitMon(m, dmg, null, p.x, p.y, 300);
-    const B = G.boss; if (bossOpen(B) && inCone(B.x, B.y, bossR(B))) hitBoss(null, B.x, B.y);
+    // (the screen shakes only when his blow lands on the boss: not every 1.5 s at the monsters)
+    const B = G.boss; if (bossOpen(B) && inCone(B.x, B.y, bossR(B))) { hitBoss(null, B.x, B.y); G.shake = Math.max(G.shake, 5); }
     fireFistFx(p.x, p.y, a, reach);
     if (NET.role && NET.fq.length < 10) NET.fq.push(["k", p.i, p.x | 0, p.y | 0, Math.round(a * 100), reach | 0]);
-    play("fire"); G.shake = Math.max(G.shake, 5);
+    play("fire");
   }
   // where his fist is in his punch (`kairon.base.ult`: the right fist thrust forward, measured on the frame) for feet at (x, gy)
   const KAIRON_FIST = [0.337, 0.249];
@@ -2533,6 +2542,7 @@
   function talkBubble(lines, x, y, k, fs, up, dx) {
     if (API.said) API.said.push(lines.join(" "));   // (tests: which bubbles are drawn)
     ctx.save(); ctx.globalAlpha = k; ctx.translate(x, y); const s = 0.8 + 0.2 * k; ctx.scale(s, s);
+    if (API.saidPx) API.saidPx.push([lines.join(" "), fs * s]);
     ctx.font = `800 ${fs}px Grandstander, system-ui`;
     const lh = fs * 1.18, w = Math.max(...lines.map((l) => ctx.measureText(l).width)) + fs * 1.6, h = lines.length * lh + fs * 0.8;
     const y0 = up ? 34 : -h - 34, bx = dx ? clamp(dx / s, Math.min(0, -w / 2 + 50), Math.max(0, w / 2 - 50)) : 0;
@@ -2552,19 +2562,19 @@
     const c = G.bcut, head = B.headY === undefined ? B.y - 520 : B.headY;
     if (c && c.ph === "intro" && BD.say && c.t >= BI_SAY && c.t < BI_END - 0.3) {
       const k = Math.min(clamp((c.t - BI_SAY) / 0.25, 0, 1), clamp((BI_END - 0.3 - c.t) / 0.25, 0, 1));
-      talkBubble(BD.say, B.x, head - 20, k, 46);
+      talkBubble(BD.say, B.x, head - 20, k, 46 * WT);
     } else if (c && c.ph === "die" && BD.bye && c.t >= BD_SAY && c.t < BD_FALL) {
       const k = Math.min(clamp((c.t - BD_SAY) / 0.25, 0, 1), clamp((BD_FALL - c.t) / 0.2, 0, 1));
-      talkBubble(BD.bye, B.x + Math.sin(c.t * 13) * 4, head - 20, k, 46);
+      talkBubble(BD.bye, B.x + Math.sin(c.t * 13) * 4, head - 20, k, 46 * WT);
     } else if (B.alive && B.st === "morph" && BD.morph && B.t >= 0.15 && B.t < MORPH_T - 0.1) {
       // changing form: he growls his line, shaking with rage
       const k = Math.min(clamp((B.t - 0.15) / 0.2, 0, 1), clamp((MORPH_T - 0.1 - B.t) / 0.2, 0, 1));
-      talkBubble(BD.morph, B.x + Math.sin(G.t * 40) * 5, head - 20, k, 54);
+      talkBubble(BD.morph, B.x + Math.sin(G.t * 40) * 5, head - 20, k, 54 * WT);
     } else if (B.alive && G.quiz && G.quiz.ph !== "down" && BD.ha) {
       // he laughs from beside the fence: the bubble over his head, leaning in toward the arena
       const sd = B.x < G.arena.x ? 1 : -1, k = G.quiz.ph === "up" ? clamp(G.quiz.t / 0.3, 0, 1) : 1;
       const big = bossLaughing(B) ? 1 + 0.07 * Math.abs(Math.sin(G.t * 14)) : 1;
-      talkBubble([BD.ha], B.x + sd * 130 + Math.sin(G.t * 40) * 4, head + 10, k, 72 * big);
+      talkBubble([BD.ha], B.x + sd * 130 + Math.sin(G.t * 40) * 4, head + 10, k, 62 * WT * big);   // (62: as big on the screen as before under the quiz's lighter zoom)
     }
   }
   function updateBossBar() { if (G.boss) { $("bfill").style.width = (100 * Math.max(0, G.boss.hp) / G.boss.max) + "%"; $("bossbar").classList.toggle("p2", G.boss.phase === 2); } }
@@ -3316,6 +3326,10 @@
   const ULT_PACE = 0.62;   // the ultimate's show runs slower than real time so it can be enjoyed
   // how much she has turned to light at ult clock t: back to herself through the blast (t 1.45-1.6), so she is seen through it
   const ultLight = (t) => ss(0.05, 0.4, t) * (1 - ss(1.45, 1.6, t));
+  // how high she floats at ult clock t (150 at the painted size: CHAR_K of it, as she is drawn)
+  const ultZ = (t) => 150 * CHAR_K * (ss(0, 0.6, t) - ss(2.0, 2.5, t));
+  // her ultimate over now (its end, or cut short): its show is cleared and she is back on the ground
+  function ultEnd() { G.ult = null; P.z = 0; ufxEnd(UFX.p); }
   function startUlt() {
     if (G.energy < 100 || G.ult || P.dead || P.winT || G.mode !== "play" || G.quiz || (G.boss && G.boss.st === "morph")) return;   // (not during a maths question: she would stay frozen through it)
     G.energy = 0; updateHud();
@@ -3325,16 +3339,19 @@
   }
   function updateUlt(dt) {
     const U = G.ult; if (!U) { P.z = 0; if (UFX.p.on) ufxEnd(UFX.p); return; }
+    // the boss's quiz began meanwhile (her blast, or her bolts, took him to his quiz mark): it ends now so she is not frozen into the
+    // question; one whose blast had not gone off yet gives her energy back
+    if (G.quiz) { if (!U.fired) { G.energy = 100; updateHud(); } ultEnd(); return; }
     U.t += dt * ULT_PACE;
     U.cx = G.camX + VW / 2; U.cy = G.camY + VH / 2;
-    P.z = 150 * ss(0, 0.6, U.t) - 150 * ss(2.0, 2.5, U.t);
+    P.z = ultZ(U.t);
     ufxStep(UFX.p, hero, P.x, P.y, U.t, U.cx, U.cy, true);   // (the look: drawUltFx)
     if (!U.fired && U.t > 1.5) {
       U.fired = true; SFX.boom(); ultShake();
       if (NET.role === "guest") netEmit("ult", { cx: U.cx | 0, cy: U.cy | 0, hw: (VW / 2 + 120) | 0, hh: (VH / 2 + 160) | 0 });
       else ultBlast(U.cx, U.cy, VW / 2 + 120, VH / 2 + 160);
     }
-    if (U.t > 2.6) { G.ult = null; P.z = 0; ufxEnd(UFX.p); }
+    if (U.t > 2.6) ultEnd();
   }
   // src: "p" (this page's girl) or "q" (the partner). Both girls' ultimates within 2 s: the sisters' combo, five times as strong
   function ultBlast(cx, cy, hw, hh, src = "p") {
@@ -3668,7 +3685,7 @@
     qzK = clamp(qzK + (G.quiz && G.quiz.ph !== "down" ? dt : -dt) / 0.6, 0, 1);
     const MB = G.boss, morphing = !!(MB && MB.alive && MB.st === "morph");
     mzK = clamp(mzK + (morphing ? dt : -dt) / 0.4, 0, 1);
-    let qc = qzK > 0 && G.arena ? [lerp(P.x, G.arena.x, rsEase(qzK)), lerp(P.y - 70, G.arena.y - 150, rsEase(qzK))] : null;
+    let qc = qzK > 0 && G.arena ? [lerp(P.x, G.arena.x, rsEase(qzK)), lerp(P.y - 70, G.arena.y - QZ_CAM_DY, rsEase(qzK))] : null;
     if (!qc && mzK > 0 && MB) { const e = 0.6 * rsEase(mzK); qc = [lerp(P.x, MB.x, e), lerp(P.y - 70, MB.y - 400, e)]; }
     const tx = clamp((qc ? qc[0] : P.x + P.vx * 0.3) - VW / 2, 0, WORLD - VW), ty = clamp((qc ? qc[1] : P.y - 70 - hangLift() + P.vy * 0.3) - VH / 2, 0, WORLD - VH), k = 1 - Math.pow(0.02, dt);
     G.camX = lerp(G.camX, tx, k); G.camY = lerp(G.camY, ty, k);
@@ -3759,6 +3776,7 @@
   }
   function groundCircle(name, x, y, m, a, rot) { ctx.save(); ctx.translate(x, y); ctx.scale(1, 0.55); fx(name, 0, 0, m, a, rot); ctx.restore(); }
   function label(txt, x, y, size = 40, col = "#ffe9a6") {
+    size *= WT;   // (world text: as big on the screen as in the old 1150-unit view)
     ctx.save(); ctx.font = `800 ${size}px Grandstander, system-ui`; ctx.textAlign = "center"; ctx.lineWidth = size * 0.16; ctx.strokeStyle = "rgba(0,0,0,.6)"; ctx.fillStyle = col;
     ctx.strokeText(txt, x, y); ctx.fillText(txt, x, y); ctx.restore();
   }
@@ -3991,11 +4009,12 @@
     spr(f, x, y, flip, sc, 1, rot, sy);
     if (B.morphFlash > 0) sprFlash(f, x, y, flip, sc, Math.min(1, B.morphFlash * 2.5));   // (the flash as he changes)
     else if (morph && B.t < MORPH_SWAP) sprFlash(f, x, y, flip, sc, 0.25 * B.t / MORPH_SWAP * (0.5 + 0.5 * Math.sin(G.t * 30)));
-    if (B.alive && B.slow > 0) sprFlash(f, x, y, flip, 1, 0.3);
-    if (B.alive && B.frz > 0) drawIceBlock(f, x, y, flip, 1, B.frz, B.frzMax);
+    // (the overlays at his drawn size: sc, swollen while he changes form)
+    if (B.alive && B.slow > 0) sprFlash(f, x, y, flip, sc, 0.3);
+    if (B.alive && B.frz > 0) drawIceBlock(f, x, y, flip, sc, B.frz, B.frzMax);
     if (B.alive && B.burn > 0) drawFlames(B.x, B.y - 200, 220, 360, 1);
-    if (B.flash > 0) sprFlash(f, x, y, flip, 1, 0.5);
-    if (stag && Math.sin(B.die * 18) > 0.55) sprFlash(f, x, y, flip, 1, 0.45);
+    if (B.flash > 0) sprFlash(f, x, y, flip, sc, 0.5);
+    if (stag && Math.sin(B.die * 18) > 0.55) sprFlash(f, x, y, flip, sc, 0.45);
   }
   // a hero sprite at (x, y) lifted by z: used for this girl and the partner
   // walking: two steps per cycle; each step lifts her a little, rocks her body and puffs dust at the footfall
@@ -4036,7 +4055,8 @@
   const auraHash = (a, b) => { const v = Math.sin(a * 12.9898 + b * 78.233) * 43758.5453; return v - Math.floor(v); };
   function drawAura(el, x, y, left, part) {
     const E = ELEM[el]; if (!E) return;
-    const k = clamp(left / 2, 0, 1), grow = 0.7 + 0.3 * ss(0, 0.45, ELEM_TIME - left), t = G.t;
+    // (sized for the painted girls: everything times CHAR_K, as she is drawn)
+    const K = CHAR_K, k = clamp(left / 2, 0, 1), grow = (0.7 + 0.3 * ss(0, 0.45, ELEM_TIME - left)) * K, t = G.t;
     if (k <= 0.01) return;
     if (part === 0) {
       ctx.save(); ctx.translate(x, y); ctx.scale(1, 0.5); glow(0, 0, 165 * grow, E.rgb, (0.34 + 0.08 * Math.sin(t * 4)) * k); ctx.restore();
@@ -4047,44 +4067,44 @@
       return;
     }
     const front = part === 2, side = (a) => (Math.sin(a) > 0) === front;
-    if (!front) glow(x, y - 100, 150, E.rgb, (0.18 + 0.06 * Math.sin(t * 5)) * k);
+    if (!front) glow(x, y - 100 * K, 150 * K, E.rgb, (0.18 + 0.06 * Math.sin(t * 5)) * k);
     if (el === "fire") {
       // flames licking up off the ring, turning with it, and embers drifting higher
       for (let i = 0; i < 7; i++) {
         const u = (t / 0.85 + i * 0.618) % 1, a = i * TAU / 7 + t * 0.8; if (!side(a)) continue;
         const R = 88 * grow * (1 - 0.35 * u);
-        fx("fx_flame", x + Math.cos(a) * R, y + Math.sin(a) * R * 0.5 - 18 - u * 105, (0.55 - 0.3 * u) * grow, 0.85 * Math.sin(Math.PI * u) * k);
+        fx("fx_flame", x + Math.cos(a) * R, y + Math.sin(a) * R * 0.5 - (18 + u * 105) * K, (0.55 - 0.3 * u) * grow, 0.85 * Math.sin(Math.PI * u) * k);
       }
       for (let i = 0; i < 6; i++) {
         const u = (t / 1.5 + i * 0.381) % 1, a = i * 2.39996 + t * 0.3; if (!side(a)) continue;
-        const R = 70 * (1 - 0.5 * u);
-        fx(fr("fx_aura_ember", "fx_flame"), x + Math.cos(a) * R + Math.sin(t * 3 + i * 2) * 14, y + Math.sin(a) * R * 0.5 - 30 - u * 220, 0.6 * (1 - 0.5 * u), Math.sin(Math.PI * u) * k);
+        const R = 70 * K * (1 - 0.5 * u);
+        fx(fr("fx_aura_ember", "fx_flame"), x + Math.cos(a) * R + Math.sin(t * 3 + i * 2) * 14 * K, y + Math.sin(a) * R * 0.5 - (30 + u * 220) * K, 0.6 * K * (1 - 0.5 * u), Math.sin(Math.PI * u) * k);
       }
     } else if (el === "ice") {
       // three ice crystals circling her, snowflakes drifting up and spinning, frost twinkles on her
       for (let i = 0; i < 3; i++) {
         const a = t * 1.4 + i * TAU / 3; if (!side(a)) continue;
-        fx(fr("fx_aura_shard", "fx_snow"), x + Math.cos(a) * 82, y + Math.sin(a) * 41 - 95 - Math.sin(t * 2.2 + i * 2) * 14, 0.75 * grow, (front ? 0.75 : 0.9) * k, Math.cos(a) * 0.25);
+        fx(fr("fx_aura_shard", "fx_snow"), x + Math.cos(a) * 82 * K, y + (Math.sin(a) * 41 - 95 - Math.sin(t * 2.2 + i * 2) * 14) * K, 0.75 * grow, (front ? 0.75 : 0.9) * k, Math.cos(a) * 0.25);
       }
       for (let i = 0; i < 7; i++) {
         const u = (t / 2.6 + i * 0.618) % 1, a = i * 2.39996 + t * 0.5; if (!side(a)) continue;
-        const R = 50 + (i % 3) * 18;
-        fx("fx_snow", x + Math.cos(a) * R, y + Math.sin(a) * R * 0.5 - 20 - u * 200, 0.32 + 0.1 * (i % 2), 0.9 * Math.sin(Math.PI * u) * k, t * 1.5 + i);
+        const R = (50 + (i % 3) * 18) * K;
+        fx("fx_snow", x + Math.cos(a) * R, y + Math.sin(a) * R * 0.5 - (20 + u * 200) * K, (0.32 + 0.1 * (i % 2)) * K, 0.9 * Math.sin(Math.PI * u) * k, t * 1.5 + i);
       }
       if (front) for (let i = 0; i < 3; i++) {
         const c = Math.floor(t / 1.1 + i / 3), u = (t / 1.1 + i / 3) % 1;
-        fx("fx_twinkle", x + (auraHash(c, i) - 0.5) * 120, y - 25 - auraHash(i, c) * 95, 0.45 * Math.sin(Math.PI * u), 0.85 * k);
+        fx("fx_twinkle", x + (auraHash(c, i) - 0.5) * 120 * K, y - (25 + auraHash(i, c) * 95) * K, 0.45 * K * Math.sin(Math.PI * u), 0.85 * k);
       }
     } else {
       // green bubbles swelling as they rise and popping, and curls of toxic mist
       for (let i = 0; i < 4; i++) {
         const u = (t / 2.8 + i * 0.25) % 1, a = i * TAU / 4 + t * 0.25 + 0.4; if (!side(a)) continue;
-        fx(fr("fx_aura_wisp", "fx_smoke"), x + Math.cos(a) * 70, y + Math.sin(a) * 35 - 30 - u * 150, (0.75 + 0.4 * u) * grow, (front ? 0.32 : 0.5) * Math.sin(Math.PI * u) * k, Math.sin(t * 1.5 + i) * 0.3, i % 2 === 1);
+        fx(fr("fx_aura_wisp", "fx_smoke"), x + Math.cos(a) * 70 * K, y + (Math.sin(a) * 35 - 30 - u * 150) * K, (0.75 + 0.4 * u) * grow, (front ? 0.32 : 0.5) * Math.sin(Math.PI * u) * k, Math.sin(t * 1.5 + i) * 0.3, i % 2 === 1);
       }
       for (let i = 0; i < 7; i++) {
         const u = (t / 1.9 + i * 0.618) % 1, a = i * 2.39996 + t * 0.4; if (!side(a)) continue;
-        const R = 85 * (1 - 0.4 * u);
-        fx("fx_bubble", x + Math.cos(a) * R + Math.sin(t * 2.5 + i) * 10, y + Math.sin(a) * R * 0.5 - 15 - u * 170, (0.3 + 0.35 * u) * grow, Math.min(1, u * 6) * (1 - ss(0.82, 1, u)) * 0.9 * k);
+        const R = 85 * K * (1 - 0.4 * u);
+        fx("fx_bubble", x + Math.cos(a) * R + Math.sin(t * 2.5 + i) * 10 * K, y + Math.sin(a) * R * 0.5 - (15 + u * 170) * K, (0.3 + 0.35 * u) * grow, Math.min(1, u * 6) * (1 - ss(0.82, 1, u)) * 0.9 * k);
       }
     }
   }
@@ -4145,7 +4165,7 @@
     Q.wd = (Q.wd || 0) + (mv < 60 ? mv : 0); Q.still = mv > 0.5 ? 0 : (Q.still || 0) + 1;
     const qWalk = Q.ultT > 0 || Q.dead || Q.still > 6 ? -1 : Q.wd;
     if (Q.dead) drawFainted(Q.hero, Q.x, Q.y, Q.rev || 0, Q.helped, P, Q.of);
-    else if (Q.fn) drawHeroSprite(Q.hero, Q.ultT > 0 ? outfitFrame(Q.hero, Q.of, "ult") : Q.fn, Q.x, Q.y, Q.ultT > 0 ? 150 * ss(0, 0.6, Q.ultT) - 150 * ss(2.0, 2.5, Q.ultT) : 0, Q.inv && !Q.dead && !G.rescue && Math.floor(G.t * 16) % 2 === 0 ? 0.45 : 1, Q.ultT, stepPose(Q, qWalk));
+    else if (Q.fn) drawHeroSprite(Q.hero, Q.ultT > 0 ? outfitFrame(Q.hero, Q.of, "ult") : Q.fn, Q.x, Q.y, Q.ultT > 0 ? ultZ(Q.ultT) : 0, Q.inv && !Q.dead && !G.rescue && Math.floor(G.t * 16) % 2 === 0 ? 0.45 : 1, Q.ultT, stepPose(Q, qWalk));
     if (qa) drawAura(Q.elem, Q.x, Q.y, qa, 2);
     if (Q.slow) drawWeb(Q.x, Q.y - 70 * CHAR_K, 40 * CHAR_K, 1);
     // name tag and hearts
@@ -4569,7 +4589,7 @@
     S.drawn += ufxN - n0; S.maxW = Math.max(S.maxW, ufxW); if (layer === 1) S.bigA1 = ufxBig;
   }
   function drawUltMochi(S, A, x, y, t, cx, cy, layer, own) {
-    const env = ss(0, 0.4, t) * (1 - ss(2.15, 2.55, t)), fz = 150 * ss(0, 0.6, t) - 150 * ss(2.0, 2.5, t), hy = y - fz - 110 * CHAR_K, b = t - ULT_BOOM, dur = ufxDur("g");
+    const env = ss(0, 0.4, t) * (1 - ss(2.15, 2.55, t)), fz = ultZ(t), hy = y - fz - 110 * CHAR_K, b = t - ULT_BOOM, dur = ufxDur("g");
     const rgb = ULT_RGB.g, top = hy - 160 * CHAR_K, wmax = VW * 1.3;
     if (layer === 0) {
       if (own) { ctx.globalAlpha = 0.42 * env; ctx.fillStyle = "#2a0726"; ctx.fillRect(cx - VW * 0.6, cy - VH * 0.6, VW * 1.2, VH * 1.2); }
@@ -4636,7 +4656,7 @@
     return UCONF;
   }
   function drawUltMatcha(S, A, x, y, t, cx, cy, layer, own) {
-    const env = ss(0, 0.4, t) * (1 - ss(2.15, 2.55, t)), fz = 150 * ss(0, 0.6, t) - 150 * ss(2.0, 2.5, t), hy = y - fz - 110 * CHAR_K, b = t - ULT_BOOM, dur = ufxDur("s");
+    const env = ss(0, 0.4, t) * (1 - ss(2.15, 2.55, t)), fz = ultZ(t), hy = y - fz - 110 * CHAR_K, b = t - ULT_BOOM, dur = ufxDur("s");
     const rgb = ULT_RGB.s, wmax = VW * 1.3;
     if (layer === 0) {
       if (own) { ctx.globalAlpha = 0.55 * env; ctx.fillStyle = "#06102c"; ctx.fillRect(cx - VW * 0.6, cy - VH * 0.6, VW * 1.2, VH * 1.2); }   // (night falls)
@@ -4852,7 +4872,7 @@
         ctx.restore();
       }
       else if (p.type === "text") {
-        ctx.globalAlpha = a; ctx.font = "800 44px Grandstander, system-ui"; ctx.textAlign = "center"; ctx.lineWidth = 7; ctx.strokeStyle = "rgba(40,20,0,.7)"; ctx.fillStyle = "#ffd34d";
+        ctx.globalAlpha = a; ctx.font = `800 ${Math.round(44 * WT)}px Grandstander, system-ui`; ctx.textAlign = "center"; ctx.lineWidth = 7 * WT; ctx.strokeStyle = "rgba(40,20,0,.7)"; ctx.fillStyle = "#ffd34d";
         ctx.strokeText(p.txt, p.x, p.y); ctx.fillText(p.txt, p.x, p.y);
       }
     }
@@ -4880,6 +4900,7 @@
     const hw = VW / 2 / zm, hh = VH / 2 / zm, L = G.camX + VW / 2 - hw, R = G.camX + VW / 2 + hw, T = G.camY + VH / 2 - hh, B = G.camY + VH / 2 + hh;
     // ground chunks (a couple of new ones painted per frame)
     chunkBudget = 2;
+    chunkCap = Math.max(16, (Math.floor(R / CH) - Math.floor(L / CH) + 1) * (Math.floor(B / CH) - Math.floor(T / CH) + 1) + 4);
     for (let ix = Math.floor(L / CH); ix <= Math.floor(R / CH); ix++) for (let iy = Math.floor(T / CH); iy <= Math.floor(B / CH); iy++) {
       const c = groundChunk(ix, iy, chunkCache.size < 4);
       if (c) ctx.drawImage(c, ix * CH, iy * CH, CH + CH_PAD, CH + CH_PAD);
@@ -5093,7 +5114,7 @@
     if (i === 0) for (const c of Object.keys(HEROES)) { MEM.outfit[c] = "base"; try { localStorage.setItem("sksp-outfit-" + c, "base"); } catch (e) {} }
     if (i === 0) P.outfit = "base";
     // her pet: rescued on the way in Màn 1, already with her when she starts further on
-    // (the friends of everyone are with her once their level is behind her: Simmy from Màn 2 on, Sammy from Màn 3)
+    // (the friends of everyone are with her once their level is behind her: Simmy from Màn 2 on, Kairon from Màn 3, Sammy from Màn 4)
     P.pets = i > 0 ? Object.keys(PETS).filter((k) => PETS[k].owner === hero || (isAlly(k) && PETS[k].lv < i)) : [];
     G.sksp = ["", "", "", ""]; G.cine = null; G.rescue = null; G.shopPhase = 0; G.say = null; G.pmode = null;
     if ($("hud").dataset.ship) shipUiOff();   // (a new game from the ship)
@@ -5594,7 +5615,8 @@
   // bow on the right, the sea around it): the boarding film ("board": Simmy has everyone change into sailor clothes, a group pose, she hands
   // each girl a rod and points to the bow with line 10), fishing at the bow until FISH_GOAL fish ("fish"), cooking at the stern until
   // DISH_GOAL dishes ("cook", line 11), then the arrival ("arrive": line 12 and "Sắp cập bến rồi!…", the island comes into view) and the
-  // clothes shop opens: Màn 3 starts there (shop -> runway -> team photo -> the island, LEVELS[1], with line 13).
+  // clothes shop opens: Màn 2 goes on there (shop -> runway -> team photo -> the island, LEVELS[1], with line 13). (The ship is parked:
+  // nothing in the game leads onto it now; it is kept, with its co-op code, for when it comes back.)
   // On the ship P.x / P.y are picture px of the deck painting (1536 x 1024): she walks up / down / left / right on the deck (inside ISO.walk,
   // kept out of the counters, the mast, the barrels and the tank: deckFix), drawn in front of what is behind her by her feet's y; her world
   // position is put back when the ship is left. Each page's camera follows its own girl (shipCam); the one button (#bUlt, Space / K / C)
@@ -5788,15 +5810,15 @@
     if (onShip()) { G.mode = "play"; G.pmode = null; $("pauseScreen").hidden = true; }
     shipUiOff();
   }
-  // the arrival is over (or, on a guest's page, the host's page opened the shop): Màn 3 starts in the clothes shop
+  // the arrival is over (or, on a guest's page, the host's page opened the shop): Màn 2 goes on in the clothes shop
   function shipToShop(fromNet, w) {
     leaveShip();
     if (w) G.stars = Math.max(0, Math.floor(num(w.st)));
-    openShop((G.lvl && G.lvl.shop) || "pirate", fromNet);   // (it shows the Màn 3 banner)
+    openShop((G.lvl && G.lvl.shop) || "pirate", fromNet);   // (it shows the Màn 2 banner)
     if (w && w.sh === "closed") closeShop(true);   // (the host has shopped already: straight on to the runway)
   }
   function endShip() { shipToShop(false); }
-  // on into Màn 3 (the island), where Simmy says line 13 (a guest a little later: her page builds the level when the host's world says so)
+  // on to the island (Màn 2, LEVELS[1]), where Simmy says line 13 (a guest a little later: her page builds the level when the host's world says so)
   function toLevel2() {
     startLevel2();
     if (G.mode === "play") G.say = { seq: SAYS.level2Start, t: NET.role === "guest" ? -2.2 : -0.8 };
@@ -7535,7 +7557,7 @@
     const say = sayAt(G.say.seq, G.say.t); if (!say) return;
     const [spk, lines] = G.say.seq[say.i], sm = PETE.find((e) => e.kind === "simmy");
     const at = spk === "simmy" ? (sm ? [sm.x, sm.y - CHAR_H.simmy - 50] : [P.x, P.y - CHAR_H[hero] - 40]) : girlSpot(spk);
-    talkBubble(lines, at[0], at[1], say.k, 44);
+    talkBubble(lines, at[0], at[1], say.k, 44 * WT);
   }
 
   // ---------------------------------------------------------------- Simmy leads the team off to the clothes shop (after the candy boss)
@@ -7621,7 +7643,7 @@
     ctx.font = `800 ${fs}px Grandstander, system-ui`;
     const w = Math.max(...lines.map((l) => ctx.measureText(l).width)) + fs * 1.6, h = lines.length * fs * 1.18 + fs * 0.8;
     const hw = VW / 2 / zm, hh = VH / 2 / zm, cx = G.camX + VW / 2, cy = G.camY + VH / 2;
-    return [clamp(x, cx - hw + w / 2 + 24 / zm, cx + hw - w / 2 - 24 / zm), clamp(y, cy - hh + h + 34 + 150 / zm, cy + hh - 24 / zm)];
+    return [clamp(x, cx - hw + w / 2 + 24 / zm, cx + hw - w / 2 - 24 / zm), clamp(y, cy - hh + h + 34 + 150 * WT / zm, cy + hh - 24 / zm)];
   }
   // the end of the film (or a tap on skip): the host / a solo girl opens the shop; a guest waits for the host's shop (syncShop opens hers)
   function endWalkIn() {
@@ -7638,7 +7660,7 @@
     const W = c.W || SAYS.afterCandyBoss, say = sayAt(W, t, c.mul);
     if (say) {
       const [spk, lines] = W[say.i], at = spk === "simmy" ? (sm ? [sm.x, sm.y - CHAR_H.simmy - 50] : null) : girlSpot(spk);
-      if (at) { const [bx, by] = bubbleInView(lines, at[0], at[1], 44); talkBubble(lines, bx, by, say.k, 44); if (API.saidAt) API.saidAt.push([lines.join(" "), bx, by, G.camX, G.camY, VW, VH]); }
+      if (at) { const [bx, by] = bubbleInView(lines, at[0], at[1], 44 * WT); talkBubble(lines, bx, by, say.k, 44 * WT); if (API.saidAt) API.saidAt.push([lines.join(" "), bx, by, G.camX, G.camY, VW, VH]); }
     }
   }
   function drawWalkFade(W, H) {
@@ -8471,6 +8493,7 @@
     refreshFrames: () => DIRN.clear(),   // call after adding frames to FR at run time
     audio: () => ({ ctx: AC && AC.state, samples: Object.keys(SAMPLE).length, music: !!musicSrc, track: musicNow, want: musicWanted() }),
     heroFrame4, monFrame, guideTarget, heroStats, xpNeed, gainXp, addEnergy, startUlt, rescuePet, ultBlast, ultFx: () => UFX, ULT_DRAW_CAP, ULT_PART_CAP, ultLight, viewSize: () => ({ VW, VH }), startBoss, pets: () => PETE,
+    groundPaints: () => groundPaints, viewBox, saidPx: null,   // (groundPaints: ground chunks painted so far; saidPx: an array -> talkBubble records [text, its drawn font size in world px])
     spawnMon: (kind, x, y) => spawnMon(kind, x === undefined ? P.x + 400 : x, y === undefined ? P.y : y),
     damageBoss: (n) => damageBoss(n, 0, 0, false, true),
     // with hold = true the world only moves on step(): exact moments for screenshots
