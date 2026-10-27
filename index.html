@@ -360,7 +360,7 @@
   let META = null, ready = false;
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261027.2009", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261027.2016", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -3609,8 +3609,15 @@
   }
   function waterStart(w) {
     if (d2(w.x, w.y, P.x, P.y) > 2200 * 2200) return;
-    if (w.k === "spike") { SFX.shatter(); G.shake = Math.max(G.shake, 8); burst(w.x, w.y - 80, 18, SNOW_COLS, 520, 0.7); G.parts.push({ type: "ring", x: w.x, y: w.y, r: w.r * 0.5, vr: 420, life: 0.5, max: 0.5, col: "200,235,255" }); return; }
-    if (w.k === "snowball") { G.shake = Math.max(G.shake, 8); return; }
+    if (w.k === "spike") {
+      // the spikes burst: a painted burst of powder and ice at their foot, shards thrown up, a cold flash of light
+      SFX.shatter(); G.shake = Math.max(G.shake, 11);
+      snowPuff(w.x, w.y + w.r * 0.4, w.r * 1.6, 0.6);
+      for (let i = 0; i < 7; i++) iceBit(w.x + rnd(-w.r, w.r) * 0.5, w.y + rnd(-w.r, w.r) * 0.3, rnd(160, 420), rnd(0.35, 0.7));
+      G.parts.push({ type: "ring", x: w.x, y: w.y, r: w.r * 0.6, vr: 380, life: 0.4, max: 0.4, col: "210,240,255" });
+      return;
+    }
+    if (w.k === "snowball") { G.shake = Math.max(G.shake, w.av ? 14 : 10); return; }
     if (w.k === "blizzard") { G.shake = Math.max(G.shake, 5); noise(1.2, 0.12, 900, 0.5, 0, "lowpass"); return; }
     if (w.k === "geyser") {
       // the column bursts: a painted splash at its foot, a flat ring of water running out along the ground, droplets thrown high
@@ -3686,7 +3693,8 @@
         const c0 = lanes[0], mid = ax ? A.x : A.y, s0 = mid - c0 >= 0 ? 1 : -1, off = 2 * SNOW_HW + SNOW_GAP;
         for (const s of [s0, -s0]) { const c = c0 + s * off; if (Math.abs(c - mid) < A.r - SNOW_HW * 0.6 && lanes.every((l) => Math.abs(l - c) >= off)) { lanes.push(c); break; } }
       }
-      for (const c of lanes) addWater("snowball", ax ? c : A.x, ax ? A.y : c, { w, r: SNOW_HW, ax, dir, end: w + 2 * (A.r + SNOW_R1 + 40) / SNOW_V + 0.4 });
+      // (av: drawn as the avalanche's tumbling snow boulder instead of the snowball; the look only)
+      for (const c of lanes) addWater("snowball", ax ? c : A.x, ax ? A.y : c, { w, r: SNOW_HW, ax, dir, av: B.move === "avalanche" ? 1 : 0, end: w + 2 * (A.r + SNOW_R1 + 40) / SNOW_V + 0.4 });
       SFX.slam(); G.shake = Math.max(G.shake, 10); dust(B.x, B.y, 16);
     } else if (B.move === "icespikes") {
       // one under each girl, the others around her, far enough apart that there is always room between them
@@ -3704,16 +3712,34 @@
   function snowBorn(w) {
     if (w.k === "blizzard" && w.t < w.w + 0.5) { showBanner("Bão tuyết sắp tới!", "Bé sẽ đi chậm lại một chút"); SFX.swoosh(); }
   }
-  // droplets of snow (the look only): a spray off the rolling ball, ice shards as the spikes burst
+  // the Yeti's painted snow (art4/world/fx_snow_*.png, ChatGPT; cut by tools/g4_fx_cut.py): the snowball's four turns, the avalanche's
+  // tumbling boulder side-on and coming at the camera, the ice spikes (frost cracks, bursting, full, shattering), frost and broken ice
+  // left on the ground, powder sprays and bursts, an ice shard; the blizzard's gusts, flurries and snow cloud (painted on black: their
+  // brightness is their strength). The code adds only light, the shake, flying bits and the warnings' outlines and arrows.
+  const SNFX = {
+    ball: ["fxsn_ball0", "fxsn_ball1", "fxsn_ball2", "fxsn_ball3"], avS: ["fxsn_aval_s0", "fxsn_aval_s1", "fxsn_aval_s2"], avF: ["fxsn_aval_f0", "fxsn_aval_f1", "fxsn_aval_f2"],
+    spike: ["fxsn_spike0", "fxsn_spike1", "fxsn_spike2", "fxsn_spike3"], spray: ["fxsn_spray0", "fxsn_spray1"], burst: ["fxsn_burst0", "fxsn_burst1"],
+    gust: ["fxsn_gust0", "fxsn_gust1", "fxsn_cloud", "fxsn_flakes", "fxsn_gust0", "fxsn_swirl", "fxsn_gust1", "fxsn_glitter"],
+  };
+  // an ice shard or a clump of snow thrown up, tumbling, falling back (a "rock" particle drawn with the painted shard)
+  function iceBit(x, y, v, sc, up = 1) {
+    if (G.parts.length >= 470) return;
+    const a = Math.random() * TAU;
+    G.parts.push({ type: "rock", x, y, z: 20, vx: Math.cos(a) * v, vy: Math.sin(a) * v * 0.6, vz: rnd(450, 900) * up, rot: rnd(0, 6), vr: rnd(-12, 12), name: "fxsn_icicle", sc, life: 2, max: 2 });
+  }
+  // a painted burst of powder snow standing on the ground (its frames over its life)
+  function snowPuff(x, y, w, life = 0.7) {
+    if (G.parts.length < 480) G.parts.push({ type: "pfx", seq: SNFX.burst, x, y, w, foot: true, grow: 0.3, life, max: life, flip: Math.random() < 0.5 });
+  }
+  // flying snow (the look only): powder kicked up off the rolling ball and shards off it, ice shards as the spikes burst
   function snowSpray(w) {
-    const A = G.arena, flake = (x, y, vx, vy, r, g) => G.parts.push({ type: "dot", x, y, vx, vy, life: rnd(0.35, 0.7), max: 0.7, r, col: SNOW_COLS[Math.floor(Math.random() * SNOW_COLS.length)], g });
+    const A = G.arena;
     if (w.k === "snowball") {
       const f = snowFront(w), R = snowR(w); if (Math.abs(f) > A.r + R) return;
       const bx = w.ax ? w.x : A.x + f, by = w.ax ? A.y + f : w.y;
-      for (let i = 0; i < 2; i++) flake(bx + rnd(-R, R) * 0.7, by - rnd(0, R * 0.4), (w.ax ? rnd(-120, 120) : -w.dir * rnd(80, 260)), -rnd(150, 380) + (w.ax ? -w.dir * 120 : 0), rnd(4, 9), 1100);
-    } else if (w.k === "spike" && w.t - w.w < 0.25) {
-      for (let i = 0; i < 2; i++) flake(w.x + rnd(-60, 60), w.y - rnd(60, 200), rnd(-280, 280), -rnd(200, 450), rnd(4, 8), 1300);
-    }
+      if (Math.random() < 0.35) iceBit(bx + rnd(-R, R) * 0.6, by, rnd(80, 260), rnd(0.3, 0.55) * R / 120);
+      if (Math.random() < 0.12) snowPuff(bx - (w.ax ? 0 : w.dir * R * 0.7), by + (w.ax ? -w.dir * R * 0.4 : 0), R * 1.1, 0.6);
+    } else if (w.k === "spike" && w.t - w.w < 0.2 && Math.random() < 0.6) iceBit(w.x + rnd(-60, 60), w.y + rnd(-30, 30), rnd(150, 380), rnd(0.35, 0.6));
   }
   // the ground under the snow moves: a lane with arrows (the snowball's), circles closing in (the spikes'), then packed snow and frost
   // (the warnings are bright pink-red edged in white and deep red: they read on the pale ice floor)
@@ -3742,59 +3768,67 @@
     } else {
       const e = w.t - w.w;
       if (warn) {
-        ctx.globalAlpha = (0.2 + 0.14 * pulse) * Math.min(1, k * 3 + 0.3); ctx.fillStyle = "#ff3d6e"; ctx.beginPath(); ctx.arc(w.x, w.y, w.r, 0, TAU); ctx.fill();
+        // the painted frost cracks opening in the snow, glowing more as it comes (over its circle, under the warning's outline)
+        ctx.globalAlpha = 1; fitFrame(SNFX.spike[0], w.x, w.y - w.r * 0.08, w.r * 2.3 * (0.75 + 0.25 * k), w.r * 1.75 * (0.75 + 0.25 * k), Math.min(1, k * 1.6));
+        glow(w.x, w.y, w.r * (0.6 + 0.5 * k), "150,215,255", 0.2 + 0.35 * k * pulse);
+        ctx.globalAlpha = (0.16 + 0.12 * pulse) * Math.min(1, k * 3 + 0.3); ctx.fillStyle = "#ff3d6e"; ctx.beginPath(); ctx.arc(w.x, w.y, w.r, 0, TAU); ctx.fill();
         ctx.globalAlpha = 0.9; ctx.strokeStyle = "#c2185b"; ctx.lineWidth = 13; ctx.stroke();
         ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 7; ctx.setLineDash([28, 16]); ctx.lineDashOffset = -G.t * 90; ctx.stroke(); ctx.setLineDash([]);
         ctx.globalAlpha = 0.85; ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 12; ctx.beginPath(); ctx.arc(w.x, w.y, Math.max(4, w.r * (1 - k)), 0, TAU); ctx.stroke();
-        // ice glinting in the circle
-        ctx.fillStyle = "#ffffff";
-        for (let i = 0; i < 6; i++) { const a = i * TAU / 6 + G.t * 1.2, r = w.r * (0.25 + 0.5 * ((G.t * 0.8 + i * 0.37) % 1)); ctx.globalAlpha = 0.75 * k; ctx.beginPath(); ctx.arc(w.x + Math.cos(a) * r, w.y + Math.sin(a) * r, 5 + 6 * k, 0, TAU); ctx.fill(); }
       } else {
-        // frost where they burst
-        ctx.globalAlpha = 0.55 * fade; ctx.fillStyle = "#f2fbff"; ctx.beginPath(); ctx.arc(w.x, w.y, w.r * (0.9 + 0.3 * Math.min(1, e * 3)), 0, TAU); ctx.fill();
-        ctx.globalAlpha = 0.6 * fade; ctx.strokeStyle = "#9fd8ff"; ctx.lineWidth = 6; ctx.stroke();
+        // painted frost where they burst, then the broken ice left lying in it
+        ctx.globalAlpha = 1; const s = 0.9 + 0.25 * Math.min(1, e * 4);
+        fitFrame("fxsn_frost", w.x, w.y, w.r * 2.3 * s, w.r * 1.7 * s, 0.85 * fade * clamp(1.4 - e, 0, 1));
+        fitFrame("fxsn_frost2", w.x, w.y, w.r * 2.4 * s, w.r * 1.75 * s, fade * Math.min(1, e * 2.5));
       }
     }
     ctx.restore();
   }
   // what of the snow stands up off the ground, for the y-sorted pass: the rolling ball (sorted by the ground y it rolls on), the spikes
-  const SPIKES = [[-0.42, -0.18, 0.95, false], [0.4, -0.24, 0.85, true], [0.02, 0.26, 1.15, false]];   // [x, y (of the circle), size, mirrored]
   function snowPieces(w, out) {
     const A = G.arena; if (w.t < w.w) return;
     if (w.k === "snowball") {
       const f = snowFront(w), R = snowR(w); if (Math.abs(f) > A.r + R) return;
       const x = w.ax ? w.x : A.x + f, y = w.ax ? A.y + f : w.y;
       out.push({ w, k: "ball", x, y, R });
-    } else if (w.k === "spike" && w.t - w.w < SPIKE_T) for (const [ox, oy, s, fl] of SPIKES) out.push({ w, k: "spike", x: w.x + ox * w.r, y: w.y + oy * w.r, s, fl });
+    } else if (w.k === "spike" && w.t - w.w < SPIKE_T) out.push({ w, k: "spike", x: w.x, y: w.y + w.r * 0.3 });   // (one cluster per circle)
+  }
+  // a painted frame with its foot (the bottom middle) at (x, footY), w wide (its own proportions; sy stretches it up)
+  function footFrame(name, x, footY, w, a = 1, flip = false, sy = 1, add = false) {
+    const f = FR[name]; if (!f) return false;
+    const h = w * f.h / f.w * sy; return fitFrame(name, x, footY - h / 2, w, h, a, 0, flip, add);
   }
   function drawSnowPiece(o) {
     const w = o.w;
     if (o.k === "ball") {
-      const R = o.R, cx = o.x, cy = o.y - R * 0.92, roll = SNOW_V * (w.t - w.w) / R;
+      // the snowball (four painted turns, the turn it has rolled picks the frame) or, in his avalanche, the tumbling snow boulder
+      // (side-on across the screen, facing the camera up and down it); powder sprays up behind it. Its ground circle (R) is what hurts.
+      const R = o.R, cx = o.x, cy = o.y - R * 0.92, roll = SNOW_V * (w.t - w.w) / R, back = w.ax ? 0 : -w.dir;
       if (API.drawn) API.drawn.push(["snowball", w.id, o.y, o.x, o.y, R]);
-      shadow(o.x, o.y + 4, R * 0.95, R * 0.3, 0.3);
-      const g = ctx.createRadialGradient(cx - R * 0.35, cy - R * 0.4, R * 0.1, cx, cy, R);
-      g.addColorStop(0, "#ffffff"); g.addColorStop(0.65, "#eef7ff"); g.addColorStop(1, "#bcdcf2");
-      ctx.save(); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, R, 0, TAU); ctx.fill();
-      ctx.globalAlpha = 0.7; ctx.strokeStyle = "#a9cde8"; ctx.lineWidth = 5; ctx.stroke();
-      // lumps of snow turning with it (across the screen: round its middle; toward / away from the camera: up and down its face)
-      ctx.beginPath(); ctx.arc(cx, cy, R - 3, 0, TAU); ctx.clip();
-      ctx.fillStyle = "#dcecf8";
-      for (let i = 0; i < 6; i++) {
-        const a = i * TAU / 6 + roll * (w.ax ? -1 : w.dir), lx = w.ax ? cx + Math.cos(i * 2.1) * R * 0.45 : cx + Math.cos(a) * R * 0.6, ly = w.ax ? cy + Math.sin(a) * R * 0.6 : cy + Math.sin(a) * R * 0.6;
-        if (w.ax && Math.cos(a) < 0) continue;
-        ctx.globalAlpha = 0.8; ctx.beginPath(); ctx.ellipse(lx, ly, R * 0.16, R * 0.11, a, 0, TAU); ctx.fill();
+      shadow(o.x, o.y + 4, R * 1.05, R * 0.32, 0.45);
+      const sp = SNFX.spray[Math.floor(roll / 1.4) % 2];
+      if (w.ax) footFrame(SNFX.burst[Math.floor(roll / 1.4) % 2], o.x, o.y - w.dir * R * 0.3 + 10, R * 1.9, 0.7, Math.floor(roll / 2.8) % 2 === 1, 0.55);   // (up / down the screen: a low cloud of powder round its foot)
+      else footFrame(sp, o.x + back * R * 0.95, o.y + 6, R * 1.9, 0.9, w.dir < 0);
+      let ok;
+      if (w.av) {
+        const seq = w.ax ? SNFX.avF : SNFX.avS;
+        ok = footFrame(seq[Math.floor(roll / 1.3) % 3], cx - back * R * 0.12, o.y + R * 0.1, R * 2.75, 1, !w.ax && w.dir < 0);
+      } else {
+        const n = Math.floor(roll / (Math.PI / 2)) % 4, nm = SNFX.ball[w.dir > 0 ? n : 3 - n], f = FR[nm];
+        ok = !!f && fitFrame(nm, cx, cy, R * 2.25, R * 2.25 * f.h / f.w, 1, Math.sin(roll * 0.5) * 0.06 * (w.ax ? 1 : w.dir));
       }
-      ctx.restore();
-      glow(cx, cy, R * 1.3, "220,240,255", 0.3);
+      if (!ok) { ctx.fillStyle = "#eef7ff"; ctx.beginPath(); ctx.arc(cx, cy, R, 0, TAU); ctx.fill(); }
+      glow(cx, cy, R * 1.4, "205,235,255", 0.32);
       return;
     }
-    // an ice spike (the snowy crystal painting) bursting up out of the ground, then cracking away
-    const e = w.t - w.w, up = Math.min(1, e / 0.12), out = clamp((e - (SPIKE_T - 0.35)) / 0.35, 0, 1), f = FR.sn_crystal;
+    // an ice spike cluster (painted) bursting up out of the frost: rising, full, shattering into falling shards
+    const e = w.t - w.w, out = clamp((e - (SPIKE_T - 0.4)) / 0.4, 0, 1), W = w.r * 2.55, foot = o.y + w.r * 0.05;
     if (API.drawn) API.drawn.push(["spike", w.id, o.y]);
-    if (f) { spr(f, o.x, o.y, o.fl, o.s, 1 - out, 0, Math.max(0.05, up)); if (e < 0.2) sprFlash(f, o.x, o.y, o.fl, o.s, 1 - e / 0.2); }
-    else { ctx.fillStyle = "#bfe3ff"; ctx.beginPath(); ctx.moveTo(o.x - 40 * o.s, o.y); ctx.lineTo(o.x, o.y - 200 * o.s * up); ctx.lineTo(o.x + 40 * o.s, o.y); ctx.fill(); }
-    if (e < 0.6) glow(o.x, o.y - 100 * o.s, 150, "170,225,255", 0.5 * (1 - e / 0.6));
+    if (e < 0.14) footFrame(SNFX.spike[1], w.x, foot, W, 1, false, 0.35 + 0.65 * e / 0.14);
+    else if (out <= 0) footFrame(SNFX.spike[2], w.x, foot, W * (1 + 0.04 * Math.max(0, 1 - (e - 0.14) * 6)), 1, false, e < 0.3 ? 1 + 0.12 * (0.3 - e) / 0.16 : 1);
+    else { footFrame(SNFX.spike[2], w.x, foot, W, 1 - out); footFrame(SNFX.spike[3], w.x, foot, W, Math.min(1, out * 3) * (1 - out * out)); }
+    if (e < 0.2 && FR[SNFX.spike[2]]) footFrame(SNFX.spike[2], w.x, foot, W, 0.4 * (1 - e / 0.2), false, 1, true);   // (a white flash as they burst)
+    if (e < 0.7) glow(w.x, foot - w.r * 0.9, w.r * 1.6, "170,225,255", 0.55 * (1 - e / 0.7));
   }
   // the blizzard over the view (world space, over the standing things): first a warning (snow starting, "Bão tuyết!" big at the top),
   // then thick snow and a white fog that leaves only a circle of clear sight round her
@@ -3813,25 +3847,35 @@
       g.addColorStop(0, "rgba(214,228,242,0)"); g.addColorStop(0.55, `rgba(214,228,242,${(fogA * 0.7).toFixed(3)})`); g.addColorStop(1, `rgba(214,228,242,${fogA.toFixed(3)})`);
       ctx.fillStyle = g; ctx.fillRect(L, T, R - L, B - T);
     }
+    const touch = API.touch ?? COARSE, W = R - L, Hh = B - T;
+    // the painted blizzard: gusts of wind-blown snow, flurries, a swirl and drifting snow clouds sweeping across the view (each its own
+    // place, size and speed; a few while it is coming, many once it blows, fewer on a touch screen)
+    const ng = Math.round((warn ? 4 : touch ? 9 : 15) * Math.max(0.35, k));
+    for (let i = 0; i < ng; i++) {
+      const hs = (k2) => { const v = Math.sin(i * 7.137 + k2 * 31.71) * 24634.6345; return v - Math.floor(v); }, sp = 0.7 + hs(3) * 0.7;
+      const nm = SNFX.gust[i % SNFX.gust.length], f = FR[nm]; if (!f) continue;
+      const gw = (nm === "fxsn_cloud" ? 820 : nm === "fxsn_swirl" ? 480 : 680) * (0.8 + 0.5 * hs(4)), gh = gw * f.h / f.w, span = W + 2 * gw, spanY = Hh + 2 * gh;
+      const x = L - gw + ((hs(1) * span + G.t * 820 * sp) % span), y = T - gh + ((hs(2) * spanY + G.t * 300 * sp) % spanY);
+      fitFrame(nm, x, y, gw, gh, (nm === "fxsn_cloud" ? 0.7 : 1) * (0.75 + 0.25 * hs(5)) * Math.max(0.25, k), Math.sin(G.t * 1.3 + i) * 0.08 + 0.18);
+    }
     // flakes blown across the view: short white streaks with a soft blue edge, so they show on the snow too. Batched: the flakes fall in
     // BLIZ_BINS widths, each width one path stroked twice (blue edge, white body), not two strokes per flake; fewer on a touch screen
-    const touch = API.touch ?? COARSE;
-    const n = Math.round((warn ? 50 : 190) * Math.max(0.3, k) * (touch ? 0.55 : 1)), W = R - L, Hh = B - T;
+    const n = Math.round((warn ? 50 : 190) * Math.max(0.3, k) * (touch ? 0.55 : 1));
     ctx.lineCap = "round";
     const paths = [];
     for (let b = 0; b < BLIZ_BINS; b++) paths.push([]);
     for (let i = 0; i < n; i++) {
       const hs = (k2) => { const v = Math.sin(i * 12.9898 + k2 * 78.233) * 43758.5453; return v - Math.floor(v); }, sx = hs(1), sy = hs(2), sp = 0.6 + hs(3) * 0.8;   // (each flake its own spot and speed)
       const x = L + ((sx * W + G.t * 620 * sp) % W + W) % W, y = T + ((sy * Hh + G.t * 330 * sp) % Hh + Hh) % Hh;
-      paths[Math.min(BLIZ_BINS - 1, Math.floor((sp - 0.6) / 0.8 * BLIZ_BINS))].push(x - 30 * sp, y - 16 * sp, x, y);
+      paths[Math.min(BLIZ_BINS - 1, Math.floor((sp - 0.6) / 0.8 * BLIZ_BINS))].push(x - 12 * sp, y - 6 * sp, x, y);
     }
     let strokes = 0;
     paths.forEach((pts, b) => {
       if (!pts.length) return;
-      const r = 4 + 5 * (0.6 + (b + 0.5) * 0.8 / BLIZ_BINS);
+      const r = 3 + 3.5 * (0.6 + (b + 0.5) * 0.8 / BLIZ_BINS);
       ctx.beginPath(); for (let j = 0; j < pts.length; j += 4) { ctx.moveTo(pts[j], pts[j + 1]); ctx.lineTo(pts[j + 2], pts[j + 3]); }
-      ctx.globalAlpha = 0.5; ctx.strokeStyle = "#9fbedc"; ctx.lineWidth = r * 2 + 4; ctx.stroke();
-      ctx.globalAlpha = 0.95; ctx.strokeStyle = "#ffffff"; ctx.lineWidth = r * 2; ctx.stroke();
+      ctx.globalAlpha = 0.4; ctx.strokeStyle = "#9fbedc"; ctx.lineWidth = r * 2 + 4; ctx.stroke();
+      ctx.globalAlpha = 0.85; ctx.strokeStyle = "#ffffff"; ctx.lineWidth = r * 2; ctx.stroke();
       strokes += 2;
     });
     if (API.drawn) API.drawn.push(["blizzardFx", strokes, n]);
@@ -4087,8 +4131,11 @@
           addLava("rock", x, y, { w: w + i * 0.05, r: ERU_ROCK, end: w + i * 0.05 + ROCK_END, ring: [cx, cy] });
         }
       }
-      SFX.boom(); G.shake = Math.max(G.shake, 16);
-      burst(B.x, B.y - 300, 40, LAVA_COLS, 700, 1.1);
+      SFX.boom(); G.shake = Math.max(G.shake, 18);
+      // the eruption out of the ground at his feet: the painted lava fountain (rising, then spraying out), smoke and embers
+      lavaPfx(LVFX.fount, B.x, B.y + 30, 620, 1.1, { add: true, grow: 0.2 });
+      lavaPfx(["fxlv_smoke"], B.x, B.y - 80, 420, 1.6, { vy: -110, grow: 0.6, al: 0.7 });
+      for (let i = 0; i < 6; i++) lavaPfx(["fxlv_embers"], B.x + rnd(-120, 120), B.y - rnd(80, 260), rnd(140, 220), rnd(0.8, 1.3), { add: true, vx: rnd(-160, 160), vy: -rnd(180, 380), grow: 0.3 });
       G.parts.push({ type: "ring", x: B.x, y: B.y - 40, r: 80, vr: 1300, life: 0.6, max: 0.6, col: "255,120,40" });
     }
   }
@@ -4118,23 +4165,46 @@
     }
     G.lavas = G.lavas.filter((o) => o.t < o.end);
   }
+  // Quỷ Dung Nham's painted fire (art4/world/fx_lava_*.png, ChatGPT; cut by tools/g4_fx_cut.py): the meteor (a burning basalt rock
+  // falling, 4 frames), the impact explosion (4, painted on black: added as light), the craters it leaves (fresh, cooled), scorched
+  // ground, the spreading lava pool (splash, flowing, full, cooling), the fire pillar (ignite, rising, full, fading; on black), the lava
+  // fountain of his eruption, smoke and embers. The code adds only light, the shake, flying bits and the warnings' outlines and arrows.
+  const LVFX = {
+    meteor: ["fxlv_meteor0", "fxlv_meteor1", "fxlv_meteor2", "fxlv_meteor3"], boom: ["fxlv_boom0", "fxlv_boom1", "fxlv_boom2", "fxlv_boom3"],
+    pool: ["fxlv_pool0", "fxlv_pool1", "fxlv_pool2", "fxlv_pool3"], pillar: ["fxlv_pillar0", "fxlv_pillar1", "fxlv_pillar2", "fxlv_pillar3"], fount: ["fxlv_fount0", "fxlv_fount1"],
+  };
+  // each pool frame's lava as an ellipse in shares of the frame [cx, cy, rx, ry] (tools/g4_fx_cut.py measure): fitted so the lava drawn
+  // is exactly the circle that burns (the cooled frame takes the full one's)
+  const POOL_FIT = [[0.4991, 0.4988, 0.3829, 0.3823], [0.4991, 0.4975, 0.4427, 0.4428], [0.4991, 0.4977, 0.4377, 0.438], [0.4991, 0.4977, 0.4377, 0.438]];
+  // a painted fire / smoke piece: its frames over its life, standing on its foot at (x, y), w wide (o: add, vx, vy, grow, al, flip)
+  function lavaPfx(seq, x, y, w, life, o = {}) {
+    if (G.parts.length >= 480 || !FR[seq[0]]) return;
+    G.parts.push({ type: "pfx", seq: seq.length > 1 ? seq : null, name: seq[0], x, y, w, foot: true, life, max: life, flip: o.flip ?? Math.random() < 0.5, ...o });
+  }
   function lavaStart(o) {
     if (d2(o.x, o.y, P.x, P.y) > 2200 * 2200) return;
     if (o.k === "rock") {
-      SFX.slam(); G.shake = Math.max(G.shake, o.ring ? 8 : 12);
-      G.parts.push({ type: "qboom", x: o.x, y: o.y, r: o.r, life: 0.6, max: 0.6 });
-      burst(o.x, o.y - 40, 16, LAVA_COLS, 460, 0.7);
+      // the meteor lands: the painted impact explosion (flash, fireball, fire cloud, smoke) added as light, a big flash of glow,
+      // smoke rising, embers and burning rock chunks thrown out
+      SFX.slam(); G.shake = Math.max(G.shake, o.ring ? 10 : 15);
+      lavaPfx(LVFX.boom, o.x, o.y + o.r * 0.3, o.r * 2.9, 0.75, { add: true, grow: 0.15 });
+      G.parts.push({ type: "fx", name: "fx_rays", x: o.x, y: o.y - o.r * 0.4, sc: o.r / 110, life: 0.3, max: 0.3, grow: 1.2 });
+      lavaPfx(["fxlv_smoke"], o.x + rnd(-30, 30), o.y - o.r * 0.2, o.r * 1.9, 1.4, { vy: -90, grow: 0.5, al: 0.55 });
+      lavaPfx(["fxlv_embers"], o.x, o.y - o.r * 0.3, o.r * 1.6, 0.9, { add: true, vy: -160, grow: 0.4 });
       for (let i = 0; i < 5 && G.parts.length < 470; i++) {
         const a = Math.random() * TAU, v = rnd(120, 340);
         G.parts.push({ type: "rock", x: o.x + Math.cos(a) * o.r * 0.3, y: o.y + Math.sin(a) * o.r * 0.2, z: 20, vx: Math.cos(a) * v, vy: Math.sin(a) * v * 0.6, vz: rnd(500, 900), rot: rnd(0, 6), vr: rnd(-9, 9), name: "qk_rock2", sc: rnd(0.4, 0.7), life: 2, max: 2 });
       }
-    } else if (o.k === "pool") { play("fire"); G.shake = Math.max(G.shake, 8); G.parts.push({ type: "ring", x: o.x, y: o.y, r: POOL_R0, vr: 700, life: 0.6, max: 0.6, col: "255,110,40" }); }
-    else { play("fire"); G.shake = Math.max(G.shake, 9); }
+    } else if (o.k === "pool") {
+      // the lava wells up out of the ground at his feet: a burst of molten lava, the ring of heat running out
+      play("fire"); G.shake = Math.max(G.shake, 10); G.parts.push({ type: "ring", x: o.x, y: o.y, r: POOL_R0, vr: 700, life: 0.6, max: 0.6, col: "255,110,40" });
+      lavaPfx(LVFX.fount, o.x, o.y + 20, 360, 0.7, { add: true });
+    } else { play("fire"); G.shake = Math.max(G.shake, 11); }
   }
   // embers and bubbles (the look only): a pool's lava bubbling, sparks flying up out of the fire columns
   function lavaEmbers(o, t0) {
     if (G.parts.length > 360 || o.t < o.w || d2(o.x, o.y, G.camX + VW / 2, G.camY + VH / 2) > 2600 * 2600) return;
-    const e = o.t - o.w, dot = (x, y, vx, vy, r) => G.parts.push({ type: "dot", x, y, vx, vy, life: rnd(0.4, 0.8), max: 0.8, r, col: LAVA_COLS[Math.floor(Math.random() * LAVA_COLS.length)], g: -60 });
+    const e = o.t - o.w, dot = (x, y, vx, vy, r) => (Math.random() < 0.3 ? lavaPfx(["fxlv_embers"], x, y, r * 14, rnd(0.6, 1), { add: true, vx, vy, grow: 0.3, al: 0.8 }) : G.parts.push({ type: "dot", x, y, vx, vy, life: rnd(0.4, 0.8), max: 0.8, r, col: LAVA_COLS[Math.floor(Math.random() * LAVA_COLS.length)], g: -60 }));
     if (o.k === "pool") { const r = poolNow(o); if (r > 0 && Math.random() < 0.6) { const a = Math.random() * TAU, d = Math.sqrt(Math.random()) * r; dot(o.x + Math.cos(a) * d, o.y + Math.sin(a) * d, rnd(-30, 30), -rnd(60, 160), rnd(4, 8)); } }
     else if (o.k === "pillar") {
       const n = pilN(o);
@@ -4186,16 +4256,22 @@
       ctx.save(); ctx.beginPath(); ctx.arc(A.x, A.y, A.r - 6, 0, TAU); ctx.clip();
       if (o.k === "rock") {
         if (warn) {
+          // the painted scorch opening under it, glowing more as the rock comes (under the warning's outline)
+          ctx.globalAlpha = 1; fitFrame("fxlv_scorch", o.x, o.y, o.r * 2.2 * (0.55 + 0.45 * k), o.r * 1.6 * (0.55 + 0.45 * k), Math.min(1, k * 2));
+          glow(o.x, o.y - 10, o.r * (0.6 + 0.6 * k), "255,120,40", 0.2 + 0.35 * k * pulse);
           // (pale yellow-white with a dark edge under the dashes: it must read on the glowing orange floor)
-          ctx.globalAlpha = (0.22 + 0.18 * pulse) * Math.min(1, k * 3 + 0.3); ctx.fillStyle = LAVA_WARN; ctx.beginPath(); ctx.arc(o.x, o.y, o.r, 0, TAU); ctx.fill();
+          ctx.globalAlpha = (0.16 + 0.14 * pulse) * Math.min(1, k * 3 + 0.3); ctx.fillStyle = LAVA_WARN; ctx.beginPath(); ctx.arc(o.x, o.y, o.r, 0, TAU); ctx.fill();
           ctx.globalAlpha = 0.55; ctx.strokeStyle = "#2a0d06"; ctx.lineWidth = 17; ctx.stroke();
           ctx.globalAlpha = 0.95; ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 9; ctx.setLineDash([28, 16]); ctx.lineDashOffset = -G.t * 90; ctx.stroke(); ctx.setLineDash([]);
           ctx.globalAlpha = 0.85; ctx.strokeStyle = "#ff8a2a"; ctx.lineWidth = 13; ctx.beginPath(); ctx.arc(o.x, o.y, Math.max(4, o.r * (1 - k)), 0, TAU); ctx.stroke();
           // its shadow grows as the rock comes down
           const f = clamp((o.t - (o.w - ROCK_FALL)) / ROCK_FALL, 0, 1); if (f > 0) { ctx.globalAlpha = 0.35 * f; ctx.fillStyle = "#000"; ctx.beginPath(); ctx.ellipse(o.x, o.y, o.r * 0.55 * f, o.r * 0.25 * f, 0, 0, TAU); ctx.fill(); }
         } else {
-          ctx.globalAlpha = 1; sprW("qk_crater", o.x, o.y, o.r * 2.1, Math.min(1, fade * 1.5));
-          glow(o.x, o.y - 10, o.r * 1.1, "255,110,30", 0.55 * fade * clamp(1 - e / 1.2, 0.3, 1));
+          // the painted crater, its glowing cracks cooling down
+          const cool = clamp((e - 0.4) / 0.8, 0, 1); ctx.globalAlpha = 1;
+          fitFrame("fxlv_crater_cool", o.x, o.y, o.r * 2.3, o.r * 1.75, Math.min(1, fade * 1.5) * cool);
+          fitFrame("fxlv_crater", o.x, o.y, o.r * 2.3, o.r * 1.75, Math.min(1, fade * 1.5) * (1 - cool));
+          glow(o.x, o.y - 10, o.r * 1.2, "255,110,30", 0.55 * fade * clamp(1 - e / 1.2, 0.3, 1));
         }
       } else if (o.k === "pool") {
         const sp = poolSpread(o), rr = warn ? 0 : e < sp ? POOL_R0 + (o.v || POOL_V) * e : o.r, cool = clamp((e - sp - POOL_HOLD) / POOL_FADE, 0, 1);
@@ -4208,16 +4284,15 @@
           for (let i = 0; i < 3; i++) { const q = ((G.t * 0.9 + i / 3) % 1); ctx.globalAlpha = 0.6 * (1 - q); ctx.beginPath(); ctx.arc(o.x, o.y, POOL_R0 + (o.r - POOL_R0) * q, 0, TAU); ctx.stroke(); }
         }
         if (rr > 0) {
-          // the lava: a hot yellow middle, orange, a dark red crust at its edge; it darkens as it cools
-          const g = ctx.createRadialGradient(o.x, o.y, 0, o.x, o.y, rr);
-          g.addColorStop(0, cool > 0 ? "rgba(120,40,20,.9)" : "rgba(255,226,120,.95)"); g.addColorStop(0.45, cool > 0 ? "rgba(90,30,16,.9)" : "rgba(255,130,40,.92)");
-          g.addColorStop(0.85, "rgba(200,50,20,.9)"); g.addColorStop(1, "rgba(70,20,12,.85)");
-          ctx.globalAlpha = fade; ctx.fillStyle = g; ctx.beginPath(); ctx.arc(o.x, o.y, rr, 0, TAU); ctx.fill();
-          ctx.globalAlpha = 0.7 * fade; ctx.strokeStyle = "#3a1408"; ctx.lineWidth = 12; ctx.stroke();
-          // crust plates drifting on it, and bubbles
-          ctx.fillStyle = "rgba(60,22,14,.55)";
-          for (let i = 0; i < 9; i++) { const a = i * 2.39 + o.id, d = rr * (0.25 + 0.6 * ((i * 0.37) % 1)); ctx.beginPath(); ctx.ellipse(o.x + Math.cos(a + G.t * 0.15) * d, o.y + Math.sin(a + G.t * 0.15) * d, 26 + (i % 3) * 10, 14 + (i % 2) * 6, a, 0, TAU); ctx.fill(); }
-          if (!cool) { ctx.fillStyle = "#ffe08a"; for (let i = 0; i < 6; i++) { const a = i * 1.7 + G.t * 0.4, d = rr * ((i * 0.29 + G.t * 0.2) % 0.9), s = 6 + 5 * Math.abs(Math.sin(G.t * 5 + i)); ctx.globalAlpha = 0.8 * fade; ctx.beginPath(); ctx.arc(o.x + Math.cos(a) * d, o.y + Math.sin(a) * d, s, 0, TAU); ctx.fill(); } }
+          // the painted lava: a splash welling up, flowing out, the full pool bubbling, then its crust cooling dark; each frame fitted
+          // so its lava is exactly the circle that burns now (rr). Its heat lights the ground round it
+          const p = clamp((rr - POOL_R0) / Math.max(1, o.r - POOL_R0), 0, 1);
+          const one = (i, a) => { const f = POOL_FIT[i], W = rr / f[2], H = rr / f[3]; fitFrame(LVFX.pool[i], o.x + (0.5 - f[0]) * W, o.y + (0.5 - f[1]) * H, W, H, a); };
+          ctx.globalAlpha = 1;
+          ctx.save(); ctx.globalCompositeOperation = "lighter"; glow(o.x, o.y, rr * 1.45, "255,90,20", 0.4 * fade * (1 - cool)); ctx.restore();
+          if (e < sp) { if (p < 0.35) { one(0, fade); one(1, fade * p / 0.35); } else { one(1, fade); one(2, fade * (p - 0.35) / 0.65); } }
+          else { one(2, fade); if (cool > 0) one(3, fade * cool); }
+          if (!cool) { ctx.save(); ctx.globalCompositeOperation = "lighter"; one(2, fade * 0.12 * (1 + Math.sin(G.t * 3.3 + o.id))); ctx.restore(); }   // (the lava glowing brighter and dimmer)
         }
       } else {
         // the lane in its own frame: x along it from where it starts, y across
@@ -4231,10 +4306,15 @@
           ctx.globalAlpha = 0.55 * Math.min(1, k * 3 + 0.2); ctx.strokeStyle = "#fff4c2"; ctx.lineWidth = 18; ctx.lineCap = "round"; ctx.lineJoin = "round";
           for (let i = 0; i < 6; i++) { const x = o.d0 + ((G.t * 480 + i * 200) % len); ctx.beginPath(); ctx.moveTo(x - 45, -hw * 0.45); ctx.lineTo(x + 15, 0); ctx.lineTo(x - 45, hw * 0.45); ctx.stroke(); }
         } else {
-          // scorched ground, glowing where the columns still burn
-          ctx.globalAlpha = 0.5 * fade; ctx.fillStyle = "#2a0d06"; ctx.fillRect(o.d0, -hw * 0.8, len, 1.6 * hw);
+          // painted scorched ground under each column that has burst, glowing while it still burns
+          ctx.rotate(-o.a); ctx.translate(-o.x, -o.y); ctx.globalAlpha = 1;
           const n = pilN(o);
-          for (let i = 0; i < n; i++) { const on = e - i * PIL_DT; if (on < 0) continue; const h = clamp(1 - (on - PIL_ON) / 0.4, 0, 1); ctx.globalAlpha = 0.55 * h * fade; ctx.fillStyle = "#ff5a1a"; ctx.fillRect(o.d0 + i * PIL_STEP + 6, -hw * 0.55, PIL_STEP - 12, 1.1 * hw); }
+          for (let i = 0; i < n; i++) {
+            const on = e - i * PIL_DT; if (on < 0) continue;
+            const d = o.d0 + (i + 0.5) * PIL_STEP, x = o.x + Math.cos(o.a) * d, y = o.y + Math.sin(o.a) * d, h = clamp(1 - (on - PIL_ON) / 0.4, 0, 1);
+            fitFrame("fxlv_scorch", x, y, hw * 2.4, hw * 1.7, 0.9 * fade * Math.min(1, on * 8));
+            if (h > 0) glow(x, y - 10, hw * 1.5, "255,110,30", 0.5 * h * fade);
+          }
         }
       }
       ctx.restore();
@@ -4263,22 +4343,24 @@
   function drawLavaPiece(p) {
     const o = p.o;
     if (p.k === "fall") {
-      // a burning rock: falls in from high above, a tail of fire behind it
+      // the painted meteor: a burning basalt rock falling in from high above, its tail of fire streaming up (its frames flicker)
       const x = p.x, y = p.gy - p.z, s = o.r / ROCK_R;
-      glow(x, y - 30, 130 * s, "255,120,40", 0.7);
-      fx("fx_flame", x + 20 * s, y - 90 * s, 1.5 * s, 0.9, Math.PI);
-      if (!sprW("qk_rock2", x, y, 150 * s, 1, G.t * 4 + o.id)) { ctx.fillStyle = "#5a2a1a"; ctx.beginPath(); ctx.arc(x, y - 40, 50 * s, 0, TAU); ctx.fill(); }
+      glow(x, y - 60 * s, 170 * s, "255,120,40", 0.75);
+      if (!footFrame(LVFX.meteor[Math.floor(G.t * 12 + o.id) % 4], x, y + 10 * s, 270 * s, 1, o.id % 2 === 1)) { ctx.fillStyle = "#5a2a1a"; ctx.beginPath(); ctx.arc(x, y - 40, 50 * s, 0, TAU); ctx.fill(); }
       return;
     }
     // a column of fire: grows up fast, burns, sinks back
     if (API.drawn) API.drawn.push(["lavaPiece", o.id, p.y, "col", p.x, p.y]);
-    const up = clamp(0.2 + p.on / 0.12, 0, 1), down = clamp((p.on - PIL_ON) / 0.25, 0, 1), hk = up * (1 - down), sc = o.r / 95 * 1.9;
+    // the painted pillar of fire (on black: added as light): igniting out of a glowing crack, shooting up, roaring full height
+    // (flickering: mirrored and stretched a little in turn), then breaking up into flames and smoke
+    const up = clamp(0.2 + p.on / 0.12, 0, 1), down = clamp((p.on - PIL_ON) / 0.25, 0, 1), hk = up * (1 - down), W = o.r * 2.05, flip = (Math.floor(G.t * 11) + p.i) % 2 === 1;
     if (hk <= 0) return;
-    glow(p.x, p.y - PIL_H * 0.4 * hk, PIL_H * 0.55, "255,110,30", 0.6 * hk);
-    for (let j = 0; j < 3; j++) {
-      const fl = 1 + 0.12 * Math.sin(G.t * 19 + j * 2 + p.i);
-      fx("fx_flame", p.x + Math.sin(G.t * 11 + j + p.i) * 8, p.y - 20 - j * 85 * hk, sc * (1 - j * 0.22) * fl * (0.4 + 0.6 * hk), Math.min(1, 1.3 * hk), Math.sin(G.t * 7 + j) * 0.1, j === 1, 1.1 + 0.2 * hk);
-    }
+    glow(p.x, p.y - PIL_H * 0.4 * hk, PIL_H * 0.6, "255,110,30", 0.6 * hk);
+    const F = LVFX.pillar;
+    if (p.on < 0.07) footFrame(F[0], p.x, p.y + 12, W, 1, flip, 1, true);
+    else if (p.on < 0.16) { footFrame(F[0], p.x, p.y + 12, W, 1 - (p.on - 0.07) / 0.09, flip, 1, true); footFrame(F[1], p.x, p.y + 12, W, (p.on - 0.07) / 0.09, flip, 1, true); }
+    else if (p.on < PIL_ON) footFrame(F[2], p.x, p.y + 12, W * (1 + 0.04 * Math.sin(G.t * 23 + p.i)), 0.85, flip, 1 + 0.05 * Math.sin(G.t * 17 + p.i * 2), true);
+    else { footFrame(F[2], p.x, p.y + 12, W, 1 - down, flip, 1, true); footFrame(F[3], p.x, p.y + 12, W, Math.min(1, down * 3) * (1 - down * down), flip, 1, true); }
   }
   // ---------------------------------------------------------------- Phù thủy Xám Xịt's magic (style "hex"), one move after another:
   // summon: purple circles glow on the floor away from the girls, then a ghost or a crow steps out of each (a wave of her monsters);
@@ -4593,14 +4675,18 @@
     for (const [fx0, fy, r] of c) glow(d.x + (d.flip ? -fx0 : fx0) * w, d.y + fy * h, r * d.m, d.name === "cs_cauldron" ? "150,255,90" : "255,200,110", 0.4 * (0.85 + 0.15 * Math.sin(G.t * 7 + d.x)) * (d.fa === undefined ? 1 : d.fa));
   }
   // ---------------------------------------------------------------- Núi Dung Nham's lava pools (a level with `lavaPools`): Dad's
-  // "hồ dung nham chảy, đi qua chạm phải là bị ngất". The painted lava pool (lv_lava_pool) lies beside and across the path; code adds
+  // "hồ dung nham chảy, đi qua chạm phải là bị ngất". The big painted lava pool (fxlv_hpool*) lies beside and across the path; code adds
   // the light (a flowing glow, bubbles, heat shimmer, embers). Her feet in the lava drawn -> she faints at once (heroDown), less a small
   // forgiving margin (LP_M). Some pulse: rest small, warn (glow, bubbles, a dashed ring at how far it will reach) for LP_WARN s, grow,
   // stay big, sink back. Laid out from the level's seed and its path (both co-op pages build the same); pulses run on G.lpT, the host's
   // clock (sent to the guest); the host decides who touched it, as with the boss's hazards. The way past is never shut: every pulsing
   // pool at its biggest still leaves >= LP_GAP of open ground (no props there either).
   // { id, x, y (the middle of its lava), W (the painting's width at its biggest), pulse, kLo (its smallest), ph (its pulse's phase) }
-  const LP_ART = "lv_lava_pool", LP_AR = 168 / 287;   // (the painting's height / width: fixed, so the layout never waits on the atlas)
+  // the hit shape: an ellipse over a W-wide pool (LP_AR / LP_CX..LP_RY: measured on the first painting, lv_lava_pool; kept so the layout
+  // and the fairness gaps stay as they were). The pools are now drawn with the big painted lava pool (fx_lava_hpool.png, 4 flow frames,
+  // tools/g4_fx_cut.py), each frame fitted so its own lava (LP_FIT, measured: tools/g4_fx_cut.py measure) is exactly that ellipse
+  const LP_SEQ = ["fxlv_hpool0", "fxlv_hpool1", "fxlv_hpool2", "fxlv_hpool3"], LP_FIT = [0.499, 0.4985, 0.376, 0.374];
+  const LP_ART = LP_SEQ[0], LP_AR = 168 / 287;   // (the old painting's height / width: fixed, so the layout never waits on the atlas)
   const LP_CX = 0.475, LP_CY = 0.46, LP_RX = 0.345, LP_RY = 0.245;   // its lava in the painting: an ellipse, in shares of its width / height
   const LP_M = 14, LP_CLEAR = 320, LP_GAP = 200, LP_PAIR = 210, LP_INTRUDE = 30, LP_CROSS = 40, LP_KEEP = 420;
   const LP_LOW = 2.6, LP_WARN = 1.2, LP_GROW = 1.0, LP_HIGH = 2.4, LP_SHRINK = 1.2, LP_PERIOD = LP_LOW + LP_GROW + LP_HIGH + LP_SHRINK;
@@ -4758,7 +4844,7 @@
   // flat on the ground (with the arena and the hazards): the painting, its light, its bubbles; a pulsing one's warning
   function drawLavaPools(L, R, T, B) {
     if (!G.lpools || !G.lpools.length) return;
-    const f = FR[LP_ART];
+    const f = FR[LP_ART] || FR.lv_lava_pool, hp = !!FR[LP_ART];
     for (const o of G.lpools) {
       const k = lpScale(o, G.lpT), w = lpWarn(o, G.lpT), e = lpEll(o, k), Wd = o.W * k, Hd = Wd * LP_AR, big = lpEll(o, 1);
       const x0 = o.x - LP_CX * Wd, y0 = o.y - LP_CY * Hd;
@@ -4768,8 +4854,14 @@
       // its heat lighting the ground round it
       ctx.save(); ctx.globalCompositeOperation = "lighter";
       ctx.translate(o.x, o.y); ctx.scale(1, e.ry / e.rx); glow(0, 0, e.rx * 1.7, "255,90,20", (0.22 + 0.25 * w) * fl); ctx.restore();
-      // the painting
-      if (f) ctx.drawImage(f.img, f.sx, f.sy, f.w, f.h, x0, y0, Wd, Hd);
+      // the painting: the big pool's flow frames one after another (each fading into the next), its lava over the hit ellipse
+      const W2 = e.rx / LP_FIT[2], H2 = e.ry / LP_FIT[3], cx = o.x + (0.5 - LP_FIT[0]) * W2, cy = o.y + (0.5 - LP_FIT[1]) * H2;
+      const ph = G.t * 2.2 + o.id * 0.77, fi = Math.floor(ph) % LP_SEQ.length, fq = ph - Math.floor(ph);
+      const art = (a) => {
+        if (hp) { fitFrame(LP_SEQ[fi], cx, cy, W2, H2, a); fitFrame(LP_SEQ[(fi + 1) % LP_SEQ.length], cx, cy, W2, H2, a * fq); }
+        else if (f) { ctx.globalAlpha = a; ctx.drawImage(f.img, f.sx, f.sy, f.w, f.h, x0, y0, Wd, Hd); ctx.globalAlpha = 1; }
+      };
+      if (f) art(1);
       else { ctx.fillStyle = "#ff6a1a"; ctx.beginPath(); ctx.ellipse(o.x, o.y, e.rx, e.ry, 0, 0, TAU); ctx.fill(); }
       ctx.save(); ctx.globalCompositeOperation = "lighter";
       // the lava flowing: two hot patches drifting round inside it, brighter as it warns
@@ -4777,7 +4869,7 @@
         const a = G.t * (0.35 + i * 0.12) * (i ? -1 : 1) + o.id * 1.3 + i * 2.6, px = o.x + Math.cos(a) * e.rx * 0.38, py = o.y + Math.sin(a) * e.ry * 0.3;
         ctx.save(); ctx.translate(px, py); ctx.scale(1, 0.55); glow(0, 0, e.rx * 0.6, i ? "255,170,60" : "255,220,120", (0.22 + 0.3 * w) * fl); ctx.restore();
       }
-      if (w > 0 && f) { ctx.globalAlpha = 0.18 + 0.32 * w * (0.6 + 0.4 * Math.sin(G.t * 12)); ctx.drawImage(f.img, f.sx, f.sy, f.w, f.h, x0, y0, Wd, Hd); ctx.globalAlpha = 1; }
+      if (w > 0 && f) art(0.18 + 0.32 * w * (0.6 + 0.4 * Math.sin(G.t * 12)));
       // bubbles swelling and popping (more and faster as it warns)
       const nb = 4 + Math.round(6 * w);
       for (let i = 0; i < nb; i++) {
@@ -5354,6 +5446,7 @@
       p.x += (p.vx || 0) * dt; p.y += (p.vy || 0) * dt;
       if (p.g) p.vy += p.g * dt;
       if (p.type === "dust") { p.vx *= 0.92; p.vy *= 0.92; p.r += 20 * dt; }
+      if (p.vr && p.type === "pfx") p.rot += p.vr * dt;
     }
     G.parts = G.parts.filter((p) => p.life > 0);
     if (G.parts.length > 500) G.parts.splice(0, G.parts.length - 500);
@@ -7000,7 +7093,7 @@
         if (f) {
           const s = 1 + (p.grow || 0) * k, w = p.w * s, h = (p.h ? p.h * s : w * f.h / f.w);
           const rot = p.spin ? Math.atan2(-p.vy, -p.vx) + Math.PI / 2 : p.rot || 0;
-          fitFrame(nm, p.x, p.foot ? p.y - h / 2 : p.y, w, h, Math.min(1, a * (p.seq ? 3 : 2.2)), rot, !!p.flip);
+          fitFrame(nm, p.x, p.foot ? p.y - h / 2 : p.y, w, h, Math.min(1, a * (p.seq ? 3 : 2.2)) * (p.al ?? 1), rot, !!p.flip, !!p.add);   // (add: a fire effect, added as light)
         }
       }
       else if (p.type === "fx") { ctx.globalAlpha = 1; fx(p.name, p.x, p.y, p.sc * (1 + (1 - a) * (p.grow || 0.6)), a, p.rot || 0, !!p.flip); }
@@ -10380,7 +10473,7 @@
       f: G.foes.map((f) => [FTYPES.indexOf(f.type), f.x | 0, f.y | 0, f.vx | 0, f.vy | 0]),
       cz: G.cps.map((o) => [o.id, CPK.indexOf(o.k), MKINDS.indexOf(o.mk), o.x | 0, o.y | 0, o.sx | 0, o.sy | 0, Math.round(o.a * 1000), o.r | 0, o.L | 0, Math.round(o.t * 20), Math.round(o.w * 20), Math.round(o.end * 20), o.v | 0, Math.round(o.on * 20), Math.round(o.ha * 1000), o.mid]),   // the monsters' attacks (see updateCreepPieces)
       v: G.rings.map((w) => [w.x | 0, w.y | 0, w.r | 0, Math.round(w.life * 10), Math.round(w.delay * 10)]),
-      wa: G.waters.map((w) => [w.id, WA_KINDS.indexOf(w.k), w.x | 0, w.y | 0, Math.round(w.t * 20), Math.round(w.w * 20), Math.round(w.end * 20), w.r | 0, w.ax, w.dir]),   // the captain's sea, the yeti's snow (see seaMove, snowMove)
+      wa: G.waters.map((w) => [w.id, WA_KINDS.indexOf(w.k), w.x | 0, w.y | 0, Math.round(w.t * 20), Math.round(w.w * 20), Math.round(w.end * 20), w.r | 0, w.ax, w.dir, w.av ? 1 : 0]),   // the captain's sea, the yeti's snow (see seaMove, snowMove)
       lz: G.lavas.map((o) => [o.id, LKINDS.indexOf(o.k), o.x | 0, o.y | 0, Math.round(o.t * 20), Math.round(o.w * 20), Math.round(o.end * 20), o.r | 0, Math.round(o.a * 1000), o.d0 | 0, o.L | 0, o.ring ? o.ring[0] | 0 : -1, o.ring ? o.ring[1] | 0 : -1, o.v | 0]),   // the lava demon's fire (see lavaMove)
       lp: Math.round((G.lpT || 0) * 20),   // the lava pools' clock (their pulses), in 1/20 s
       hx: (G.hexes || []).map((o) => [o.id, HKINDS.indexOf(o.k), o.x | 0, o.y | 0, Math.round(o.t * 20), Math.round(o.w * 20), Math.round(o.end * 20), o.r | 0, o.vx | 0, o.vy | 0, o.cx | 0, o.cy | 0, o.v | 0, Math.round(o.fly * 20), (o.n & 7) | ((o.m & 7) << 3) | (o.weak ? 64 : 0) | (o.mon ? 128 : 0)]),   // the grey witch's magic (see hexMove)
@@ -10573,7 +10666,7 @@
       for (const a of w.wa) {
         if (!Array.isArray(a) || !WA_KINDS[num(a[1])]) continue;
         const id = num(a[0]), t = num(a[4]) / 20, end = num(a[6]) / 20; let o = have.get(id);
-        if (!o) { if (t > end - 0.3) continue; o = { id, k: WA_KINDS[num(a[1])], x: num(a[2]), y: num(a[3]), t, w: num(a[5]) / 20, end, r: clamp(num(a[7]), 20, 900), ax: num(a[8]) ? 1 : 0, dir: num(a[9]) < 0 ? -1 : 1 }; }
+        if (!o) { if (t > end - 0.3) continue; o = { id, k: WA_KINDS[num(a[1])], x: num(a[2]), y: num(a[3]), t, w: num(a[5]) / 20, end, r: clamp(num(a[7]), 20, 900), ax: num(a[8]) ? 1 : 0, dir: num(a[9]) < 0 ? -1 : 1, av: num(a[10]) ? 1 : 0 }; }
         else if (Math.abs(o.t - t) > 0.25) o.t = t;
         list.push(o);
       }
@@ -10782,7 +10875,7 @@
     refreshFrames: () => DIRN.clear(),   // call after adding frames to FR at run time
     audio: () => ({ ctx: AC && AC.state, samples: Object.keys(SAMPLE).length, music: !!musicSrc, track: musicNow, want: musicWanted() }),
     lpools: () => G.lpools || [], LP: { M: LP_M, CLEAR: LP_CLEAR, GAP: LP_GAP, WARN: LP_WARN, PERIOD: LP_PERIOD }, lpEll, lpScale, lpWarn, lpHit,
-    heroFrame4, monFrame, guideTarget, heroStats, lavaMove, xpNeed, gainXp, BOSS_HIT, bossHit, hurtInv, hurtTarget, COOP_XP, COOP_HP, creepHp, spawnGem, addEnergy, startUlt, rescuePet, ultBlast, ultFx: () => UFX, ULT_DRAW_CAP, ULT_PART_CAP, UFX_E, UFX_RAIN, ultLight, viewSize: () => ({ VW, VH }), startBoss, pets: () => PETE,
+    heroFrame4, monFrame, guideTarget, heroStats, lavaMove, snowMove, xpNeed, gainXp, BOSS_HIT, bossHit, hurtInv, hurtTarget, COOP_XP, COOP_HP, creepHp, spawnGem, addEnergy, startUlt, rescuePet, ultBlast, ultFx: () => UFX, ULT_DRAW_CAP, ULT_PART_CAP, UFX_E, UFX_RAIN, ultLight, viewSize: () => ({ VW, VH }), startBoss, pets: () => PETE,
     groundPaints: () => groundPaints, viewBox, saidPx: null, saidBox: null, saidRect: null, touch: undefined,   // (touch: true / false overrides the touch-screen check (COARSE); groundPaints: ground chunks painted so far; saidPx: an array -> talkBubble records [text, its drawn font size in world px])
     spawnMon: (kind, x, y) => spawnMon(kind, x === undefined ? P.x + 400 : x, y === undefined ? P.y : y),
     SKILL, CREEP_LV, creepLv, teleCap, cps: () => G.cps, clearCps, addCp, cpArt, cpStats: () => ({ ...CPST, free: CP_POOL.length }), shieldUp, monLift, LOB_WIND,   // (the monsters' own attacks)
