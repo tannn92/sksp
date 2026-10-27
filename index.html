@@ -360,7 +360,7 @@
   let META = null, ready = false;
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261028.0130", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261028.0138", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -630,7 +630,9 @@
   // spawn: monsters per second at start / after the 5-minute ramp. camps: monster camps waiting beside the path.
   // gr: ground palette. deco: [sprite, weight] scattered beside the path. pets: caged friends to rescue along the path (PETS[k].at).
   const LEVELS = [
-    { name: "Màn 1: Rừng Kẹo Ngọt", seed: 1101, path: "river", arena: true, shop: "pirate",
+    // (hazard: the map's own painted hazard on its path, placeHazards: "goo" Màn 1, "tide" Màn 2, "ice" Màn 3, "spike" Màn 5; Màn 4 has
+    // its lava pools, lavaPools)
+    { name: "Màn 1: Rừng Kẹo Ngọt", seed: 1101, path: "river", arena: true, shop: "pirate", hazard: "goo",
       // the title card (intro, trusted markup) and the end screen (end) of this level
       intro: "Phù thủy Xám Xịt đã bắt cả nhóm SKSP vào Rừng Kẹo Ngọt! Chọn Mochi hoặc chị Matcha, đi theo con đường để đánh bại <b>Bánh Kem Khổng Lồ</b> và cứu bạn nhé.",
       end: "Bánh Kem Khổng Lồ đã bị đánh bại và Mèo Simmy đã được cứu! Phù thủy Xám Xịt vẫn giữ các bạn còn lại. Cuộc phiêu lưu vẫn còn tiếp!",
@@ -644,7 +646,7 @@
     // Màn 2: a sand-and-sea island. The boss is a ghost captain who calls up the sea (a tsunami, geysers, a whirlpool) and calls parrots.
     // Props are drawn about 12% smaller than the candy ones, so each deco entry carries a scale: [sprite, weight, scale].
     // (next: Màn 3, Núi Tuyết (id "snow"); see nextLevelAfter)
-    { name: "Màn 2: Đảo Cướp Biển", seed: 2207, path: "river", arena: true, next: "snow",
+    { name: "Màn 2: Đảo Cướp Biển", seed: 2207, path: "river", arena: true, next: "snow", hazard: "tide",
       intro: "Phù thủy Xám Xịt đã đưa cả nhóm tới Đảo Cướp Biển! Mặc đồ cướp biển, đi theo lối cát vàng, đánh bại <b>Thuyền Trưởng Ma</b> và cứu anh Kairon nhé.",
       end: "Thuyền Trưởng Ma đã bị đánh bại và Kairon đã được cứu! Sắp tới: cứu Sammy Đào ở Núi Tuyết!",
       boss: { art: "pirate_boss", name: "Thuyền Trưởng Ma", hp: 60, tip: "Thuyền trưởng gọi sóng thần, cột nước và xoáy nước!", summon: "pirate_bat", style: "captain", fence: "pr_rope_fence",
@@ -658,7 +660,7 @@
     // Màn 3: a snowy mountain (white and pale blue snow, frozen ponds; the world's edge is ice). The boss is a yeti who rolls snowballs,
     // calls up ice spikes and a blizzard (style "yeti"); Sammy waits in a standing ice cage (`cage`). The snow props are cut at the
     // island props' world size, so they take the island's scales.
-    { id: "snow", name: "Màn 3: Núi Tuyết", seed: 3301, path: "river", arena: true,
+    { id: "snow", name: "Màn 3: Núi Tuyết", seed: 3301, path: "river", arena: true, hazard: "ice",
       intro: "Phù thủy Xám Xịt đã đưa Sammy Đào lên Núi Tuyết! Đi theo lối tuyết, đánh bại <b>Người Tuyết Yeti</b> và cứu chị Sammy Đào nhé.",
       end: "Yeti đã bị đánh bại và Sammy Đào đã được cứu! Sắp tới: cứu Phong Cận ở Núi Dung Nham!",
       boss: { art: "snow_boss", name: "Người Tuyết Yeti", hp: 70, tip: "Yeti lăn cầu tuyết, gọi gai băng và bão tuyết!", summon: "snow_bat", style: "yeti", fence: "sn_fence",
@@ -696,7 +698,7 @@
     // magic orbs after the girls, vanishes in smoke and comes back at a warned spot, and sets magic circles burning on the floor; her second
     // form adds shadow clones and a ring of circles (the hexes, G.hexes: see hexMove). After her: the finale film and the end screen
     // (`finale`). Ground: dusky purple flagstones, lighter than Map 4's rock so the girls stand out (its own calm prop fill, as Map 4's).
-    { id: "castle", name: "Màn 5: Lâu Đài Phù Thủy Xám", seed: 5507, path: "river", arena: true, last: true, finale: true,
+    { id: "castle", name: "Màn 5: Lâu Đài Phù Thủy Xám", seed: 5507, path: "river", arena: true, last: true, finale: true, hazard: "spike",
       intro: "Đây là lâu đài của Phù thủy Xám Xịt! Cả nhóm SKSP đã đoàn tụ. Cùng nhau đánh bại <b>Phù thủy Xám Xịt</b> nhé!",
       end: "Cảm ơn Mochi và Matcha đã cứu cả nhóm SKSP!",
       boss: { art: "castle_boss", name: "Phù thủy Xám Xịt", hp: 80, tip: "Phù thủy gọi hồn ma, bắn cầu phép, biến mất và vẽ vòng phép!", summon: "castle_bat", style: "hex", fence: "cs_fence",
@@ -1057,7 +1059,7 @@
     }
     // Núi Dung Nham's lava pools (levels with `lavaPools`); no star or candy left lying in lava
     G.lpools = placeLavaPools(L, path, endI); G.lpT = 0; G.lpSafe = null; G.lpSide = 0;
-    G.waves = placeWaves(i, path, endI, cageSpots); G.waveFlash = 0;   // (the ambush spots: clear of the arena, the cages, the lava pools)
+    G.hz = []; G.waves = placeWaves(i, path, endI, cageSpots); G.waveFlash = 0;   // (the ambush spots: clear of the arena, the cages, the lava pools)
     if (G.lpools.length) G.items = G.items.filter((it) => !G.lpools.some((o) => lpNear(o, it.x, it.y, 60)));
     // bucket everything the ground painter needs per chunk
     G.chunkData = new Map();
@@ -1103,6 +1105,16 @@
       if (G.lpools.some((o) => lpNear(o, x, y, 120))) continue;   // (none in the lava)
       addDeco(d);
     }
+    // the map's own hazard on its path (placeHazards: after the props, so they stay where they were, and after the ambush waves, whose rings
+    // (G.waves) and the friends' cages and their guardians it keeps clear of; those props it lands on are taken out,
+    // G.hzCut of them); no star or candy left lying in one that hurts; the test bot's steering round all of them and the lava (G.steer)
+    G.hz = placeHazards(L, path, endI); G.hzT = 0; G.hzSafe = null; G.hzSplats = []; G.hzCut = 0;
+    if (G.hz.length) {
+      const n0 = G.deco.length, keep = G.deco.filter((d) => !G.hz.some((o) => inEll(o, d.x, d.y, (d.r || 0) + HZ_KEEP[o.site])));
+      G.decoGrid = new Map(); G.deco = []; for (const d of keep) addDeco(d); G.hzCut = n0 - G.deco.length;
+      G.items = G.items.filter((it) => !G.hz.some((o) => o.k !== "goo" && inEll(o, it.x, it.y, 40)));
+    }
+    G.steer = [...G.lpools.map((o) => ({ x: o.x, y: o.y, ...lpEll(o, 1) })), ...G.hz.map((o) => ({ x: o.x, y: o.y, rx: o.rx, ry: o.ry }))];
     // reset the play state
     G.nextId = 1; G.mons = []; G.shots = []; G.pshots = []; G.foes = []; G.afx = []; clearCps(); G.hexes = []; G.parts = []; G.drops = []; G.gems = []; G.rings = []; G.quakes = []; G.waters = []; G.lavas = [];
     G.shopDone = false; G.shopPhase = 0; G.m2 = false;   // (a new level has no shop phase left over from the last one)
@@ -1327,7 +1339,7 @@
     return [0, 0];
   }
   // test bot: walk the path toward the guide target; wait near a sealed gate; circle the boss at a safe distance
-  function autopilot() { const v = autopilotWay(); return G.lpools && G.lpools.length ? lpSteer(v) : v; }   // (round Núi Dung Nham's lava pools)
+  function autopilot() { const v = autopilotWay(); return G.steer && G.steer.length ? lpSteer(v) : v; }   // (round Núi Dung Nham's lava pools and each map's hazards)
   function autopilotWay() {
     const B = G.boss;
     let tx, ty, dx, dy, d;
@@ -1429,9 +1441,9 @@
     if (P.dead) return;
     P.dead = true; G.hearts = 0; renderHearts(); G.reviveT = FAINT_T; TALLY.faint++; P.vx = P.vy = 0; SFX.hurt();
     // (by lava: carried back to the nearest spot with no lava within LP_CLEAR, where she lies and gets up)
-    const safe = lavaSafeSpot(P.x, P.y);
+    const safe = lavaSafeSpot(P.x, P.y) || hzSafeSpot(P.x, P.y);   // (or a map's hazards: the same, clear of them by HZ.CLEAR)
     if (safe) { burst(P.x, P.y - 80, 16, ["#fff4c2", "#ffd34d", "#ff9a5c"], 300, 0.5); P.x = safe[0]; P.y = safe[1]; burst(P.x, P.y - 80, 20, ["#fff4c2", "#ffd34d", "#ffffff"], 300, 0.6); }
-    showBanner(why === "lava" ? "Ối, dung nham nóng quá! Bé bị ngất rồi!" : "Bé bị ngất rồi!", Q && NET.role ? "Bạn kia lại gần để cứu nhanh nhé" : "Chờ vòng tròn quay hết là bé tỉnh lại");
+    showBanner(why === "lava" ? "Ối, dung nham nóng quá! Bé bị ngất rồi!" : why === "ice" ? "Ối, băng vỡ! Bé rơi xuống nước lạnh, bị ngất rồi!" : "Bé bị ngất rồi!", Q && NET.role ? "Bạn kia lại gần để cứu nhanh nhé" : "Chờ vòng tròn quay hết là bé tỉnh lại");
   }
   // fainting: she lies dizzy for FAINT_T seconds; the partner standing close by revives her five times faster
   const FAINT_T = 10, RESCUE_R = 280;
@@ -1459,7 +1471,7 @@
     P.inv -= dt; P.hurtT -= dt; P.slowT -= dt; P.castT -= dt;
     if (P.dead) { P.moving = false; P.helped = rescuing(); if ((G.reviveT -= dt * (P.helped ? 5 : 1)) <= 0) reviveHero(); return; }
     if (G.ult || P.winT) { P.vx = P.vy = 0; P.moving = false; return; }
-    const [ax, ay] = readMove(), sp = 360 * Math.min(P.slowT > 0 ? 0.55 : 1, snowSlow());   // (a web, the yeti's blizzard)
+    const [ax, ay] = readMove(), sp = 360 * Math.min(P.slowT > 0 ? 0.55 : 1, snowSlow()) * gooSlow();   // (a web, the yeti's blizzard; Màn 1's candy goo)
     if (P.hurtT > 0) { P.vx *= Math.pow(0.01, dt); P.vy *= Math.pow(0.01, dt); }
     else {
       const acc = 3200 * dt;
@@ -2570,6 +2582,7 @@
       if (d2(x, y, path.x[0], path.y[0]) < 2500 * 2500) return false;
       if (cages.some((c) => d2(x, y, c.x, c.y) < (WAVE.R + 900) ** 2)) return false;
       if ((G.lpools || []).some((o) => lpNear(o, x, y, WAVE.R + 200))) return false;
+      if ((G.hz || []).some((o) => inEll(o, x, y, WAVE.R + 200))) return false;   // (nor by a map's hazard: those are laid out after the waves and keep clear of them, placeHazards; this keeps it so whatever the order)
       if (out.some((w) => d2(x, y, w.x, w.y) < 3200 * 3200)) return false;
       if (strict && G.camps.some((c) => d2(x, y, c.x, c.y) < (WAVE.R + CAMP_R) ** 2)) return false;
       return true;
@@ -5794,17 +5807,19 @@
   // the test bot: steer round the lava (each pool at its biggest, grown by her body and a little more): feel ahead along the way it
   // wants to go, turning a little at a time (away from the pool in the way first) until the way is clear
   function lpBlocked(x, y, m) { for (const o of G.lpools) if (lpNear(o, x, y, m)) return o; return null; }
+  // (G.steer: every lava pool at its biggest and every hazard of the map, as ellipses {x, y, rx, ry}: what the bot keeps out of)
+  function steerHit(x, y, m) { for (const e of G.steer) { const a = (x - e.x) / (e.rx + m), b = (y - e.y) / (e.ry + m); if (a * a + b * b < 1) return e; } return null; }
   function lpSteer(v) {
-    if (!G.lpools || !G.lpools.length || P.dead || !(v[0] || v[1])) return v;
-    if (!G.lpools.some((o) => d2(o.x, o.y, P.x, P.y) < (lpEll(o, 1).rx + 700) ** 2)) return v;
-    const m = HERO_R + 26, inn = lpBlocked(P.x, P.y, m - 12);
-    if (inn) { const e = lpEll(inn, 1); return norm((P.x - inn.x) / (e.rx * e.rx), (P.y - inn.y) / (e.ry * e.ry)); }
-    const clear = (a) => { const c = Math.cos(a), s = Math.sin(a); for (let t = 25; t <= 225; t += 25) if (lpBlocked(P.x + c * t, P.y + s * t, m)) return false; return true; };
+    if (!G.steer || !G.steer.length || P.dead || !(v[0] || v[1])) return v;
+    if (!G.steer.some((e) => d2(e.x, e.y, P.x, P.y) < (e.rx + 700) ** 2)) return v;
+    const m = HERO_R + 26, inn = steerHit(P.x, P.y, m - 12);
+    if (inn) return norm((P.x - inn.x) / (inn.rx * inn.rx), (P.y - inn.y) / (inn.ry * inn.ry));
+    const clear = (a) => { const c = Math.cos(a), s = Math.sin(a); for (let t = 25; t <= 225; t += 25) if (steerHit(P.x + c * t, P.y + s * t, m)) return false; return true; };
     const a0 = Math.atan2(v[1], v[0]);
     if (clear(a0)) { G.lpSide = 0; return v; }
     // which way round: the side kept for a while, else away from the pool in the way
     let sg = G.lpSide;
-    if (!sg) { let hit = null; for (let t = 25; t <= 225 && !hit; t += 25) hit = lpBlocked(P.x + Math.cos(a0) * t, P.y + Math.sin(a0) * t, m); sg = hit && (Math.cos(a0) * (hit.y - P.y) - Math.sin(a0) * (hit.x - P.x)) > 0 ? -1 : 1; G.lpSide = sg; }
+    if (!sg) { let hit = null; for (let t = 25; t <= 225 && !hit; t += 25) hit = steerHit(P.x + Math.cos(a0) * t, P.y + Math.sin(a0) * t, m); sg = hit && (Math.cos(a0) * (hit.y - P.y) - Math.sin(a0) * (hit.x - P.x)) > 0 ? -1 : 1; G.lpSide = sg; }
     for (let k = 1; k <= 12; k++) for (const s of [sg, -sg]) { const a = a0 + s * k * 0.26; if (clear(a)) return [Math.cos(a), Math.sin(a)]; }
     return v;
   }
@@ -5865,6 +5880,310 @@
         for (let i = 0; i < 2; i++) { const q = (G.t * 0.9 + i / 2) % 1; ctx.globalAlpha = 0.6 * (1 - q) * a; ctx.beginPath(); ctx.ellipse(o.x, o.y, e.rx + (big.rx - e.rx) * q, e.ry + (big.ry - e.ry) * q, 0, 0, TAU); ctx.stroke(); }
         ctx.restore();
       }
+    }
+  }
+  // ---------------------------------------------------------------- each map's own hazard on its path (spec "Game khó hơn" item 6;
+  // a level's `hazard`; Màn 4 keeps its lava pools). Painted (art4/world/hz_*.png, tools/g4_fx_cut.py hz) and laid out like the lava
+  // pools: from the level's seed and its path (both co-op pages build the same), beside and over the path, never shutting it (every point
+  // of it keeps >= HZ_GAP of open ground across, props counted), never at the start, in or by the boss arena, on a cage's spot (where its
+  // guardian waits), a chest, a camp or where an ambush wave fights. What it does lies exactly where it is drawn, less HZ.M:
+  //   goo   (Màn 1 Kẹo): a sticky candy puddle: inside she walks at HZ.GOO of her speed; stepping in leaves the stuck-feet splat; never hurts
+  //   tide  (Màn 2 Đảo): a sand patch the sea comes over: out -> creeping in (the warning: its last wave drawn, a dashed ring) -> flooded
+  //         (1 heart and a push out of it, once a flood) -> ebbing; a raised sand mound / mossy rock in some patches stays dry
+  //   ice   (Màn 3 Tuyết): thin ice: a girl on it starts it cracking (HZ.ICE.CRACK s, drawn cracking with the dashed ring of the hole to
+  //         come) then it breaks into a hole of icy water: falling in = fainting (as lava); it freezes over HZ.ICE.OPEN s later
+  //   spike (Màn 5 Lâu Đài): a cursed floor circle: dormant -> a violet warning glow (HZ.SPIKE.WARN s, the dashed ring) -> crystal spikes
+  //         up (1 heart, once a rise) -> they sink back
+  // The tides and the spikes run on G.hzT, the host's clock (sent to the guest, as the lava pools'); the ice's state is the host's (it
+  // decides who stepped on it and who fell in); the goo is each page's own (her own walk). A faint by one, or near one, leaves her lying
+  // HZ.CLEAR clear of them (hzSafeSpot); her guard after a hit / getting up keeps her safe as from any hurt.
+  // { id, k (its kind), art (goo: which puddle), x, y, rx, ry (its painted ground, an ellipse), ph (tide / spike: its phase), mound
+  //   ({ x, y, rx, ry, art }: a tide patch's dry spot), st, t (ice: 0 intact, 1 cracking, 2 open; its clock), hit (who was hurt in which
+  //   flood / rise), L (its live parts, see hzLive) }
+  const HZ = { M: 14, CLEAR: 320, GOO: 0.5, GAP: 200,
+    TIDE: { OUT: 3.2, IN: 1.2, FULL: 2.4, EBB: 1.0 }, SPIKE: { REST: 2.6, WARN: 1.0, UP: 1.0, DOWN: 0.8 }, ICE: { CRACK: 1.0, OPEN: 10, FREEZE: 0.6 } };
+  HZ.TIDE.PERIOD = HZ.TIDE.OUT + HZ.TIDE.IN + HZ.TIDE.FULL + HZ.TIDE.EBB; HZ.SPIKE.PERIOD = HZ.SPIKE.REST + HZ.SPIKE.WARN + HZ.SPIKE.UP + HZ.SPIKE.DOWN;
+  const HZ_PH = { tide: [["out", "OUT"], ["in", "IN"], ["full", "FULL"], ["ebb", "EBB"]], spike: [["rest", "REST"], ["warn", "WARN"], ["up", "UP"], ["down", "DOWN"]] };
+  // each painted frame's ground (tools/g4_fx_cut.py hzmeasure: [cx / W, cy / H, rx / W, ry / H]; the frames of one animation share it,
+  // so they lie on each other) and its height-to-width share in the world (fixed here, so the layout never waits on the atlas)
+  const HZ_FIT = { hz_goo0: [0.499, 0.512, 0.4829, 0.4849], hz_goo1: [0.501, 0.5866, 0.4822, 0.3767], hz_goo2: [0.5041, 0.653, 0.4772, 0.3272],
+    hz_tide0: [0.5062, 0.4925, 0.4774, 0.4779], hz_tide1: [0.5062, 0.4928, 0.4774, 0.4751], hz_tide2: [0.5062, 0.491, 0.4793, 0.474], hz_tide_wet: [0.4998, 0.4913, 0.4714, 0.5151],
+    hz_ice0: [0.502, 0.5074, 0.4839, 0.4832], hz_ice1: [0.503, 0.5073, 0.4828, 0.4819], hz_ice2: [0.5, 0.5091, 0.4859, 0.4687],
+    hz_spike0: [0.4978, 0.5189, 0.4789, 0.481], hz_spike1: [0.4971, 0.6095, 0.4769, 0.3912], hz_spike2: [0.4965, 0.6801, 0.4739, 0.3217], hz_spike3: [0.4978, 0.614, 0.4791, 0.3863],
+    hz_goo_big: [0.5037, 0.5047, 0.4929, 0.494], hz_goo_small: [0.4977, 0.5155, 0.5079, 0.4964], hz_goo_splat: [0.5039, 0.4718, 0.5054, 0.4568],
+    hz_tide_mound: [0.5226, 0.5691, 0.4879, 0.4497], hz_tide_rock: [0.4927, 0.5291, 0.4831, 0.5097],
+    hz_ice_shards0: [0.5264, 0.5407, 0.4913, 0.4838], hz_ice_shards1: [0.4936, 0.5665, 0.4829, 0.492], hz_ice_crack: [0.4892, 0.4973, 0.5056, 0.5167] };
+  const HZ_AR = { hz_goo0: 0.5081, hz_goo_big: 0.5391, hz_goo_small: 0.5522, hz_tide0: 0.5509, hz_ice0: 0.5686, hz_spike0: 0.4503, hz_tide_mound: 0.6977, hz_tide_rock: 0.6368 };
+  // the live part of each, measured on the frame that shows it, relative to its ground: [dx / rx, dy / ry, rx' / rx, ry' / ry] (the goo's
+  // sticky body, the flood's water, a mound's / rock's top, the ice (not its snow rim), the hole's open water, the inside of the cursed ring)
+  const HZ_LIVE = { goo: [0.0053, -0.004, 1.0329, 1.0116], goo_big: [-0.001, -0.0021, 0.9921, 0.9932], goo_small: [0.0069, -0.0128, 0.9772, 0.9695],
+    flood: [-0.018, -0.0286, 1.0219, 1.0333], tide_mound: [-0.0299, 0.0297, 0.9575, 0.8866], tide_rock: [-0.0052, -0.005, 0.9823, 0.974],
+    ice: [0.0309, -0.0604, 0.9482, 0.8462], hole: [-0.0045, -0.0371, 0.7433, 0.8765], ring: [-0.0077, -0.0874, 0.9178, 0.874] };
+  // its size in the world (the ground's half width) and the anim's first frame
+  const HZ_RX = { hz_goo0: 245, hz_goo_big: 330, hz_goo_small: 175, tide: 265, ice: 250, spike: 255 }, HZ_ART = { tide: "hz_tide0", ice: "hz_ice0", spike: "hz_spike0" };
+  const HZ_MINI = { goo: "#ff7fbf", tide: "#3fd0d8", ice: "#bfe8ff", spike: "#9b5cff" };
+  // where along the path (share of its length): side (beside it, lapping HZ_INTRUDE onto it), cross (over it all but HZ_CROSS: the way
+  // round is the open ground beside it); a cross that does not fit tries as a side
+  const HZ_SITES = [[0.1, "side"], [0.16, "cross"], [0.36, "side"], [0.42, "cross"], [0.58, "side"], [0.64, "cross"], [0.8, "side"], [0.86, "cross"], [0.93, "side"]];
+  const HZ_INTRUDE = 80, HZ_CROSS = 40, HZ_MAX = 8, HZ_WAVE_AT = [0.28, 0.72], HZ_WAVE_R = 650;
+  // the props (and lamps) cleared round each (from its ground, plus the prop's own size): a little round one beside the path; round one
+  // over it, enough that the way round it on the open ground beside the path is free
+  const HZ_KEEP = { side: 120, cross: 300 };
+  // is (x, y) inside its ground grown by g?
+  const inEll = (o, x, y, g = 0) => { const a = (x - o.x) / (o.rx + g), b = (y - o.y) / (o.ry + g); return a * a + b * b < 1; };
+  // one of its live parts as an ellipse {x, y, rx, ry} (as drawn: never wider than its ground): "goo", "flood", "mound", "ice", "hole", "ring"
+  function hzLive(o, what) {
+    const b = what === "mound" ? o.mound : o; if (!b) return null;
+    const r = HZ_LIVE[what === "goo" ? (o.art === "hz_goo_big" ? "goo_big" : o.art === "hz_goo_small" ? "goo_small" : "goo") : what === "mound" ? o.mound.art.slice(3) : what];
+    return { x: b.x + r[0] * b.rx, y: b.y + r[1] * b.ry, rx: Math.min(1, r[2]) * b.rx, ry: Math.min(1, r[3]) * b.ry };
+  }
+  const inLive = (e, x, y, g) => { const rx = e.rx + g, ry = e.ry + g; if (rx <= 0 || ry <= 0) return false; const a = (x - e.x) / rx, b = (y - e.y) / ry; return a * a + b * b < 1; };
+  // where a tide / a cursed floor is in its cycle at time T: { s (its phase), q (0..1 through it), n (which cycle) }; the ice: its state
+  function hzPhase(o, T = G.hzT) {
+    if (o.k === "ice") return { s: ["intact", "crack", "open"][o.st], q: 0, n: 0 };
+    if (o.k !== "tide" && o.k !== "spike") return { s: "on", q: 0, n: 0 };
+    const C = o.k === "tide" ? HZ.TIDE : HZ.SPIKE, u = T + o.ph, n = Math.floor(u / C.PERIOD);
+    let t = u - n * C.PERIOD;
+    for (const [s, k] of HZ_PH[o.k]) { if (t < C[k]) return { s, q: t / C[k], n }; t -= C[k]; }
+    return { s: HZ_PH[o.k][0][0], q: 0, n: n + 1 };
+  }
+  // do feet at (x, y) take its effect now (the goo's slowing, the flood's / spikes' hit, the open hole)? (less the margin HZ.M)
+  function hzHit(o, x, y, T = G.hzT) {
+    if (o.k === "goo") return inLive(o.L.goo, x, y, -HZ.M);
+    if (o.k === "ice") return o.st === 2 && o.t < HZ.ICE.OPEN - HZ.ICE.FREEZE && inLive(o.L.hole, x, y, -HZ.M);
+    const s = hzPhase(o, T).s;
+    if (o.k === "spike") return s === "up" && inLive(o.L.ring, x, y, -HZ.M);
+    return s === "full" && inLive(o.L.flood, x, y, -HZ.M) && !(o.mound && inLive(o.L.mound, x, y, HZ.M));   // (dry on its mound, a little round it too)
+  }
+  // this page's girl's walk now (Màn 1's goo: half her speed while her feet are in it)
+  const gooSlow = () => (G.hz && G.hz.length && G.lvl && G.lvl.hazard === "goo" && !P.dead && G.hz.some((o) => hzHit(o, P.x, P.y)) ? HZ.GOO : 1);
+  // where a line (x, y) + (nx, ny) * u crosses an ellipse {x, y, rx, ry}: [u0, u1] or null
+  function ellSpan(e, x, y, nx, ny) {
+    const px = (x - e.x) / e.rx, py = (y - e.y) / e.ry, qx = nx / e.rx, qy = ny / e.ry;
+    const a = qx * qx + qy * qy, b = 2 * (px * qx + py * qy), c = px * px + py * py - 1, D = b * b - 4 * a * c;
+    if (D <= 0) return null; const s = Math.sqrt(D); return [(-b - s) / (2 * a), (-b + s) / (2 * a)];
+  }
+  // the widest open stretch across the path at sample i (|u| <= half), with the hazards of `list` (the props near them are cleared: HZ_KEEP)
+  function hzOpen(i, list, half) {
+    const p = G.path, [dx, dy] = pathDir(i), nx = -dy, ny = dx, x = p.x[i], y = p.y[i], cut = [];
+    for (const o of list) { const s = ellSpan(o, x, y, nx, ny); if (s) cut.push(s); }
+    cut.sort((a, b) => a[0] - b[0]);
+    let from = -half, best = 0;
+    for (const [a, b] of cut) { if (a > from) best = Math.max(best, Math.min(a, half) - from); from = Math.max(from, b); if (from >= half) break; }
+    return Math.max(best, half - from);
+  }
+  // lay them out (buildLevel, after the props): their own random stream, so nothing else on the map moves; from the level's seed and its
+  // path only (not the props, which differ with the cages a sister has), so every page and either sister gets the same
+  function placeHazards(L, path, endI) {
+    const out = [], kind = L.hazard; if (!kind || !path) return out;
+    const RH = mulberry(L.seed + 505), A = G.arena, len = path.len, HALF = PATH_W / 2;
+    const pt = (s) => { const i = clamp(Math.round(s / STEP), 0, endI); return { x: path.x[i], y: path.y[i] }; };
+    const cageAt = (L.pets || []).map((k) => pt(PETS[k].at * len));
+    const waves = HZ_WAVE_AT.map((f) => pt(f * len)).concat(G.waves || []);
+    const nearPath = (o, i, K) => { for (let j = 0; j < path.n; j++) if (Math.abs(j - i) > K && d2(o.x, o.y, path.x[j], path.y[j]) < (o.rx + HALF + 150) ** 2) return true; return false; };
+    const fits = (o, i, K) => {
+      const R = o.rx;
+      if (o.x < 400 || o.y < 400 || o.x > WORLD - 400 || o.y > WORLD - 400) return false;
+      if (d2(o.x, o.y, path.x[0], path.y[0]) < (R + 1400) ** 2) return false;   // (not at the start)
+      if (A && d2(o.x, o.y, A.x, A.y) < (A.r + 500 + R) ** 2) return false;   // (nor in or near the boss arena)
+      if (G.camps.some((c) => d2(o.x, o.y, c.x, c.y) < (R + 250) ** 2)) return false;
+      if (G.chests.some((c) => d2(o.x, o.y, c.x, c.y) < (R + 230) ** 2)) return false;
+      if (cageAt.some((c) => d2(o.x, o.y, c.x, c.y) < (R + 720) ** 2)) return false;   // (every cage spot, built or not: its guardian waits there)
+      if (waves.some((w) => d2(o.x, o.y, w.x, w.y) < (R + HZ_WAVE_R + 150) ** 2)) return false;   // (where an ambush wave fights)
+      if (G.lpools && G.lpools.some((q) => d2(o.x, o.y, q.x, q.y) < (R + lpEll(q, 1).rx + 300) ** 2)) return false;
+      if (out.some((q) => d2(o.x, o.y, q.x, q.y) < (R + q.rx + 300) ** 2)) return false;
+      return !nearPath(o, i, K);
+    };
+    let mounds = 0;
+    HZ_SITES.forEach(([f, site], si) => {
+      // (each site's draws come first, so one that does not fit never moves the next)
+      const sd = RH() < 0.5 ? -1 : 1, ph = RH() * (kind === "tide" ? HZ.TIDE.PERIOD : HZ.SPIKE.PERIOD), sm = RH() < 0.5 ? -1 : 1;
+      if (out.length >= HZ_MAX) return;
+      const art = kind === "goo" ? ["hz_goo0", "hz_goo_big", "hz_goo_small"][si % 3] : HZ_ART[kind];
+      const rx = HZ_RX[kind === "goo" ? art : kind], ry = rx * HZ_AR[art];
+      let got = null;
+      for (const how of site === "side" ? ["side"] : [site, "side"]) for (let k = 0; k <= 32 && !got; k++) {
+        const s = f * len + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 40, i = Math.round(s / STEP);
+        if (i < 2 || i > endI - 2) continue;
+        const [dx, dy] = pathDir(i), nx = -dy, ny = dx, h = Math.sqrt((rx * nx) ** 2 + (ry * ny) ** 2);
+        const u = how === "side" ? sd * (HALF - HZ_INTRUDE + h) : sd * (-HALF + HZ_CROSS + h);
+        const o = { id: out.length, k: kind, art, x: path.x[i] + nx * u, y: path.y[i] + ny * u, rx, ry, ph: kind === "tide" || kind === "spike" ? ph : 0, mound: null, st: 0, t: 0, hit: {}, site: how };
+        const K = Math.ceil((rx + 450) / STEP);
+        if (!fits(o, i, K)) continue;
+        // the way past stays open all along it
+        const all = [...out, o]; let open = true;
+        for (let j = Math.max(1, i - K); j <= Math.min(path.n - 2, i + K) && open; j++) if (hzOpen(j, all, HALF + 250) < HZ.GAP - 10) open = false;
+        if (open) got = o;
+      }
+      if (!got) return;
+      if (kind === "tide" && out.length % 2 === 0) {
+        // a raised mound / rock to stand on, inside the flood toward one end of the patch
+        const ma = mounds++ % 2 ? "hz_tide_rock" : "hz_tide_mound", mrx = 0.34 * got.rx;
+        got.mound = { x: got.x + sm * 0.42 * got.rx, y: got.y - 0.08 * got.ry, rx: mrx, ry: mrx * HZ_AR[ma], art: ma };
+      }
+      got.L = { goo: hzLive(got, "goo"), flood: hzLive(got, "flood"), ice: hzLive(got, "ice"), hole: hzLive(got, "hole"), ring: hzLive(got, "ring"), mound: got.mound ? hzLive(got, "mound") : null };
+      out.push(got);
+    });
+    return out;
+  }
+  // how far (x, y) is from its painted ground (0 inside; sampled round its edge)
+  function hzDist(o, x, y) {
+    if (inEll(o, x, y)) return 0;
+    if (Math.abs(x - o.x) > o.rx + 2000 || Math.abs(y - o.y) > o.ry + 2000) return 2000;
+    let m = Infinity; for (let i = 0; i < 48; i++) { const t = i / 48 * TAU; m = Math.min(m, Math.hypot(o.x + Math.cos(t) * o.rx - x, o.y + Math.sin(t) * o.ry - y)); }
+    return Math.max(0, m - 4);
+  }
+  const hzDistAt = (x, y) => { let m = Infinity; for (const o of G.hz || []) if (o.k !== "goo") m = Math.min(m, hzDist(o, x, y)); return m; };
+  // where she lies after fainting near one that hurts: the nearest path point with none within HZ.CLEAR, back the way she came first
+  function hzSafeSpot(x, y) {
+    if (!G.hz || !G.hz.some((o) => o.k !== "goo") || hzDistAt(x, y) >= HZ.CLEAR) return null;
+    const p = G.path;
+    if (!G.hzSafe) { G.hzSafe = new Uint8Array(p.n); for (let i = 0; i < p.n; i++) G.hzSafe[i] = hzDistAt(p.x[i], p.y[i]) >= HZ.CLEAR ? 1 : 0; }
+    const ns = nearestSample(x, y, 2400), j = ns.i >= 0 ? ns.i : clamp(P.prog, 0, p.n - 1);
+    for (let k = 0; k < p.n; k++) for (const i of [j - k, j + k]) if (i >= 0 && i < p.n && G.hzSafe[i]) return [p.x[i], p.y[i]];
+    return null;
+  }
+  // her feet in an open ice hole: she faints at once (as lava; her guard after a hit or getting up keeps her safe)
+  function hzFaint() {
+    if (P.dead || P.inv > 0 || G.ult || P.winT) return;
+    G.hzHits = (G.hzHits || 0) + 1; G.iceFaints = (G.iceFaints || 0) + 1;
+    play("splash"); burst(P.x, P.y - 40, 22, ["#ffffff", "#bfe8ff", "#6fb8e8", "#2f6fa8"], 380, 0.7);
+    heroDown("ice");
+  }
+  // the thin ice changes state (the host's own change, or the guest following the host's): its look and sound
+  function iceTo(o, st, t = 0) {
+    const was = o.st; o.st = st; o.t = t; if (was === st) return;
+    const near = d2(o.x, o.y, P.x, P.y) < 1800 * 1800;
+    if (st === 1 && near) { play("shatter"); burst(o.x, o.y - 10, 8, ["#ffffff", "#dff4ff"], 160, 0.4); }
+    if (st === 2) { o.brokeT = G.t; if (near) { play("splash"); G.shake = Math.max(G.shake, 6); burst(o.x, o.y - 20, 20, ["#ffffff", "#bfe8ff", "#7cc6f0", "#2f6fa8"], 420, 0.7); } }
+    if (st === 0 && was === 2) { o.frozeT = G.t; if (near) burst(o.x, o.y - 20, 12, ["#ffffff", "#e6f6ff", "#bfe8ff"], 200, 0.6); }
+  }
+  // both pages: the clock, the ice's timers, the goo's splats; the host (hurt): who stepped on the ice, who the flood / spikes / hole caught
+  function updateHazards(dt, hurt) {
+    if (!G.hz || !G.hz.length) return;
+    G.hzT += dt;
+    const kind = G.lvl && G.lvl.hazard;
+    if (kind === "ice") for (const o of G.hz) {
+      o.t += dt;
+      if (o.st === 1 && o.t >= HZ.ICE.CRACK) iceTo(o, 2);
+      else if (o.st === 2 && o.t >= HZ.ICE.OPEN) iceTo(o, 0);
+    }
+    if (kind === "goo") {
+      // stepping into the goo: the stuck-feet splat under her (each girl seen on this page)
+      for (const g of Q && NET.role ? [P, Q] : [P]) {
+        const inn = !g.dead && G.hz.some((o) => hzHit(o, g.x, g.y));
+        if (inn && !g.inGoo) { G.hzSplats.push({ x: g.x, y: g.y, t: 0 }); if (g === P) { play("web"); G.gooSteps = (G.gooSteps || 0) + 1; } burst(g.x, g.y - 20, 8, ["#ff7fbf", "#ffb36b", "#fff0f6"], 160, 0.4); }
+        g.inGoo = inn;
+      }
+      for (const s of G.hzSplats) s.t += dt;
+      G.hzSplats = G.hzSplats.filter((s) => s.t < 0.9);
+      return;
+    }
+    if (!hurt) return;
+    for (const g of girls()) {
+      if (g.dead) continue;
+      for (const o of G.hz) {
+        if (kind === "ice" && o.st === 0 && inLive(o.L.ice, g.x, g.y, -HZ.M)) iceTo(o, 1);   // (she stepped on it: it starts cracking)
+        if (!hzHit(o, g.x, g.y)) continue;
+        if (kind === "ice") {
+          if (g === P) hzFaint();
+          else if (!(g.inv || g.ultT > 0 || g.win || g.hostInv > 0)) { g.hostInv = 2; netEmit("hurt", { to: NET.partner, fx: g.x | 0, fy: g.y | 0, web: 0, hz: 1 }); }
+          continue;
+        }
+        // the flood / the spikes: 1 heart, once a flood / a rise, pushed out from its middle
+        const n = hzPhase(o).n, who = g === P ? "p" : "q";
+        if (o.hit[who] === n) continue;
+        if (g === P ? P.inv > 0 || G.ult || P.winT : g.inv || g.ultT > 0 || g.win || g.hostInv > 0) continue;
+        o.hit[who] = n;
+        if (g === P) G.hzHits = (G.hzHits || 0) + 1;
+        const cx = o.k === "tide" ? o.L.flood.x : o.L.ring.x, cy = o.k === "tide" ? o.L.flood.y : o.L.ring.y;
+        hurtTarget(g, cx + (g.x === cx && g.y === cy ? -1 : 0), cy, false, 1);
+        burst(g.x, g.y - 30, 12, o.k === "tide" ? ["#ffffff", "#bff6f2", "#3fd0d8"] : ["#e9d6ff", "#b67dff", "#6a2bd9"], 300, 0.5);
+        if (g === P) play(o.k === "tide" ? "wave" : "shatter");
+      }
+    }
+  }
+  // draw a painted hazard frame so its painted ground lies on b's ground ellipse
+  function hzFit(name, b, a = 1, add = false, jx = 0) {
+    const f = HZ_FIT[name]; if (!f || !FR[name]) return false;
+    const W = b.rx / f[2], Hh = b.ry / f[3];
+    return fitFrame(name, b.x + (0.5 - f[0]) * W + jx, b.y + (0.5 - f[1]) * Hh, W, Hh, a, 0, false, add);
+  }
+  // a hazard's warning, as the game's others: a dark edge under white moving dashes round where it will act (col: its fill)
+  function hzRing(e, a, col) {
+    ctx.save(); const pu = 0.5 + 0.5 * Math.sin(G.t * 10);
+    ctx.globalAlpha = (0.1 + 0.12 * pu) * a; ctx.fillStyle = col; ctx.beginPath(); ctx.ellipse(e.x, e.y, e.rx, e.ry, 0, 0, TAU); ctx.fill();
+    ctx.globalAlpha = 0.5 * a; ctx.strokeStyle = "#1d1430"; ctx.lineWidth = 13; ctx.stroke();
+    ctx.globalAlpha = 0.9 * a; ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 7; ctx.setLineDash([28, 16]); ctx.lineDashOffset = -G.t * 90; ctx.stroke(); ctx.setLineDash([]);
+    ctx.restore();
+  }
+  // flat on the ground (with the lava pools): each painting, its light, its warning (only those in view)
+  function drawHazards(L, R, T, B) {
+    if (!G.hz || !G.hz.length) return;
+    for (const o of G.hz) {
+      if (o.x + o.rx * 1.3 < L || o.x - o.rx * 1.3 > R || o.y + o.ry * 1.5 < T || o.y - o.ry * 3.4 > B) continue;
+      let st = "off", e = null;
+      if (o.k === "goo") {
+        st = "on"; e = o.L.goo;
+        if (o.art === "hz_goo0") {
+          // the puddle bubbling and stretching: its three paintings one into the next (still, bubbling, still, stretching)
+          const seq = ["hz_goo0", "hz_goo1", "hz_goo0", "hz_goo2"], u = G.t * 0.45 + o.id * 0.7, i = Math.floor(u) % 4, q = ss(0.7, 1, u - Math.floor(u));
+          hzFit(seq[i], o); if (q > 0) hzFit(seq[(i + 1) % 4], o, q);
+        } else hzFit(o.art, o);
+        // its glossy sheen drifting
+        ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.translate(o.x + Math.cos(G.t * 0.6 + o.id) * o.rx * 0.3, o.y - o.ry * 0.15); ctx.scale(1, 0.45); glow(0, 0, o.rx * 0.45, "255,220,235", 0.16); ctx.restore();
+      } else if (o.k === "tide") {
+        const p = hzPhase(o); e = o.L.flood;
+        if (p.s === "out") hzFit("hz_tide0", o);
+        else if (p.s === "in") { st = "warn"; hzFit("hz_tide0", o); hzFit("hz_tide1", o, ss(0, 0.35, p.q)); if (p.q > 0.75) hzFit("hz_tide2", o, 0.6 * ss(0.75, 1, p.q)); }
+        else if (p.s === "full") { st = "on"; hzFit("hz_tide2", o); ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.translate(o.x + Math.sin(G.t * 1.3 + o.id) * o.rx * 0.25, o.y); ctx.scale(1, 0.5); glow(0, 0, o.rx * 0.5, "190,255,250", 0.18); ctx.restore(); }
+        else { hzFit(p.q < 0.5 ? "hz_tide2" : "hz_tide_wet", o); hzFit(p.q < 0.5 ? "hz_tide_wet" : "hz_tide0", o, ss(0, 0.5, p.q < 0.5 ? p.q : p.q - 0.5)); }
+        if (p.s === "in") hzRing(e, Math.min(1, 0.4 + p.q), "#bff6f2");
+        if (o.mound) hzFit(o.mound.art, o.mound);
+      } else if (o.k === "ice") {
+        if (o.st === 0) {
+          e = o.L.ice; hzFit("hz_ice0", o);
+          const since = G.t - (o.frozeT ?? -99);   // (just frozen over: its new cracks fade)
+          if (since < 2) hzFit("hz_ice_crack", { x: o.L.ice.x, y: o.L.ice.y, rx: o.L.ice.rx * 0.8, ry: o.L.ice.ry * 0.8 }, 0.8 * (1 - since / 2));
+          ctx.save(); ctx.globalCompositeOperation = "lighter"; const gx = o.x + Math.sin(G.t * 0.7 + o.id) * o.rx * 0.4; glow(gx, o.y - o.ry * 0.2, 40, "230,248,255", 0.35 + 0.2 * Math.sin(G.t * 3 + o.id)); ctx.restore();
+        } else if (o.st === 1) {
+          st = "warn"; e = o.L.hole; const sh = Math.sin(G.t * 60) * 3 * Math.min(1, o.t / HZ.ICE.CRACK);   // (it shudders as it cracks)
+          hzFit("hz_ice0", o, 1, false, sh); hzFit("hz_ice1", o, ss(0, 0.3, o.t / HZ.ICE.CRACK), false, sh);
+          hzRing(e, Math.min(1, 0.5 + o.t / HZ.ICE.CRACK), "#dff4ff");
+          if (Math.random() < 0.25 && G.parts.length < 400) G.parts.push({ type: "dot", x: o.x + rnd(-0.6, 0.6) * o.rx, y: o.y + rnd(-0.5, 0.5) * o.ry, vx: rnd(-40, 40), vy: -rnd(60, 160), life: 0.5, max: 0.5, r: rnd(3, 6), col: "#ffffff", g: 400 });
+        } else {
+          const fz = ss(HZ.ICE.OPEN - HZ.ICE.FREEZE, HZ.ICE.OPEN, o.t); e = o.L.hole; st = o.t < HZ.ICE.OPEN - HZ.ICE.FREEZE ? "on" : "off";
+          hzFit("hz_ice2", o); if (fz > 0) hzFit("hz_ice0", o, fz);
+          // the icy water rippling; just broken: the shards thrown up at its rim
+          ctx.save(); ctx.strokeStyle = "#dff4ff"; ctx.lineWidth = 3;
+          for (let i = 0; i < 2; i++) { const q = (G.t * 0.5 + i / 2 + o.id * 0.3) % 1; ctx.globalAlpha = 0.35 * (1 - q) * (1 - fz); ctx.beginPath(); ctx.ellipse(e.x, e.y, e.rx * (0.15 + 0.5 * q), e.ry * (0.15 + 0.5 * q), 0, 0, TAU); ctx.stroke(); }
+          ctx.restore();
+          const since = G.t - (o.brokeT ?? -99);
+          if (since < 1.2) {
+            const k = ss(0, 0.25, since) * (1 - ss(0.8, 1.2, since));
+            hzFit("hz_ice_shards0", { x: o.x - o.rx * 0.62, y: o.y + o.ry * 0.25, rx: o.rx * 0.36 * k, ry: o.rx * 0.36 * 0.542 * k });
+            hzFit("hz_ice_shards1", { x: o.x + o.rx * 0.6, y: o.y + o.ry * 0.3, rx: o.rx * 0.34 * k, ry: o.rx * 0.34 * 0.5668 * k });
+          }
+        }
+      } else if (o.k === "spike") {
+        const p = hzPhase(o); e = o.L.ring;
+        if (p.s === "rest") { hzFit("hz_spike0", o); ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.translate(e.x, e.y); ctx.scale(1, e.ry / e.rx); glow(0, 0, e.rx * 1.1, "170,90,255", 0.08 + 0.05 * Math.sin(G.t * 2 + o.id)); ctx.restore(); }
+        else if (p.s === "warn") {
+          st = "warn"; hzFit("hz_spike0", o); hzFit("hz_spike1", o, ss(0, 0.2, p.q));
+          ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.translate(e.x, e.y); ctx.scale(1, e.ry / e.rx); glow(0, 0, e.rx * 1.2, "190,110,255", (0.2 + 0.25 * p.q) * (0.75 + 0.25 * Math.sin(G.t * 14))); ctx.restore();
+          hzRing(e, Math.min(1, 0.4 + p.q), "#d9b8ff");
+        } else if (p.s === "up") {
+          st = "on"; hzFit("hz_spike2", o);
+          ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.translate(e.x, e.y - e.ry * 0.6); ctx.scale(1, 0.7); glow(0, 0, e.rx * 1.1, "200,120,255", 0.35 * (1 - 0.5 * p.q)); ctx.restore();
+        } else { hzFit("hz_spike3", o); hzFit("hz_spike0", o, ss(0.4, 1, p.q)); }
+      }
+      if (API.drawn && e) API.drawn.push(["hz", o.id, o.k, st, e.x, e.y, e.rx, e.ry]);
+    }
+    // the stuck-feet splats (Màn 1's goo): under her feet as she steps in, fading
+    for (const s of G.hzSplats || []) {
+      const a = 1 - ss(0.5, 0.9, s.t), k = 0.7 + 0.3 * ss(0, 0.12, s.t);
+      hzFit("hz_goo_splat", { x: s.x, y: s.y + 6, rx: 80 * k, ry: 80 * 0.7426 * k }, a);
+      if (API.drawn) API.drawn.push(["hzsplat", s.x, s.y]);
     }
   }
   // ---------------------------------------------------------------- quakes: the ground cracks, glows, then bursts open
@@ -6546,7 +6865,7 @@
     }
     G.foes = G.foes.filter((f) => f.life > 0);
     updateCreepPieces(dt, true);   // (the monsters' own attacks)
-    updateRings(dt, true); updateQuakes(dt, true); updateWaters(dt, true); updateLavas(dt, true); updateLavaPools(dt, true); updateHexes(dt, true);
+    updateRings(dt, true); updateQuakes(dt, true); updateWaters(dt, true); updateLavas(dt, true); updateLavaPools(dt, true); updateHazards(dt, true); updateHexes(dt, true);
     // portal / arena
     if (G.portal) {
       G.portal.t += dt;
@@ -8134,7 +8453,7 @@
       else { ctx.fillStyle = G.lvl.gr.base; ctx.fillRect(ix * CH, iy * CH, CH + CH_PAD, CH + CH_PAD); }
     }
     // flat things
-    drawArena(); drawLavaPools(L, R, T, B); drawWaveFog(L, R, T, B); drawRings(); drawCreepGround(L, R, T, B); drawChampGround(L, R, T, B); drawQuizFloor(); drawGuard(); drawAfxGround();
+    drawArena(); drawLavaPools(L, R, T, B); drawHazards(L, R, T, B); drawWaveFog(L, R, T, B); drawRings(); drawCreepGround(L, R, T, B); drawChampGround(L, R, T, B); drawQuizFloor(); drawGuard(); drawAfxGround();
     drawPickups(L, R, T, B);
     drawGuide();
     if (G.ult) drawUltFx(UFX.p, P.x, P.y, G.ult.t, G.ult.cx, G.ult.cy, 0, true);
@@ -8247,6 +8566,7 @@
       b.strokeStyle = G.lvl.gr.stone[0]; b.lineWidth = 6; b.lineJoin = b.lineCap = "round"; b.beginPath();
       b.moveTo(p.x[0] * k, p.y[0] * k); for (let i = 1; i < p.n; i++) b.lineTo(p.x[i] * k, p.y[i] * k); b.stroke();
       if (G.arena) { b.fillStyle = G.lvl.gr.stone[1]; b.beginPath(); b.arc(G.arena.x * k, G.arena.y * k, G.arena.r * k, 0, TAU); b.fill(); }
+      for (const o of G.hz || []) { b.fillStyle = HZ_MINI[o.k]; b.beginPath(); b.ellipse(o.x * k, o.y * k, Math.max(3, o.rx * k), Math.max(2, o.ry * k), 0, 0, TAU); b.fill(); }   // (the map's hazards)
       b.fillStyle = "#ff6a1a"; for (const o of G.lpools || []) { const e = lpEll(o, 1); b.beginPath(); b.ellipse(o.x * k, o.y * k, Math.max(3, e.rx * k), Math.max(2, e.ry * k), 0, 0, TAU); b.fill(); }   // (the lava pools)
     }
     g.clearRect(0, 0, S, S); g.drawImage(miniBase, 0, 0);
@@ -11354,7 +11674,7 @@
       } else if (msg.topic === "shoo") shoo(num(d.x), num(d.y));
       else if (msg.topic === "portal") { if (G.portal && G.portal.open && !P.winT) enterPortal(); }
     } else if (d.to === NET.me && G.mode === "play") {
-      if (msg.topic === "hurt") { if (d.lava) lavaFaint(); else if (d.web) webHero(); else hurtHero(num(d.fx), num(d.fy), clamp(Math.round(num(d.n)) || 1, 1, 4)); }   // (lava: the host saw her feet in a lava pool; n: hearts this hit costs)
+      if (msg.topic === "hurt") { if (d.hz) hzFaint(); else if (d.lava) lavaFaint(); else if (d.web) webHero(); else hurtHero(num(d.fx), num(d.fy), clamp(Math.round(num(d.n)) || 1, 1, 4)); }   // (lava: the host saw her feet in a lava pool; n: hearts this hit costs)
       else if (msg.topic === "pick") {
         const x = num(d.x), y = num(d.y);
         if (DTYPES.includes(d.ty)) pickDrop({ type: d.ty, x, y });
@@ -11420,6 +11740,7 @@
       wa: G.waters.map((w) => [w.id, WA_KINDS.indexOf(w.k), w.x | 0, w.y | 0, Math.round(w.t * 20), Math.round(w.w * 20), Math.round(w.end * 20), w.r | 0, w.ax, w.dir, w.av ? 1 : 0]),   // the captain's sea, the yeti's snow (see seaMove, snowMove)
       lz: G.lavas.map((o) => [o.id, LKINDS.indexOf(o.k), o.x | 0, o.y | 0, Math.round(o.t * 20), Math.round(o.w * 20), Math.round(o.end * 20), o.r | 0, Math.round(o.a * 1000), o.d0 | 0, o.L | 0, o.ring ? o.ring[0] | 0 : -1, o.ring ? o.ring[1] | 0 : -1, o.v | 0]),   // the lava demon's fire (see lavaMove)
       lp: Math.round((G.lpT || 0) * 20),   // the lava pools' clock (their pulses), in 1/20 s
+      hz: Math.round((G.hzT || 0) * 20), hi: (G.hz || []).filter((o) => o.k === "ice").map((o) => [o.st, Math.round(o.t * 20)]),   // the map's hazards' clock; the thin ice: each patch's state, its clock
       hx: (G.hexes || []).map((o) => [o.id, HKINDS.indexOf(o.k), o.x | 0, o.y | 0, Math.round(o.t * 20), Math.round(o.w * 20), Math.round(o.end * 20), o.r | 0, o.vx | 0, o.vy | 0, o.cx | 0, o.cy | 0, o.v | 0, Math.round(o.fly * 20), (o.n & 7) | ((o.m & 7) << 3) | (o.weak ? 64 : 0) | (o.mon ? 128 : 0)]),   // the grey witch's magic (see hexMove)
       it: bitsOf(G.items), ch: bitsOf(G.chests), cg: bitsOf(G.cages),
       gd: G.cages.map((c) => (c.gd === undefined ? "-" : c.gd)).join(""),   // each cage's guardian (- none, 0 not yet, 1 waiting, 2 awake, 3 beaten)
@@ -11641,6 +11962,10 @@
     }
     // the lava pools' pulses: the host's clock (run on here between updates; brought back if it drifted)
     if (typeof w.lp === "number" && G.lpools && G.lpools.length) { const t = num(w.lp) / 20; if (Math.abs((G.lpT || 0) - t) > 0.2) G.lpT = t; }
+    // the map's hazards: likewise their clock (the tides, the spikes); the thin ice: the host's state of each patch (its break and freezing
+    // over played here as it changes)
+    if (typeof w.hz === "number" && G.hz && G.hz.length) { const t = num(w.hz) / 20; if (Math.abs((G.hzT || 0) - t) > 0.2) G.hzT = t; }
+    if (Array.isArray(w.hi) && G.hz) { const ice = G.hz.filter((o) => o.k === "ice"); w.hi.forEach((a, i) => { const o = ice[i]; if (!o || !Array.isArray(a)) return; const st = clamp(Math.round(num(a[0])), 0, 2), t = num(a[1]) / 20; if (st !== o.st) iceTo(o, st, t); else if (Math.abs(o.t - t) > 0.25) o.t = t; }); }
     // the grey witch's magic: likewise; a flying orb follows the host's place and heading (this page flies it on in between), and one the
     // host has popped (on a girl) bursts here too
     if (Array.isArray(w.hx)) {
@@ -11704,7 +12029,7 @@
       if (f.type === "fire" && Math.random() < 0.7) G.parts.push({ type: "dot", x: f.x, y: f.y - 90, vx: rnd(-30, 30), vy: rnd(-30, 30), life: 0.35, max: 0.35, r: rnd(4, 9), col: Math.random() < 0.5 ? "#9dff6a" : "#e6ffb0" });
     }
     updateCreepPieces(dt, false);
-    updateRings(dt, false); updateQuakes(dt, false); updateWaters(dt, false); updateLavas(dt, false); updateLavaPools(dt, false); updateHexes(dt, false);
+    updateRings(dt, false); updateQuakes(dt, false); updateWaters(dt, false); updateLavas(dt, false); updateLavaPools(dt, false); updateHazards(dt, false); updateHexes(dt, false);
     if (G.quiz) { G.quiz.t += dt; quizLocal(dt); } else updateQuizHud();
     for (const c of G.chests) c.t += dt;
     for (const o of G.waves || []) { if (o.st === 1 || o.st === 2) o.t += dt; if (o.box) o.box.t += dt; }   // (the host's ambush clock, run on here between updates)
@@ -11834,6 +12159,7 @@
     scene, SCENE_RETRY,
     refreshFrames: () => DIRN.clear(),   // call after adding frames to FR at run time
     audio: () => ({ ctx: AC && AC.state, samples: Object.keys(SAMPLE).length, music: !!musicSrc, track: musicNow, want: musicWanted() }),
+    hz: () => G.hz || [], HZ, hzLive, hzGround: (o) => ({ x: o.x, y: o.y, rx: o.rx, ry: o.ry }), hzHit, hzPhase, placeHazards,
     lpools: () => G.lpools || [], LP: { M: LP_M, CLEAR: LP_CLEAR, GAP: LP_GAP, WARN: LP_WARN, PERIOD: LP_PERIOD }, lpEll, lpScale, lpWarn, lpHit,
     CLS, COMBOS, ALLY_FAINT_T, ALLY_REVIVE_T, AURA_R, allyLog: null, allyAct: (p, k, T) => startAct(p, k, T || nearestFoes(p.x, p.y, 900, 1)[0] || null), afx: () => G.afx, allyOutfit, hitables, qpets: () => QPETE,
     heroFrame4, monFrame, guideTarget, heroStats, lavaMove, snowMove, xpNeed, gainXp, BOSS_HIT, bossHit, hurtInv, hurtTarget, COOP_XP, COOP_HP, creepHp, spawnGem, addEnergy, startUlt, rescuePet, ultBlast, ultFx: () => UFX, ULT_DRAW_CAP, ULT_PART_CAP, UFX_E, UFX_RAIN, ultLight, viewSize: () => ({ VW, VH }), startBoss, pets: () => PETE,
