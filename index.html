@@ -360,7 +360,7 @@
   let META = null, ready = false;
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261027.1950", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261027.1956", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -4613,6 +4613,7 @@
     SFX.charge();
   }
   function updateUlt(dt) {
+    if (!G.combo && (UFX.cg.on || UFX.cs.on)) { ufxEnd(UFX.cg); ufxEnd(UFX.cs); }   // (a combo cut short)
     const U = G.ult; if (!U) { P.z = 0; if (UFX.p.on) ufxEnd(UFX.p); return; }
     // the boss's quiz began meanwhile (her blast, or her bolts, took him to his quiz mark): it ends now so she is not frozen into the
     // question; one whose blast had not gone off yet gives her energy back
@@ -4655,25 +4656,35 @@
     return Math.max(0, Math.min(dmg, Math.floor(o.max * frac) - (o.ultHp0 - o.hp)));
   }
   // ---------------------------------------------------------------- the sisters' combo: "Chị em hợp lực!"
-  // Both girls' ultimates landing together: the world stops and darkens, Mochi and Matcha fly in from where they stand
-  // to the middle of the screen, aim wand and staff at one point and pour pink hearts and green magic into one orb,
-  // which bursts over the whole screen (the combo's damage lands then); then they fly back to their places.
+  // Both girls' ultimates landing together (Dad: redone as the biggest show in the game, no longer game3's orb and seals): the world
+  // stops and night falls, Mochi and Matcha fly in from where they stand and rise together over the middle of the screen; between
+  // them her heart ring and her star ring turn against each other and send a pink and a silver-blue column of light into the sky,
+  // and both rains fall at once over the whole screen: Mochi's hearts and Matcha's meteors, each landing bursting the ground in its
+  // colour (their own ultimates' rains and bursts: UFX.cg / UFX.cs, sharing one pool of UFX_E bursts, all the scene's sprites
+  // within CB_DRAW_CAP; the rain hurts nothing, the combo's damage still lands at its burst). Then one huge burst: pink and
+  // silver-blue rings racing over the screen, painted quake bursts in both colours, hearts and stars flying everywhere, the big
+  // title, a light shake; and they fly back to their places. The girls are drawn over all of it (always seen), the veils are soft.
   // Played the same on both pages (the host starts it and tells the guest).
   const CB_MEET = 1.0, CB_BOOM = 2.5, CB_BACK = 3.1, CB_END = 3.7;
   const CB_K = 1.9;                                         // the girls are drawn this much bigger than in the world
-  const CB_D = 360;                                          // from the orb out to each girl's wand tip
-    const cbN = (n, alt) => (FR[n] ? n : alt);
+  const CB_D = 360;                                          // from the middle out to each girl's wand tip
+  const CB_RISE = 90;                                        // how much higher they rise together while the rains fall
+  const CB_DRAW_CAP = 420, CB_PARTS = 160;                   // the scene's sprites a frame / its own pieces (trails, sparkles)
+  // the rains' clock (their ultimates' clock) at the combo's t: falling from t 0.5, all landed by t 2.4, before the burst
+  const cbRainT = (t) => (t < 0.5 ? 0 : 0.2 + (t - 0.5) * ULT_PACE);
   const easeOut = (k) => 1 - Math.pow(1 - clamp(k, 0, 1), 3);
   const easeBack = (k) => { k = clamp(k, 0, 1); const c = 1.7; return 1 + (c + 1) * Math.pow(k - 1, 3) + c * Math.pow(k - 1, 2); };
   // hit: the combo's damage (host only), landed at the burst
   function comboUlt(send, hit) {
     if (send && NET.role) netEmit("combo", { to: NET.partner });
     // (never on top of another scene, nor without the partner on this page: then just the damage and a bang)
-    if (G.combo || G.mode !== "play" || !Q) { if (hit) hit(); SFX.boom(); G.shake = 34; return; }
-    G.combo = { t: 0, hit, t0: G.t, parts: [], cx: G.camX + VW / 2, cy: G.camY + VH / 2 };
-    G.ult = null; ufxEnd(UFX.p); P.z = 0; P.vx = P.vy = 0; P.moving = false; P.inv = Math.max(P.inv, CB_END + 1.2);
+    if (G.combo || G.mode !== "play" || !Q) { if (hit) hit(); SFX.boom(); ultShake(1.2); return; }
+    G.combo = { t: 0, hit, t0: G.t, parts: [], cx: G.camX + VW / 2, cy: G.camY + VH / 2, boomed: false };
+    G.ult = null; ufxEnd(UFX.p); ufxEnd(UFX.cg); ufxEnd(UFX.cs); P.z = 0; P.vx = P.vy = 0; P.moving = false; P.inv = Math.max(P.inv, CB_END + 1.2);
     SFX.charge();
   }
+  // the combo over (its end, the partner gone, or the level left): its rains cleared
+  function cbEnd() { G.combo = null; G.ultLast = null; ufxEnd(UFX.cg); ufxEnd(UFX.cs); }
   const comboZoom = () => {
     const C = G.combo; if (!C) return 1;
     const t = C.t, q = t - CB_BOOM;
@@ -4692,7 +4703,8 @@
     return [w[0] * m * CHAR_K, (w[1] - BOLT_Z) * m * CHAR_K];
   }
   // her place in the scene at time t: [x, y, size, pose, facing left]; Mochi on the left facing right, Matcha on the right facing left
-  // (pose: "jump" | "cast" | "win" -> her ult / cast / cheer frame; each is its own drawing, nothing is mirrored)
+  // (pose: "jump" | "cast" | "win" -> her ult / cast / cheer frame; each is its own drawing, nothing is mirrored).
+  // They rise together (CB_RISE) while the rains fall
   function cbPose(C, g, t) {
     const left = g.hk === "g", flip = !left, ox = C.cx, oy = C.cy - 80;
     const [tx, ty] = cbTip(g.hk, CB_K, flip), sx = ox + (left ? -CB_D : CB_D) - tx, sy = oy + 20 - ty;
@@ -4701,160 +4713,140 @@
       const k = easeOut((t - 0.12) / (CB_MEET - 0.12)), k2 = clamp((t - 0.12) / (CB_MEET - 0.12), 0, 1);
       return [lerp(g.x, sx, k), lerp(g.y, sy, k) - Math.sin(Math.PI * k2) * 240 - ss(0, 0.12, t) * 30 * (1 - k), lerp(1, CB_K, k), "jump", flip];
     }
-    if (t < CB_BOOM) { const push = ss(CB_BOOM - 0.25, CB_BOOM, t) * 14; return [sx + (left ? -push : push), sy + bob, CB_K, "cast", flip]; }
-    const wx = sx + (left ? -150 : 150), wy = sy - 50;
-    if (t < CB_BACK) { const k = easeOut((t - CB_BOOM) / 0.35); return [lerp(sx, wx, k), lerp(sy, wy, k) + bob * 0.6, CB_K, "win", false]; }
+    const rise = CB_RISE * ss(CB_MEET, CB_MEET + 0.7, t);
+    if (t < CB_BOOM) { const push = ss(CB_BOOM - 0.25, CB_BOOM, t) * 14; return [sx + (left ? -push : push), sy - rise + bob, CB_K, "cast", flip]; }
+    const wx = sx + (left ? -150 : 150), wy = sy - CB_RISE - 50;
+    if (t < CB_BACK) { const k = easeOut((t - CB_BOOM) / 0.35); return [lerp(sx, wx, k), lerp(sy - CB_RISE, wy, k) + bob * 0.6, CB_K, "win", false]; }
     const k = rsEase(clamp((t - CB_BACK) / (CB_END - CB_BACK), 0, 1));
     return [lerp(wx, g.x, k), lerp(wy, g.y, k) - Math.sin(Math.PI * k) * 160, lerp(CB_K, 1, k), "jump", g.x < wx];
   }
+  // her sparkles in the scene (the ultimates' own glow sprites: ufxArt)
+  const cbSp = (hk, i) => (hk === "g" ? (i % 2 ? "heartL" : "starP") : (i % 2 ? "starB" : "starW"));
   function updateCombo(dt) {
     const C = G.combo, t0 = C.t; C.t += dt;
     const t = C.t, at = (x) => t0 < x && t >= x;
     P.inv = Math.max(P.inv, 1.2); P.moving = false;
-    if (!Q || !NET.role) { if (C.hit) { C.hit(); C.hit = null; } G.combo = null; return; }   // the partner left
-    const ox = C.cx, oy = C.cy - 80, girls2 = cbGirls(C);
+    if (!Q || !NET.role) { if (C.hit) { C.hit(); C.hit = null; } cbEnd(); return; }   // the partner left
+    const girls2 = cbGirls(C);
+    // both rains, on their clock: aimed at the monsters on the screen and all over it, each landing bursting the ground (no harm)
+    const tu = cbRainT(t);
+    ufxStep(UFX.cg, "g", C.cx, C.cy, tu, C.cx, C.cy, true); ufxStep(UFX.cs, "s", C.cx, C.cy, tu, C.cx, C.cy, true);
     if (at(CB_MEET)) { SFX.ready && SFX.ready(); SFX.charge(); }
-    // they meet: a sparkle as each takes her place
+    // they meet: a ring of hearts / stars as each takes her place
     if (at(CB_MEET)) for (const g of girls2) {
       const [x, y, m, , fl] = cbPose(C, g, t), [tx, ty] = cbTip(g.hk, m, fl);
-      for (let i = 0; i < 16; i++) { const a = i / 16 * TAU; C.parts.push({ x: x + tx, y: y + ty, vx: Math.cos(a) * 520, vy: Math.sin(a) * 520, life: 0.5, max: 0.5, sp: g.hk === "g" ? cbN("fx_duo_heart", "fx_heart") : cbN("fx_duo_spark_g", "fx_hit_s"), sc: 0.5, rot: a, drag: 0.02 }); }
+      for (let i = 0; i < 8; i++) { const a = i / 8 * TAU; C.parts.push({ x: x + tx, y: y + ty, vx: Math.cos(a) * 520, vy: Math.sin(a) * 520, life: 0.5, max: 0.5, sp: cbSp(g.hk, i), sc: 52, rot: a, drag: 0.02 }); }
     }
     // the trails behind them as they fly in and back
     if ((t > 0.1 && t < CB_MEET) || t > CB_BACK) for (const g of girls2) {
       const [x, y, m] = cbPose(C, g, t);
-      if (Math.random() < dt * 40) for (let i = 0; i < 2; i++) C.parts.push({ back: true, x: x + rnd(-50, 50) * m, y: y - rnd(70, 190) * m, vx: rnd(-60, 60), vy: rnd(-40, 60), life: 0.5, max: 0.5, sp: g.hk === "g" ? (i ? "fx_heart" : cbN("fx_duo_star_p", "fx_twinkle")) : (i ? cbN("fx_duo_leaf", "fx_hit_s") : cbN("fx_duo_spark_g", "fx_twinkle")), sc: rnd(0.4, 0.75), rot: rnd(0, 6), vr: rnd(-4, 4), drag: 0.2 });
-    }
-    // pouring their magic into the orb: hearts and pink sparks from the wand, leaves and green flames from the staff, spiralling in
-    if (t > CB_MEET + 0.08 && t < CB_BOOM - 0.08) for (const g of girls2) {
-      const [x, y, m, , fl] = cbPose(C, g, t), [tx, ty] = cbTip(g.hk, m, fl), pink = g.hk === "g";
-      const set = pink ? [cbN("fx_duo_heart", "fx_heart"), "fx_heart", cbN("fx_duo_star_p", "fx_twinkle"), cbN("fx_duo_petal", "fx_heart")] : [cbN("fx_duo_leaf", "fx_hit_s"), cbN("fx_duo_spark_g", "fx_twinkle"), cbN("fx_duo_wisp", "fx_hit_s"), cbN("fx_duo_moon", "fx_twinkle")];
-      for (let i = 0; i < 3; i++) C.parts.push({ in: true, x0: x + tx, y0: y + ty + rnd(-30, 30), k: 0, dur: rnd(0.38, 0.6), curl: (pink ? 1 : -1) * rnd(1.2, 2.4), sp: set[(Math.random() * set.length) | 0], sc: rnd(0.45, 0.9), rot: rnd(0, 6), vr: rnd(-6, 6), life: 1, max: 1 });
-      if (Math.random() < dt * 9) C.parts.push({ bolt: true, x0: x + tx, y0: y + ty, k: 0, dur: 0.3, hk: g.hk, life: 1, max: 1 });
+      if (Math.random() < dt * 20) for (let i = 0; i < 2; i++) C.parts.push({ x: x + rnd(-50, 50) * m, y: y - rnd(70, 190) * m, vx: rnd(-60, 60), vy: rnd(-40, 60), life: 0.5, max: 0.5, sp: cbSp(g.hk, i), sc: rnd(34, 60), rot: rnd(0, 6), vr: rnd(-4, 4), drag: 0.2 });
     }
     // the burst: the damage lands now, at the same clock as when the ultimates hit (so the caps on bosses stay the same)
     if (at(CB_BOOM)) {
-      SFX.boom(); SFX.boom(); SFX.level && SFX.level(); G.shake = 48;
+      SFX.boom(); SFX.boom(); SFX.level && SFX.level(); ultShake(1.2); C.boomed = true;
       if (C.hit) { G.ultClock = C.t0; try { C.hit(); } finally { G.ultClock = null; } C.hit = null; }
-      const set = [cbN("fx_duo_heart", "fx_heart"), "fx_heart", cbN("fx_duo_star_p", "fx_twinkle"), cbN("fx_duo_petal", "fx_heart"), cbN("fx_duo_leaf", "fx_hit_s"), cbN("fx_duo_spark_g", "fx_twinkle"), cbN("fx_duo_wisp", "fx_hit_s"), cbN("fx_duo_moon", "fx_twinkle"), cbN("fx_duo_light", "fx_twinkle")];
-      for (let i = 0; i < 110; i++) {
-        const a = Math.random() * TAU, v = rnd(700, 2300);
-        C.parts.push({ back: true, x: ox + Math.cos(a) * 40, y: oy + Math.sin(a) * 40, vx: Math.cos(a) * v, vy: Math.sin(a) * v * 0.8, g: 260, life: rnd(0.9, 1.5), max: 1.5, sp: set[i % set.length], sc: rnd(0.6, 1.5), rot: rnd(0, 6), vr: rnd(-5, 5), drag: 0.25 });
-      }
     }
     if (at(CB_BACK)) SFX.jump2 && SFX.jump2();
     for (const p of C.parts) {
       p.life -= dt;
-      if (p.in || p.bolt) { p.k += dt / p.dur; if (p.k >= 1) p.life = 0; continue; }
       const dr = Math.pow(p.drag ?? 1, dt); p.vx *= dr; p.vy *= dr; p.vy += (p.g || 0) * dt;
       p.x += p.vx * dt; p.y += p.vy * dt; p.rot += (p.vr || 0) * dt;
     }
     C.parts = C.parts.filter((p) => p.life > 0);
-    if (C.parts.length > 420) C.parts.splice(0, C.parts.length - 420);
+    if (C.parts.length > CB_PARTS) C.parts.splice(0, C.parts.length - CB_PARTS);
     if (t >= CB_END) {
-      G.combo = null; G.ultLast = null;
-      for (const g of girls2) burst(g.x, g.y - 60, 16, g.hk === "g" ? ["#ffb3e0", "#fff4c2", "#ff9ad5"] : ["#b8ffb0", "#f0fff0", "#7be04a"], 300, 0.6);
+      cbEnd();
+      for (const g of girls2) burst(g.x, g.y - 60, 16, UPOP[g.hk === "g" ? "g" : "s"], 300, 0.6);
       P.inv = Math.max(P.inv, 1.2);
     }
   }
+  // piece i of the burst's hearts and stars, flying out of (x, y) over the whole screen q after it: [x, y, size, alpha]
+  function cbConf(i, x, y, q) {
+    const a = i / 48 * TAU + (i % 3) * 0.11, v = 900 + ((i * 131) % 1100), qq = q * (1 - q * 0.3);
+    UCONF[0] = x + Math.cos(a) * v * qq; UCONF[1] = y + Math.sin(a) * v * qq * 0.8 + 260 * q * q; UCONF[2] = 54 + (i % 4) * 14; UCONF[3] = ss(0.03, 0.14, q) * (1 - ss(0.7, 1.15, q));
+    return UCONF;
+  }
   function drawCombo(L, T) {
-    const C = G.combo; if (!C) return;
-    const t = C.t, ox = C.cx, oy = C.cy - 80, q = t - CB_BOOM;
-    const big = (VW + VH) * 1.4;
-    // the world darkens, a pink glow on Mochi's side and a green one on Matcha's
+    const C = G.combo, R = UFX.cb;
+    if (!C) { R.drawn = 0; R.titleA = 0; R.flash = 0; R.girls = 0; R.on = false; return; }
+    const t = C.t, ox = C.cx, oy = C.cy - 80, q = t - CB_BOOM, A = ufxArt(), big = (VW + VH) * 1.4, wmax = VW * 1.3;
+    const UG = ufxBoomArt("g"), US = ufxBoomArt("s"), girls2 = cbGirls(C), n0 = ufxN;
+    ufxLim = n0 + CB_DRAW_CAP; ufxW = 0; ufxBig = 0;
+    ctx.save();
+    // night falls over the world, pink on Mochi's side and silver-blue on Matcha's
     const dim = ss(0, 0.35, t) * (1 - ss(CB_BOOM + 0.35, CB_END - 0.1, t));
     if (dim > 0) {
-      ctx.save(); ctx.globalAlpha = 0.8 * dim; ctx.fillStyle = "#140a24"; ctx.fillRect(ox - big, oy - big, big * 2, big * 2); ctx.restore();
-      glow(ox - 620, oy + 40, 900, "255,90,190", 0.32 * dim);
-      glow(ox + 620, oy + 40, 900, "90,240,120", 0.28 * dim);
+      ctx.globalAlpha = 0.66 * dim; ctx.fillStyle = "#0c0a26"; ctx.fillRect(ox - big, oy - big, big * 2, big * 2);
+      ctx.globalCompositeOperation = "lighter";
+      uglow(ox - 620, oy + 40, 900, ULT_RGB.g, 0.3 * dim); uglow(ox + 620, oy + 40, 900, ULT_RGB.s, 0.3 * dim);
     }
-    // the seal behind the orb: her heart circle and her emerald circle turning against each other
-    const ch = ss(CB_MEET - 0.2, CB_BOOM - 0.1, t) * (1 - ss(CB_BOOM, CB_BOOM + 0.3, t));
+    // the rains on the ground: each burst's crater and its shockwave ring (pink / silver-blue)
+    ctx.globalCompositeOperation = "source-over"; ufxBurstsG0(UFX.cg, A, UFX.cg.t, UG);
+    ctx.globalCompositeOperation = "source-over"; ufxBurstsS0(UFX.cs, A, UFX.cs.t, US);
+    // between them her heart ring and her star ring turning against each other, and their columns of light into the sky
+    const ch = ss(CB_MEET - 0.2, CB_MEET + 0.4, t) * (1 - ss(CB_BOOM, CB_BOOM + 0.2, t)), cy0 = oy - CB_RISE * ss(CB_MEET, CB_MEET + 0.7, t);
     if (ch > 0.01) {
-      fx("fx_rays", ox, oy, 2.2 + 2.4 * ch, 0.3 * ch, t * 0.6);
-      fx("fx_circle_s", ox, oy, 0.5 + 1.25 * ch, 0.6 * ch, -t * 0.9);
-      fx("fx_circle_g", ox, oy, 0.4 + 1.0 * ch, 0.75 * ch, t * 1.3);
-      glow(ox, oy, 260 + 260 * ch, "255,150,220", 0.25 * ch);
-    }
-    // their beams: a soft band of light from each tip into the orb, bolts racing along it
-    const beam = ss(CB_MEET, CB_MEET + 0.2, t) * (1 - ss(CB_BOOM - 0.05, CB_BOOM, t));
-    const girls2 = cbGirls(C);
-    if (beam > 0.01) for (const g of girls2) {
-      const [x, y, m, , fl] = cbPose(C, g, t), [tx, ty] = cbTip(g.hk, m, fl), bx = x + tx, by = y + ty, rgb = HEROES[g.hk].rgb;
-      for (let i = 0; i <= 8; i++) { const k = i / 8; glow(lerp(bx, ox, k), lerp(by, oy, k), 70 + 30 * Math.sin(t * 20 + i), rgb, 0.4 * beam); }
-      glow(bx, by, 120, rgb, 0.8 * beam);
-      fx(g.hk === "g" ? cbN("fx_duo_star_p", "fx_twinkle") : cbN("fx_duo_spark_g", "fx_twinkle"), bx, by, 1.0 + 0.2 * Math.sin(t * 25), beam, t * 4);
-    }
-    // the burst over the whole screen (behind the girls, who stay in front cheering)
-    if (q >= 0) {
-      glow(ox, oy, 1500, "255,190,235", 0.4 * (1 - ss(0, 0.9, q)));
-      for (const [d, ground] of [[0, false], [0.08, true], [0.2, false]]) {
-        const k = q - d; if (k < 0 || k > 1) continue;
-        const m = 0.3 + 4.2 * easeOut(k / 0.85), a = 1 - ss(0.3, 0.85, k);
-        if (ground) groundCircle(cbN("fx_duo_ring", "fx_ring"), ox, oy + 330, m * 1.2, a); else fx(cbN("fx_duo_ring", "fx_ring"), ox, oy, m, a, d * 3);
+      const sq = 1 - 0.25 * ss(CB_BOOM - 0.2, CB_BOOM, t);
+      uglow(ox, cy0, 330 * ch, "230,170,255", 0.4 * ch);
+      ublit(A.ringP, ox, cy0, 430 * ch * sq, 0.85 * ch, t * 1.4);
+      ublit(A.ringB, ox, cy0, 330 * ch * sq, 0.85 * ch, -t * 1.8);
+      ublit(A.heartRing, ox, cy0, 170 * ch * sq * (1 + 0.08 * Math.sin(t * 18)), 0.9 * ch);
+      ublit(A.starW, ox, cy0, 150 * ch * sq, 0.9 * ch, t * 3);
+      for (let i = 0; i < 6; i++) {
+        const k = i / 5, yy = cy0 - 140 - k * VH * 0.85, r = 130 - 50 * k, a = ch * (0.5 - 0.3 * k) * (0.85 + 0.15 * Math.sin(t * 20 + i));
+        uglow(ox - 60, yy, r, ULT_RGB.g, a); uglow(ox + 60, yy, r, ULT_RGB.s, a);
       }
-      // (the burst laid on as paint, not added as light, so its pinks and greens stay pink and green)
-      if (FR.fx_duo_boom) spr("fx_duo_boom", ox, oy, false, 0.5 + 1.15 * easeOut(q / 0.6), 1 - ss(0.45, 1.15, q), q * 0.2);
-      else fx("fx_heartboom", ox, oy, 0.4 + 1.2 * easeOut(q / 0.8), 1 - ss(0.3, 1.0, q));
-      fx(cbN("fx_duo_flare", "fx_rays"), ox, oy, (0.7 + 1.3 * easeOut(q / 0.18)) * (1 - 0.5 * ss(0.15, 0.6, q)), 0.9 * (1 - ss(0.1, 0.6, q)), q * 0.8);
+      // their beams: from each wand tip into the rings
+      for (const g of girls2) {
+        const [x, y, m, , fl] = cbPose(C, g, t), [tx, ty] = cbTip(g.hk, m, fl), bx = x + tx, by = y + ty, rgb = ULT_RGB[g.hk === "g" ? "g" : "s"];
+        for (let i = 0; i <= 4; i++) { const k = i / 4; uglow(lerp(bx, ox, k), lerp(by, cy0, k), 60 + 25 * Math.sin(t * 20 + i), rgb, 0.4 * ch); }
+        ublit(g.hk === "g" ? A.starP : A.starB, bx, by, 120 + 24 * Math.sin(t * 25), ch, t * 4);
+      }
     }
-    // their trails and the pieces flying out of the burst, behind them
-    ctx.save(); ctx.globalCompositeOperation = "lighter";
-    for (const p of C.parts) if (p.back) { const a = clamp(p.life / p.max, 0, 1); spr(p.sp, p.x, p.y, false, p.sc * (0.5 + 0.5 * a), Math.min(1, a * 2), p.rot); }
-    ctx.restore();
-    // the girls
+    // the bursts over the ground (dust, debris, fire and light), then the falling hearts and meteors: all behind the girls
+    ctx.globalCompositeOperation = "source-over"; ufxBurstsG1(UFX.cg, A, -1e6, -1e6, UFX.cg.t, UG);
+    ctx.globalCompositeOperation = "source-over"; ufxBurstsS1(UFX.cs, A, -1e6, -1e6, UFX.cs.t, US);
+    ufxHeartsFall(UFX.cg, A, UFX.cg.t);
+    ctx.globalCompositeOperation = "lighter"; ufxMeteors(UFX.cs, A, UFX.cs.t, US, 1);
+    // the one huge burst: both lights, pink heart rings and silver-blue star rings racing out over the screen, rings over the
+    // ground, a painted quake burst in each colour under them, hearts and stars flying everywhere
+    if (q >= 0) {
+      const fa = 1 - ss(0, 0.7, q);
+      uglow(ox, oy, 1100, "235,190,255", 0.45 * (1 - ss(0, 0.9, q)));
+      ublit(A.raysP, ox, oy, Math.min(wmax, 600 + q * 2000), 0.7 * fa, q * 0.7);
+      ublit(A.raysB, ox, oy, Math.min(wmax, 520 + q * 1800), 0.7 * fa, -q * 0.6);
+      for (let j = 0; j < 4; j++) { const k = (q - j * 0.09) / 0.9; if (k > 0 && k < 1) ublit(j % 2 ? A.ringB : A.heartRing, ox, oy, Math.min(wmax, 200 + k * wmax), 0.9 * (1 - k), j % 2 ? q : 0); }
+      for (let j = 0; j < 2; j++) { const k = (q - 0.05 - j * 0.12) / 0.85; if (k > 0 && k < 1) ublit(j ? A.ringB0 : A.ringP0, ox, oy + 330, Math.min(wmax, 300 + k * wmax), 1 - k, 0, 0.5); }
+      const kb = q / 0.45;
+      if (kb < 1) for (const [U, dx] of [[UG, -300], [US, 300]]) if (U) { const f = U.boom[Math.min(3, (kb * 4) | 0)], m = U.m * 2.4; ufr(f, ox + dx, oy + 330 + UB_R * 0.6 - f.h * f.s * m / 2, m, Math.min(1, (1 - kb) * 2.5) * 0.85); }
+      for (let i = 1; i < 48; i += 2) { const P2 = cbConf(i, ox, oy, q); ublit(i % 4 === 1 ? A.starB : A.starW, P2[0], P2[1], P2[2] * 1.3, P2[3], q * 5 + i); }
+      ctx.globalCompositeOperation = "source-over";
+      for (let i = 0; i < 48; i += 2) { const P2 = cbConf(i, ox, oy, q); ublit(i % 4 ? A.heart : A.heartL, P2[0], P2[1], P2[2], P2[3], Math.sin(q * 9 + i) * 0.6); }
+      ctx.globalCompositeOperation = "lighter";
+    }
+    // their trails and sparkles
+    ctx.globalCompositeOperation = "lighter";
+    for (const p of C.parts) { const a = clamp(p.life / p.max, 0, 1); ublit(A[p.sp], p.x, p.y, p.sc * (0.5 + 0.5 * a), Math.min(1, a * 2), p.rot); }
+    // the girls, over all of it (never skipped, never covered)
+    ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = 1;
+    let gn = 0;
     if (t < CB_END) for (const g of girls2) {
       const [x, y, m, pose, fl] = cbPose(C, g, t), of = g.hk === hero ? P.outfit : (Q && Q.of) || "base";
       const fn = outfitFrame(g.hk, of, pose === "cast" ? (fl ? "cl1" : "cr1") : pose === "win" ? "cheer" : "ult");   // (the frames are already at world scale)
       const lift = t < CB_MEET ? ss(0, 0.3, t) : t > CB_BACK ? 1 - ss(CB_END - 0.2, CB_END, t) : 1;
       shadow(g.x, g.y, 46 * CHAR_K * (1 - 0.6 * lift), 12, 0.3 * (1 - lift * 0.8));
-      glow(x, y - 170 * m * CHAR_K, 220 * m * CHAR_K, HEROES[g.hk].rgb, 0.45 * lift);
+      glow(x, y - 170 * m * CHAR_K, 220 * m * CHAR_K, ULT_RGB[g.hk === "g" ? "g" : "s"], 0.45 * lift);
+      if (FR[fn]) gn++;
       spr(fn, x, y, false, m * CHAR_K, 1);
     }
-    // the magic pouring in
-    ctx.save(); ctx.globalCompositeOperation = "lighter";
-    for (const p of C.parts) {
-      if (p.bolt) {
-        const e = p.k * p.k, g = girls2.find((g) => g.hk === p.hk); if (!g) continue;
-        const x = lerp(p.x0, ox, e), y = lerp(p.y0, oy, e);
-        spr(p.hk === "s" ? "fx_bolt_s" : "fx_bolt_g", x, y, p.x0 > ox, 0.9, Math.min(1, (1 - p.k) * 4), 0);
-        continue;
-      }
-      if (p.in) {
-        const e = Math.pow(clamp(p.k, 0, 1), 1.4), r = 1 - e, an = p.curl * e, dx = p.x0 - ox, dy = p.y0 - oy;
-        const x = ox + (dx * Math.cos(an) - dy * Math.sin(an)) * r, y = oy + (dx * Math.sin(an) + dy * Math.cos(an)) * r;
-        spr(p.sp, x, y, false, p.sc * (0.5 + 0.7 * r), Math.min(1, p.k * 6) * Math.min(1, r * 3), p.rot + p.vr * p.k);
-        continue;
-      }
-      if (p.back) continue;
-      const a = clamp(p.life / p.max, 0, 1);
-      spr(p.sp, p.x, p.y, false, p.sc * (0.6 + 0.4 * a), Math.min(1, a * 2), p.rot);
-    }
-    ctx.restore();
-    // the orb, growing as they fill it, squeezing in just before it bursts
-    if (t > CB_MEET - 0.1 && q < 0.05) {
-      const k = ss(CB_MEET - 0.1, CB_BOOM - 0.15, t), sq = 1 - 0.3 * ss(CB_BOOM - 0.2, CB_BOOM, t), m = (0.22 + 0.7 * k) * sq * (1 + 0.05 * Math.sin(t * 22));
-      glow(ox, oy, 300 * m + 80, "255,120,210", 0.3);
-      if (!FR.fx_duo_orb) fx("fx_heartboom", ox, oy, m * 0.5, 1, 0);
-      else { spr("fx_duo_orb", ox, oy, false, m, 1, t * 2.4); fx("fx_duo_orb", ox, oy, m * 0.55, 0.3, -t * 3.1); }
-      glow(ox, oy, 70 * m + 30, "255,255,255", 0.45 + 0.5 * ss(CB_BOOM - 0.3, CB_BOOM, t));
-    }
-    // the words, popping in while they gather
-    if (t > 0.3 && q < 0.25) {
-      const k = easeBack((t - 0.3) / 0.45), a = clamp((t - 0.3) / 0.15, 0, 1) * (1 - clamp(q / 0.25, 0, 1)), y = oy + 470 + Math.max(0, q) * 300;
-      ctx.save(); ctx.globalAlpha = a; ctx.translate(ox, y); ctx.scale(k, k); ctx.rotate(Math.sin(t * 3) * 0.02);
-      ctx.font = "900 124px Grandstander, system-ui"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.lineJoin = "round";
-      const txt = "Chị em hợp lực!", w = ctx.measureText(txt).width / 2;
-      ctx.lineWidth = 26; ctx.strokeStyle = "rgba(40,10,60,.85)"; ctx.strokeText(txt, 0, 0);
-      const gr = ctx.createLinearGradient(-w, 0, w, 0); gr.addColorStop(0, "#ff7ccf"); gr.addColorStop(0.5, "#fff4c2"); gr.addColorStop(1, "#7cf27a");
-      ctx.lineWidth = 8; ctx.strokeStyle = "#fff"; ctx.strokeText(txt, 0, 0); ctx.fillStyle = gr; ctx.fillText(txt, 0, 0);
-      ctx.font = "800 56px Grandstander, system-ui"; ctx.lineWidth = 12; ctx.strokeStyle = "rgba(40,10,60,.85)";
-      const sub = HEROES.g.name + " + " + HEROES.s.name; ctx.strokeText(sub, 0, 100); ctx.fillStyle = "#fff"; ctx.fillText(sub, 0, 100);
-      ctx.restore();
-    }
-    // the flash as it bursts
-    // (a soft flash as the scene starts too, so the ultimates already playing give way to it)
-    if (t < 0.3) { ctx.save(); ctx.globalAlpha = 0.55 * (1 - t / 0.3) ** 2; ctx.fillStyle = "#fff0fa"; ctx.fillRect(ox - big, oy - big, big * 2, big * 2); ctx.restore(); }
-    if (q >= 0 && q < 0.3) { ctx.save(); ctx.globalAlpha = 0.75 * (1 - q / 0.3) ** 2; ctx.fillStyle = "#fff8fc"; ctx.fillRect(ox - big, oy - big, big * 2, big * 2); ctx.restore(); }
+    // a soft veil as the scene starts (the ultimates already playing give way to it) and as it bursts: never a white-out
+    const fl = t < 0.3 ? 0.22 * (1 - t / 0.3) ** 2 : q >= 0 && q < 0.25 ? 0.25 * (1 - q / 0.25) : 0;
+    if (fl > 0) { ctx.globalAlpha = fl; ctx.fillStyle = "#d9b8ff"; ctx.fillRect(ox - big, oy - big, big * 2, big * 2); }
+    ctx.restore(); ufxLim = 1e9;
+    // what the tests read, and the title (drawn on the screen by drawUltTitle)
+    R.on = true; R.drawn = ufxN - n0; R.girls = gn; R.flash = fl; R.boomed = C.boomed; R.t = t;
+    R.titleA = ss(0.3, 0.45, t) * (1 - ss(CB_END - 0.45, CB_END - 0.1, t));
   }
 
   // ---------------------------------------------------------------- particles
@@ -5943,15 +5935,18 @@
   const ULT_BOOM = 1.5, ULT_END = 2.6, ULT_DRAW_CAP = 360, ULT_PART_CAP = 60, ULT_SHAKE = 10;
   // the drops (Mochi's hearts / Matcha's meteors): n of them, one every `gap` of the ult clock from t0, each falling for `dur`.
   // Mochi's (Dad: "rơi nhanh gấp 2 lần, dày đặc gấp 5 lần"): 24 hearts one every 0.04 falling 0.3 -> 120 one every 0.008 falling 0.15
-  // (15.5 -> 77.5 hearts a second, 0.48 -> 0.24 s from the sky to the ground); Matcha's meteors as they were
-  const UFX_RAIN = { g: { n: 120, gap: 0.008, t0: 0.24, dur: 0.15 }, s: { n: 24, gap: 0.04, t0: 0.3, dur: 0.2 } }, UFX_N = 120;
-  // each of Mochi's hearts bursts the ground where it lands, like the bosses' quakes (their qk_boom frames, painted pink once):
+  // (15.5 -> 77.5 hearts a second, 0.48 -> 0.24 s from the sky to the ground). Matcha's the same (Dad: "Improve ultimate skill của
+  // Matcha, đang bị vấn đề tương tự Mochi"): 24 meteors one every 0.04 falling 0.2 -> 120 one every 0.008 falling 0.1
+  // (15.5 -> 77.5 meteors a second, 0.32 -> 0.16 s from the sky to the ground)
+  const UFX_RAIN = { g: { n: 120, gap: 0.008, t0: 0.24, dur: 0.15 }, s: { n: 120, gap: 0.008, t0: 0.3, dur: 0.1 } }, UFX_N = 120;
+  // each of Mochi's hearts / Matcha's meteors bursts the ground where it lands, like the bosses' quakes (their qk_boom frames,
+  // painted once in her colour: pink / silver-blue, ufxBoomArt):
   // a pool of UFX_E bursts per show, each living UB_LIFE of the clock (its burst the first UB_BURST); a heart landing within
   // UB_JOIN of a burst just begun joins it (it grows), and when all are busy the oldest (fading) one is taken over.
   // Each burst hurts the monsters within UB_HIT (and chips the boss a little: ufxImpact)
   const UFX_E = 24, UB_LIFE = 0.36, UB_BURST = 0.2, UB_R = 85, UB_JOIN = 110, UB_HIT = 120;
   const ULT_TITLE = { g: "Bùng Nổ Trái Tim!", s: "Mưa Sao Băng!" };
-  const ULT_RGB = { g: "255,120,200", s: "150,200,255" };
+  const ULT_RGB = { g: "255,120,200", s: "150,200,255", c: "210,170,255" };
   const UPOP = { g: ["#ffb3e0", "#ff7cc8", "#fff0f8"], s: ["#cfe4ff", "#8fc1ff", "#ffffff"] };
   const METEOR_DX = 620, METEOR_DY = 980, METEOR_ANG = Math.atan2(METEOR_DY, -METEOR_DX);   // (meteors come from the upper right)
   const reducedMotion = () => { try { return !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches); } catch (_) { return false; } };
@@ -5961,9 +5956,13 @@
   // (ex, ey, et, es: each ground burst's place, start on the ult clock (-1: free) and size; eN: how many are on now)
   function ufxNew() {
     return { on: false, hk: "g", t: 0, boomed: false, rm: false, vis: true, tx: new Float32Array(UFX_N), ty: new Float32Array(UFX_N), mon: new Uint8Array(UFX_N), st: new Uint8Array(UFX_N), landed: 0, onMon: 0, parts: 0, drawn: 0, maxW: 0, bigA1: 0, flash: 0, title: "", titleA: 0,
-      ex: new Float32Array(UFX_E), ey: new Float32Array(UFX_E), et: new Float32Array(UFX_E).fill(-1), es: new Float32Array(UFX_E), eN: 0, booms: 0, merged: 0, chip: 0, sndT: -1, nearA: 0 };
+      ex: new Float32Array(UFX_E), ey: new Float32Array(UFX_E), et: new Float32Array(UFX_E).fill(-1), es: new Float32Array(UFX_E), eN: 0, booms: 0, merged: 0, chip: 0, sndT: -1, nearA: 0,
+      cb: false, eCap: UFX_E };   // cb: one of the sisters' combo's rains (no harm, no blast of its own; eCap: its share of the bursts)
   }
-  const UFX = { p: ufxNew(), q: ufxNew() };   // p: this page's girl, q: the partner
+  const ufxCb = () => { const S = ufxNew(); S.cb = true; S.eCap = UFX_E / 2; return S; };
+  // p: this page's girl, q: the partner; cg / cs: the sisters' combo's two rains (Mochi's / Matcha's, sharing UFX_E bursts);
+  // cb: the combo's scene as last drawn (its sprites, girls drawn, veil, title: drawCombo), for the tests and its title
+  const UFX = { p: ufxNew(), q: ufxNew(), cg: ufxCb(), cs: ufxCb(), cb: { on: false, hk: "c", title: "Chị em hợp lực!", t: 0, tp: 0.3, tb: CB_BOOM, boomed: false, titleA: 0, drawn: 0, girls: 0, flash: 0, cap: CB_DRAW_CAP } };
   const UCAND = [];                           // (reused: the monsters the drops aim at)
   function ufxEnd(S) { S.on = false; S.drawn = 0; S.flash = 0; S.titleA = 0; S.et.fill(-1); S.eN = 0; S.nearA = 0; UCAND.length = 0; }
   // drop i starts falling at ufxT0 and lands ufxDur later (all before the blast)
@@ -5986,7 +5985,7 @@
     S.t = t;
     S.vis = own || (Math.abs(x - (G.camX + VW / 2)) < VW / 2 + 200 && Math.abs(y - (G.camY + VH / 2)) < VH / 2 + 300);
     const hw = VW / 2 + 120, hh = VH / 2 + 160, dur = ufxDur(hk), nd = UFX_RAIN[hk].n;
-    if (hk === "g") {   // (the ground bursts that are over free their place)
+    {   // (the ground bursts that are over free their place)
       let n = 0;
       for (let k = 0; k < UFX_E; k++) if (S.et[k] >= 0) { if (t - S.et[k] >= UB_LIFE || t < S.et[k]) S.et[k] = -1; else n++; }
       S.eN = n;
@@ -5997,18 +5996,22 @@
       if (S.st[i] === 0 && t >= t0) {
         if (nc < 0) {
           UCAND.length = 0; for (const m of G.mons) if (m.alive && Math.abs(m.x - cx) < hw && Math.abs(m.y - cy) < hh) UCAND.push(m);
-          const B = G.boss; if (hk === "g" && bossOpen(B) && Math.abs(B.x - cx) < hw && Math.abs(B.y - cy) < hh) UCAND.push(B);   // (Mochi's hearts rain on the boss too)
+          const B = G.boss; if (bossOpen(B) && Math.abs(B.x - cx) < hw && Math.abs(B.y - cy) < hh) UCAND.push(B);   // (the hearts / meteors rain on the boss too)
           nc = UCAND.length;
         }
         S.st[i] = 1;
-        if (nc) { const m = UCAND[(i * 7) % nc]; S.tx[i] = m.x + ((i * 37) % 60) - 30; S.ty[i] = m.y + ((i * 23) % 30) - 15; S.mon[i] = 1; }
-        else { S.tx[i] = cx - VW * 0.46 + ((i * 0.618034 + 0.13) % 1) * VW * 0.92; S.ty[i] = cy - VH * 0.37 + 80 + ((i * 0.754877 + 0.31) % 1) * VH * 0.74; S.mon[i] = 0; }
+        if (nc && !(S.cb && i % 2)) { const m = UCAND[(i * 7) % nc]; S.tx[i] = m.x + ((i * 37) % 60) - 30; S.ty[i] = m.y + ((i * 23) % 30) - 15; S.mon[i] = 1; }
+        else {   // (none there, or half of a combo's rain: all over the screen, Matcha's between Mochi's)
+          const o = S.cb && hk === "s" ? 0.5 : 0;
+          S.tx[i] = cx - VW * 0.46 + ((i * 0.618034 + 0.13 + o) % 1) * VW * 0.92; S.ty[i] = cy - VH * 0.37 + 80 + ((i * 0.754877 + 0.31 + o) % 1) * VH * 0.74; S.mon[i] = 0;
+        }
       }
       if (S.st[i] === 1 && t >= t0 + dur) {
         S.st[i] = 2; S.landed++; if (S.mon[i]) S.onMon++;
-        if (hk === "g") ufxImpact(S, S.tx[i], S.ty[i], t, own); else ufxPop(S, S.tx[i], S.ty[i] - 60, 2);
+        ufxImpact(S, S.tx[i], S.ty[i], t, own);
       }
     }
+    if (S.cb) { S.flash = 0; S.titleA = 0; return; }   // (a combo's rain: the scene has its own burst and title)
     if (!S.boomed && t >= ULT_BOOM) {
       S.boomed = true;
       ufxPop(S, x, y - 150 - 110, 14);
@@ -6018,10 +6021,10 @@
     S.flash = b >= 0 && b < ULT_FLASH_T ? (1 - b / ULT_FLASH_T) * ULT_FLASH_A * (S.rm ? 0.5 : 1) : 0;   // (its alpha)
     S.titleA = ss(0.15, 0.3, t) * (1 - ss(2.1, 2.45, t));
   }
-  // one of Mochi's hearts lands on (x, y): it hurts what is there (on this page when its world is this page's: alone, the host),
+  // one of Mochi's hearts / Matcha's meteors lands on (x, y): it hurts what is there (on this page when its world is this page's: alone, the host),
   // and bursts the ground (a new burst, or joined to one just begun beside it), with a little tremor and, now and then, a thud
   function ufxImpact(S, x, y, t, own) {
-    if (NET.role !== "guest" && (own || NET.role === "host")) {
+    if (!S.cb && NET.role !== "guest" && (own || NET.role === "host")) {   // (a combo's rain hurts nothing: its damage lands at its burst)
       for (const m of G.mons) {
         if (!m.alive) continue;
         const dx = m.x - x, dy = (m.y - y) / 0.62;   // (flattened onto the ground, as the bosses' quakes)
@@ -6036,7 +6039,7 @@
       }
     }
     let join = -1, jd = UB_JOIN * UB_JOIN, slot = 0, slotT = 1e9;
-    for (let k = 0; k < UFX_E; k++) {
+    for (let k = 0; k < S.eCap; k++) {
       const e = S.et[k];
       if (e < 0) { if (slotT >= 0) { slot = k; slotT = -1; } continue; }
       if (t - e < 0.1) { const dx = S.ex[k] - x, dy = S.ey[k] - y, d = dx * dx + dy * dy; if (d < jd) { jd = d; join = k; } }
@@ -6045,19 +6048,27 @@
     if (join >= 0) { S.es[join] = Math.min(1.6, S.es[join] + 0.15); S.merged++; return; }
     if (S.et[slot] < 0) S.eN++;
     S.ex[slot] = x; S.ey[slot] = y; S.et[slot] = t; S.es[slot] = 1; S.booms++;
-    ufxPop(S, x, y - 60, 1, ULT_PART_CAP - 14);   // (the blast keeps its 14)
-    if (own || S.vis) { ultShake(0.4); if (t - S.sndT > 0.15) { S.sndT = t; SFX.slam(); } }
+    ufxPop(S, x, y - 60, 1, S.cb ? ULT_PART_CAP / 2 - 7 : ULT_PART_CAP - 14);   // (the blast keeps its 14; a combo's two rains share the rest)
+    if (own || S.vis) { ultShake(0.4); if (t - S.sndT > (S.cb ? 0.25 : 0.15)) { S.sndT = t; if (S.hk === "s") SFX.shatter(); else SFX.slam(); } }   // (her meteors: a crack of ice)
   }
-  // the bosses' quake burst, its crater, a rock and a puff of dust, painted pink once (when their frames are loaded)
-  let UBA = null;
-  function ufxBoomArt() {
-    if (UBA) return UBA;
+  // the bosses' quake burst, its crater, a rock and a puff of dust, painted once in her colour (when their frames are loaded):
+  // Mochi's pink; Matcha's silver-blue, with ice-star shards (the painted ice chunks / shard) for debris, a painted twinkle for the
+  // stars flung up and an ice chunk for each meteor's head
+  const UBA = {};
+  function ufxBoomArt(hk = "g") {
+    if (UBA[hk]) return UBA[hk];
     if (!FR.qk_boom0 || !FR.qk_boom1 || !FR.qk_boom2 || !FR.qk_boom3) return null;
     const pk = "#ff4fb4", b2 = FR.qk_boom2;
-    UBA = { boom: [0, 1, 2, 3].map((i) => colorFrame("qk_boom" + i, pk, 0.85)), crater: FR.qk_crater ? colorFrame("qk_crater", "#ff7cc8", 0.45) : null,
+    if (hk === "s") {
+      const ice = ["fx_ice_chunk0", "fx_aura_shard", "fx_ice_chunk1"].filter((n) => FR[n]);
+      return (UBA.s = { boom: [0, 1, 2, 3].map((i) => colorFrame("qk_boom" + i, "#3d7dff", 1)), crater: FR.qk_crater ? colorFrame("qk_crater", "#7aa6e8", 0.55) : null,
+        smoke: FR.fx_smoke ? colorFrame("fx_smoke", "#dcebff", 0.6) : null, shard: ice.map((n) => colorFrame(n, "#d4e6ff", 0.3)),
+        star: FR.fx_twinkle ? colorFrame("fx_twinkle", "#e4f0ff", 0.9) : null, head: FR.fx_ice_chunk0 ? colorFrame("fx_ice_chunk0", "#e0edff", 0.35) : null,
+        m: UB_R * 2.4 / (b2.w * b2.s) });
+    }
+    return (UBA.g = { boom: [0, 1, 2, 3].map((i) => colorFrame("qk_boom" + i, pk, 0.85)), crater: FR.qk_crater ? colorFrame("qk_crater", "#ff7cc8", 0.45) : null,
       rock: FR.qk_rock1 ? colorFrame("qk_rock1", "#ff5fae", 0.6) : null, smoke: FR.fx_smoke ? colorFrame("fx_smoke", "#ffd0ea", 0.5) : null,
-      m: UB_R * 2.4 / (b2.w * b2.s) };   // (sized as the bosses' bursts: 2.4 times its reach wide)
-    return UBA;
+      m: UB_R * 2.4 / (b2.w * b2.s) });   // (sized as the bosses' bursts: 2.4 times its reach wide)
   }
   // the glow sprites, painted once
   let UART = null;
@@ -6159,19 +6170,7 @@
     const rgb = ULT_RGB.g, top = hy - 160 * CHAR_K, wmax = VW * 1.3;
     if (layer === 0) {
       if (own) { ctx.globalAlpha = 0.42 * env; ctx.fillStyle = "#2a0726"; ctx.fillRect(cx - VW * 0.6, cy - VH * 0.6, VW * 1.2, VH * 1.2); }
-      // each heart's ground burst (the bosses' quake look, in pink): the crater it leaves, then its shockwave racing over the ground
-      const UB = ufxBoomArt();
-      if (UB && UB.crater) for (let k = 0; k < UFX_E; k++) {
-        const e0 = S.et[k]; if (e0 < 0) continue;
-        const q = (t - e0) / UB_LIFE; if (q < 0 || q >= 1) continue;
-        ufr(UB.crater, S.ex[k], S.ey[k], UB_R * 2.1 * S.es[k] / (UB.crater.w * UB.crater.s), Math.min(1, (1 - q) * 1.8) * 0.8);
-      }
-      ctx.globalCompositeOperation = "lighter";
-      for (let k = 0; k < UFX_E; k++) {
-        const e0 = S.et[k]; if (e0 < 0) continue;
-        const q = (t - e0) / UB_LIFE; if (q < 0 || q >= 1) continue;
-        const w = ss(0, 0.6, q); ublit(A.ringP0, S.ex[k], S.ey[k], (70 + 320 * w) * S.es[k], (1 - w) * 0.9, 0, 0.55);
-      }
+      ufxBurstsG0(S, A, t, ufxBoomArt("g"));
       uglow(x, y - 10, 340, rgb, 0.3 * env);
       ublit(A.ringP, x, y, 560 * CHAR_K * (0.6 + 0.4 * env), 0.9 * env, t * 0.9, 0.5);
       for (let i = 0; i < 10; i++) { const a = i / 10 * TAU + t * 1.3; ublit(A.heartL, x + Math.cos(a) * 250 * CHAR_K, y + Math.sin(a) * 125 * CHAR_K - 14, 40 * env, 0.85 * env); }
@@ -6183,34 +6182,8 @@
       }
       return;
     }
-    // the ground bursts, over the monsters standing there: a puff of dust and a rock thrown out (solid), then the burst's fire
-    // and its light, and two hearts flung up (light); the debris flies on arcs worked out from the burst's age (nothing kept)
-    const UB = ufxBoomArt(); S.nearA = 0;
-    if (UB) for (let k = 0; k < UFX_E; k++) {
-      const e0 = S.et[k]; if (e0 < 0) continue;
-      const age = t - e0, q = age / UB_LIFE; if (q < 0 || q >= 1) continue;
-      const s = S.es[k], X = S.ex[k], Y = S.ey[k], dim = ufxDim(X, Y, x, y), tau = age / ULT_PACE;
-      ufr(UB.smoke, X + ((k * 37) % 60) - 30, Y - 30 - 140 * q, (1 + 1.6 * q) * s, 0.6 * (1 - q) * dim);
-      const a = k * 2.39, v = 240 + ((k * 53) % 200), z = (760 + ((k * 31) % 300)) * tau - 1100 * tau * tau;
-      if (z > 0) ufr(UB.rock, X + Math.cos(a) * v * tau, Y + Math.sin(a) * v * tau * 0.5 - z, 0.5 * s, dim);
-    }
-    ctx.globalCompositeOperation = "lighter";
-    for (let k = 0; k < UFX_E; k++) {
-      const e0 = S.et[k]; if (e0 < 0) continue;
-      const age = t - e0, q = age / UB_LIFE; if (q < 0 || q >= 1) continue;
-      const s = S.es[k], X = S.ex[k], Y = S.ey[k], dim = ufxDim(X, Y, x, y), tau = age / ULT_PACE, kb = age / UB_BURST;
-      if (kb < 1) {
-        const fa = Math.min(1, (1 - kb) * 2.5) * 0.85 * dim;
-        uglow(X, Y - UB_R * 0.5 * s, UB_R * (1.1 + 0.5 * kb) * s, rgb, 0.6 * (1 - kb) * dim);
-        if (UB) { const f = UB.boom[Math.min(3, (kb * 4) | 0)], m = UB.m * s; ufr(f, X, Y + UB_R * 0.25 * s - f.h * f.s * m / 2, m, fa); }
-        else ublit(A.raysP, X, Y - 70, 220 * s, fa, kb);
-        if (dim < 1 && fa > S.nearA) S.nearA = fa;
-      }
-      for (let p = 0; p < 2; p++) {
-        const a = k * 2.39 + 1.6 + p * 2.6, v = 200 + ((k * 71 + p * 97) % 220), z = (900 + ((k * 43 + p * 59) % 350)) * tau - 1100 * tau * tau, ha = (1 - q) * dim;
-        if (z > 0) { ublit(A.heartL, X + Math.cos(a) * v * tau, Y + Math.sin(a) * v * tau * 0.5 - z, 34, ha); if (dim < 1 && ha > S.nearA) S.nearA = ha; }
-      }
-    }
+    S.nearA = 0;
+    ufxBurstsG1(S, A, x, y, t, ufxBoomArt("g"));
     uglow(x, hy, 320, rgb, 0.3 * env);
     // the heart over her, beating faster as it fills; it bursts at the blast
     const beat = Math.pow(Math.max(0, Math.sin(t * (9 + t * 6))), 6), hs = (170 + 60 * beat) * ss(0.1, 0.5, t), ha = b > 0 ? ULT_BIG_A * (1 - b / 0.3) : env, hm = b > 0 ? 1 + b * 4 : 1;
@@ -6243,6 +6216,68 @@
     }
     if (b > 0) for (let i = 0; i < 32; i += 2) { const C = ufxConf(i, x, hy, b, 520); ublit(i % 4 ? A.heart : A.heartL, C[0], C[1], C[2], C[3], Math.sin(b * 9 + i) * 0.6); }
   }
+  // Mochi's hearts' ground bursts (the bosses' quake look, in pink). Layer 0 (ends in "lighter"):
+  function ufxBurstsG0(S, A, t, UB) {
+    // each heart's ground burst (the bosses' quake look, in pink): the crater it leaves, then its shockwave racing over the ground
+    if (UB && UB.crater) for (let k = 0; k < UFX_E; k++) {
+      const e0 = S.et[k]; if (e0 < 0) continue;
+      const q = (t - e0) / UB_LIFE; if (q < 0 || q >= 1) continue;
+      ufr(UB.crater, S.ex[k], S.ey[k], UB_R * 2.1 * S.es[k] / (UB.crater.w * UB.crater.s), Math.min(1, (1 - q) * 1.8) * 0.8);
+    }
+    ctx.globalCompositeOperation = "lighter";
+    for (let k = 0; k < UFX_E; k++) {
+      const e0 = S.et[k]; if (e0 < 0) continue;
+      const q = (t - e0) / UB_LIFE; if (q < 0 || q >= 1) continue;
+      const w = ss(0, 0.6, q); ublit(A.ringP0, S.ex[k], S.ey[k], (70 + 320 * w) * S.es[k], (1 - w) * 0.9, 0, 0.55);
+    }
+  }
+  // layer 1 (ends in "lighter"); those whose fire would rise over her (x, y) are see-through
+  function ufxBurstsG1(S, A, x, y, t, UB) {
+    const rgb = ULT_RGB.g;
+    // the ground bursts, over the monsters standing there: a puff of dust and a rock thrown out (solid), then the burst's fire
+    // and its light, and two hearts flung up (light); the debris flies on arcs worked out from the burst's age (nothing kept)
+    if (UB) for (let k = 0; k < UFX_E; k++) {
+      const e0 = S.et[k]; if (e0 < 0) continue;
+      const age = t - e0, q = age / UB_LIFE; if (q < 0 || q >= 1) continue;
+      const s = S.es[k], X = S.ex[k], Y = S.ey[k], dim = ufxDim(X, Y, x, y), tau = age / ULT_PACE;
+      ufr(UB.smoke, X + ((k * 37) % 60) - 30, Y - 30 - 140 * q, (1 + 1.6 * q) * s, 0.6 * (1 - q) * dim);
+      const a = k * 2.39, v = 240 + ((k * 53) % 200), z = (760 + ((k * 31) % 300)) * tau - 1100 * tau * tau;
+      if (z > 0) ufr(UB.rock, X + Math.cos(a) * v * tau, Y + Math.sin(a) * v * tau * 0.5 - z, 0.5 * s, dim);
+    }
+    ctx.globalCompositeOperation = "lighter";
+    for (let k = 0; k < UFX_E; k++) {
+      const e0 = S.et[k]; if (e0 < 0) continue;
+      const age = t - e0, q = age / UB_LIFE; if (q < 0 || q >= 1) continue;
+      const s = S.es[k], X = S.ex[k], Y = S.ey[k], dim = ufxDim(X, Y, x, y), tau = age / ULT_PACE, kb = age / UB_BURST;
+      if (kb < 1) {
+        const fa = Math.min(1, (1 - kb) * 2.5) * 0.85 * dim;
+        uglow(X, Y - UB_R * 0.5 * s, UB_R * (1.1 + 0.5 * kb) * s, rgb, 0.6 * (1 - kb) * dim);
+        if (UB) { const f = UB.boom[Math.min(3, (kb * 4) | 0)], m = UB.m * s; ufr(f, X, Y + UB_R * 0.25 * s - f.h * f.s * m / 2, m, fa); }
+        else ublit(A.raysP, X, Y - 70, 220 * s, fa, kb);
+        if (dim < 1 && fa > S.nearA) S.nearA = fa;
+      }
+      for (let p = 0; p < 2; p++) {
+        const a = k * 2.39 + 1.6 + p * 2.6, v = 200 + ((k * 71 + p * 97) % 220), z = (900 + ((k * 43 + p * 59) % 350)) * tau - 1100 * tau * tau, ha = (1 - q) * dim;
+        if (z > 0) { ublit(A.heartL, X + Math.cos(a) * v * tau, Y + Math.sin(a) * v * tau * 0.5 - z, 34, ha); if (dim < 1 && ha > S.nearA) S.nearA = ha; }
+      }
+    }
+  }
+  // Mochi's falling hearts: their trails and glows (light), then the hearts (solid); ends in "source-over" (the combo's)
+  function ufxHeartsFall(S, A, t) {
+    const dur = ufxDur("g"), nd = UFX_RAIN.g.n, rgb = ULT_RGB.g;
+    ctx.globalCompositeOperation = "lighter";
+    for (let i = 0; i < nd; i++) {
+      if (S.st[i] !== 1) continue;
+      const k = clamp((t - ufxT0("g", i)) / dur, 0, 1), X = S.tx[i] + Math.sin(i * 1.7 + t * 8) * 26 * (1 - k), Y = S.ty[i] - 70 - 1050 * (1 - k * k);
+      ustreak(A.trailP, X, Y - 20, 300, 30, Math.PI / 2, 0.85); uglow(X, Y, 90, rgb, 0.7);
+    }
+    ctx.globalCompositeOperation = "source-over";
+    for (let i = 0; i < nd; i++) {
+      if (S.st[i] !== 1) continue;
+      const k = clamp((t - ufxT0("g", i)) / dur, 0, 1), X = S.tx[i] + Math.sin(i * 1.7 + t * 8) * 26 * (1 - k), Y = S.ty[i] - 70 - 1050 * (1 - k * k);
+      ublit(i % 3 ? A.heart : A.heartL, X, Y, 84 + (i % 3) * 14, 1, Math.sin(t * 6 + i) * 0.35);
+    }
+  }
   // confetti piece i flying out of (x, y) b after the blast (g: its fall): [x, y, size, alpha] (one shared array, read at once)
   const UCONF = [0, 0, 0, 0];
   function ufxConf(i, x, y, b, g) {
@@ -6251,19 +6286,14 @@
     return UCONF;
   }
   function drawUltMatcha(S, A, x, y, t, cx, cy, layer, own) {
-    const env = ss(0, 0.4, t) * (1 - ss(2.15, 2.55, t)), fz = ultZ(t), hy = y - fz - 110 * CHAR_K, b = t - ULT_BOOM, dur = ufxDur("s"), nd = UFX_RAIN.s.n;
-    const rgb = ULT_RGB.s, wmax = VW * 1.3;
+    const env = ss(0, 0.4, t) * (1 - ss(2.15, 2.55, t)), fz = ultZ(t), hy = y - fz - 110 * CHAR_K, b = t - ULT_BOOM;
+    const rgb = ULT_RGB.s, wmax = VW * 1.3, UB = ufxBoomArt("s");
     if (layer === 0) {
       if (own) { ctx.globalAlpha = 0.55 * env; ctx.fillStyle = "#06102c"; ctx.fillRect(cx - VW * 0.6, cy - VH * 0.6, VW * 1.2, VH * 1.2); }   // (night falls)
-      ctx.globalCompositeOperation = "lighter";
+      ufxBurstsS0(S, A, t, UB);
       uglow(x, y - 10, 340, rgb, 0.3 * env);
       ublit(A.ringB, x, y, 600 * CHAR_K * (0.6 + 0.4 * env), 0.9 * env, t * 0.7, 0.5);
       ublit(A.ringB0, x, y, 380 * CHAR_K * (0.6 + 0.4 * env), 0.6 * env, -t * 1.1, 0.5);
-      for (let i = 0; i < nd; i++) {   // each meteor that landed: a ring rippling out over the ground, and its light
-        if (S.st[i] !== 2) continue;
-        const q = (t - ufxT0("s", i) - dur) / 0.45; if (q < 0 || q >= 1) continue;
-        ublit(A.ringB0, S.tx[i], S.ty[i], 90 + 330 * q, 1 - q, 0, 0.5); uglow(S.tx[i], S.ty[i], 170 * (1 - q * 0.5), rgb, (1 - q) * 0.6);
-      }
       if (b > 0) {
         for (let j = 0; j < 2; j++) { const q = (b - j * 0.14) / 0.85; if (q > 0 && q < 1) ublit(A.ringB, x, y, Math.min(wmax, 300 + q * wmax), 1 - q, b * 0.5, 0.5); }
         // (the blast's star burst and its ring stay under her and the monsters, see-through: nobody vanishes in the light)
@@ -6272,7 +6302,8 @@
       }
       return;
     }
-    ctx.globalCompositeOperation = "lighter";
+    S.nearA = 0;
+    ufxBurstsS1(S, A, x, y, t, UB);
     uglow(x, hy, 320, rgb, 0.3 * env);
     // shooting stars across the night sky
     for (let i = 0; i < 8; i++) {
@@ -6290,21 +6321,84 @@
       const a = i / 7 * TAU + rot - Math.PI / 2, sa = ss(0.05 + i * 0.06, 0.2 + i * 0.06, t) * (1 - ss(1.6, 1.9, t));
       ublit(i % 2 ? A.starB : A.starW, x + Math.cos(a) * R, ccy + Math.sin(a) * R, 70 + 18 * Math.sin(t * 9 + i), sa, t * 1.5 + i);
     }
-    // the meteors: a long silver-blue trail, a glow and a bright star head
+    if (b > 0) {
+      for (let i = 0; i < 28; i++) { const C = ufxConf(i, x, hy, b, 140); ublit(i % 3 ? A.starB : A.starW, C[0], C[1], C[2] * 1.3, C[3] * ULT_BIG_A, b * 5 + i); }
+    }
+    ufxMeteors(S, A, t, UB, 1);
+  }
+  // Matcha's meteors' ground bursts (the bosses' quake look, in silver-blue). Layer 0: the frosted crater each leaves, then its
+  // shockwave ring racing over the ground (ends in "lighter")
+  function ufxBurstsS0(S, A, t, UB) {
+    if (UB && UB.crater) for (let k = 0; k < UFX_E; k++) {
+      const e0 = S.et[k]; if (e0 < 0) continue;
+      const q = (t - e0) / UB_LIFE; if (q < 0 || q >= 1) continue;
+      ufr(UB.crater, S.ex[k], S.ey[k], UB_R * 2.1 * S.es[k] / (UB.crater.w * UB.crater.s), Math.min(1, (1 - q) * 1.8) * 0.8);
+    }
+    ctx.globalCompositeOperation = "lighter";
+    for (let k = 0; k < UFX_E; k++) {
+      const e0 = S.et[k]; if (e0 < 0) continue;
+      const q = (t - e0) / UB_LIFE; if (q < 0 || q >= 1) continue;
+      const w = ss(0, 0.55, q); ublit(A.ringB0, S.ex[k], S.ey[k], (70 + 340 * w) * S.es[k], (1 - w) * 0.9, 0, 0.55);
+    }
+  }
+  // layer 1, over the monsters standing there: frost dust and an ice-star shard thrown out tumbling (solid), then the burst's fire
+  // and its light, and two star glints flung up (light); the debris flies on arcs worked out from the burst's age (nothing kept).
+  // Those whose fire would rise over her (x, y) are see-through (ufxDim). Ends in "lighter"
+  function ufxBurstsS1(S, A, x, y, t, UB) {
+    const rgb = ULT_RGB.s;
+    if (UB) for (let k = 0; k < UFX_E; k++) {
+      const e0 = S.et[k]; if (e0 < 0) continue;
+      const age = t - e0, q = age / UB_LIFE; if (q < 0 || q >= 1) continue;
+      const s = S.es[k], X = S.ex[k], Y = S.ey[k], dim = ufxDim(X, Y, x, y), tau = age / ULT_PACE;
+      ufr(UB.smoke, X + ((k * 37) % 60) - 30, Y - 30 - 120 * q, (1 + 1.6 * q) * s, 0.55 * (1 - q) * dim);
+      const a = k * 2.39, v = 260 + ((k * 53) % 200), z = (800 + ((k * 31) % 300)) * tau - 1100 * tau * tau, sh = UB.shard[k % UB.shard.length];
+      if (z > 0 && sh) ublit(sh.img, X + Math.cos(a) * v * tau, Y + Math.sin(a) * v * tau * 0.5 - z, 44 * s, dim, tau * 11 + k);
+    }
+    ctx.globalCompositeOperation = "lighter";
+    for (let k = 0; k < UFX_E; k++) {
+      const e0 = S.et[k]; if (e0 < 0) continue;
+      const age = t - e0, q = age / UB_LIFE; if (q < 0 || q >= 1) continue;
+      const s = S.es[k], X = S.ex[k], Y = S.ey[k], dim = ufxDim(X, Y, x, y), tau = age / ULT_PACE, kb = age / UB_BURST;
+      if (kb < 1) {
+        const fa = Math.min(1, (1 - kb) * 2.5) * 0.85 * dim;
+        uglow(X, Y - UB_R * 0.5 * s, UB_R * (1.1 + 0.5 * kb) * s, rgb, 0.6 * (1 - kb) * dim);
+        if (UB) { const f = UB.boom[Math.min(3, (kb * 4) | 0)], m = UB.m * s; ufr(f, X, Y + UB_R * 0.25 * s - f.h * f.s * m / 2, m, fa); }
+        else ublit(A.raysB, X, Y - 70, 220 * s, fa, kb);
+        if (dim < 1 && fa > S.nearA) S.nearA = fa;
+      }
+      for (let p = 0; p < 2; p++) {
+        const a = k * 2.39 + 1.6 + p * 2.6, v = 200 + ((k * 71 + p * 97) % 220), z = (950 + ((k * 43 + p * 59) % 350)) * tau - 1100 * tau * tau, ha = (1 - q) * dim;
+        if (z > 0) {
+          const px = X + Math.cos(a) * v * tau, py = Y + Math.sin(a) * v * tau * 0.5 - z;
+          if (UB && UB.star) ufr(UB.star, px, py, 0.75 + 0.25 * Math.sin(age * 40 + k + p), ha); else ublit(A.starW, px, py, 46, ha, age * 6);
+          if (dim < 1 && ha > S.nearA) S.nearA = ha;
+        }
+      }
+    }
+  }
+  // the falling meteors: a long silver-blue trail and a glow (light), the painted ice-rock head (solid), a bright star on it (light);
+  // one in five that landed leaves a glint twinkling until the end. Called in "lighter"; ends in it. a: how strong
+  function ufxMeteors(S, A, t, UB, a) {
+    const dur = ufxDur("s"), nd = UFX_RAIN.s.n, rgb = ULT_RGB.s;
     for (let i = 0; i < nd; i++) {
       if (S.st[i] !== 1) continue;
       const k = clamp((t - ufxT0("s", i)) / dur, 0, 1), e = k * k, X = S.tx[i] + METEOR_DX * (1 - e), Y = S.ty[i] - 60 - METEOR_DY * (1 - e);
-      ustreak(A.trailB, X, Y, 560, 46, METEOR_ANG, 1); uglow(X, Y, 120, rgb, 0.85); ublit(A.starW, X, Y, 130, 1, t * 8 + i);
+      ustreak(A.trailB, X, Y, 560, 42, METEOR_ANG, a); uglow(X, Y, 110, rgb, 0.8 * a);
     }
-    // where each landed: a flash of light, then a glint that keeps twinkling until the end
+    for (let i = 0; i < nd; i += 5) if (S.st[i] === 2) ublit(A.starW, S.tx[i] + 24, S.ty[i] - 130, 54, a * (1 - ss(2.0, 2.4, t)) * Math.pow(Math.max(0, Math.sin(t * 9 + i * 1.9)), 3), 0);
+    if (UB && UB.head) {
+      ctx.globalCompositeOperation = "source-over";
+      for (let i = 0; i < nd; i++) {
+        if (S.st[i] !== 1) continue;
+        const k = clamp((t - ufxT0("s", i)) / dur, 0, 1), e = k * k, X = S.tx[i] + METEOR_DX * (1 - e), Y = S.ty[i] - 60 - METEOR_DY * (1 - e);
+        ublit(UB.head.img, X, Y, 64 + (i % 3) * 10, a, t * 10 + i);
+      }
+      ctx.globalCompositeOperation = "lighter";
+    }
     for (let i = 0; i < nd; i++) {
-      if (S.st[i] !== 2) continue;
-      const q = (t - ufxT0("s", i) - dur) / 0.3;
-      if (q >= 0 && q < 1) { ublit(A.raysB, S.tx[i], S.ty[i] - 60, 200 + 220 * q, (1 - q) * 0.6, q); ublit(A.starW, S.tx[i], S.ty[i] - 60, 260 * (1 - q * 0.5), 0.8 * (1 - q), q * 2); }
-      else ublit(A.starW, S.tx[i] + 24, S.ty[i] - 130, 54, (1 - ss(2.0, 2.4, t)) * Math.pow(Math.max(0, Math.sin(t * 9 + i * 1.9)), 3), 0);
-    }
-    if (b > 0) {
-      for (let i = 0; i < 28; i++) { const C = ufxConf(i, x, hy, b, 140); ublit(i % 3 ? A.starB : A.starW, C[0], C[1], C[2] * 1.3, C[3] * ULT_BIG_A, b * 5 + i); }
+      if (S.st[i] !== 1) continue;
+      const k = clamp((t - ufxT0("s", i)) / dur, 0, 1), e = k * k, X = S.tx[i] + METEOR_DX * (1 - e), Y = S.ty[i] - 60 - METEOR_DY * (1 - e);
+      ublit(A.starW, X - 4, Y - 4, 96, 0.9 * a, t * 8 + i);
     }
   }
   // the blast's short, soft flash over the screen (L, T, R, B): a see-through pink / blue veil (never a white-out); k: how strong
@@ -6317,8 +6411,8 @@
   // the ultimate's name, big near the bottom of the screen (screen space; clear of the light over her and the HUD): it pops in, bumps at the blast and fades. k: its size
   function drawUltTitle(S, W, H, k) {
     const a = S.on ? S.titleA : 0; if (a <= 0.01) return;
-    const t = S.t, A = ufxArt(), hk = S.hk, rgb = ULT_RGB[hk];
-    const pop = easeBack((t - 0.15) / 0.3), bump = S.boomed ? 1 + 0.12 * Math.max(0, 1 - (t - ULT_BOOM) / 0.25) : 1;
+    const t = S.t, A = ufxArt(), hk = S.hk, rgb = ULT_RGB[hk], tp = S.tp ?? 0.15, tb = S.tb ?? ULT_BOOM;   // (tp, tb: when it pops in, bumps)
+    const pop = easeBack((t - tp) / 0.3), bump = S.boomed ? 1 + 0.12 * Math.max(0, 1 - (t - tb) / 0.25) : 1;
     const m = Math.min(W * 0.064, H * 0.1) * k * Math.max(0.05, pop) * bump / 100;
     ctx.save(); ctx.translate(W / 2, H * 0.8); ctx.scale(m, m);
     // (the words are painted once into their own picture, 1.6x sharp: big text is costly to draw afresh every frame on the iPad)
@@ -6334,9 +6428,10 @@
       const g = c0.getContext("2d");
       g.font = "800 160px Grandstander, system-ui"; g.textAlign = "center"; g.textBaseline = "middle"; g.lineJoin = "round";
       g.translate(c0.width / 2, c0.height / 2);
-      const gr = g.createLinearGradient(0, -80, 0, 80);
-      if (hk === "g") { gr.addColorStop(0, "#fff6fb"); gr.addColorStop(0.5, "#ffa8da"); gr.addColorStop(1, "#ff4fae"); } else { gr.addColorStop(0, "#ffffff"); gr.addColorStop(0.5, "#cfe3ff"); gr.addColorStop(1, "#78aaff"); }
-      g.lineWidth = 35; g.strokeStyle = hk === "g" ? "#5a0f3f" : "#0d1f4a"; g.strokeText(S.title, 0, 0);
+      const gr = hk === "c" ? g.createLinearGradient(-tw * 0.8, 0, tw * 0.8, 0) : g.createLinearGradient(0, -80, 0, 80);
+      if (hk === "c") { gr.addColorStop(0, "#ff8fd2"); gr.addColorStop(0.5, "#fff6fb"); gr.addColorStop(1, "#8fc1ff"); }   // (the sisters': pink to silver-blue)
+      else if (hk === "g") { gr.addColorStop(0, "#fff6fb"); gr.addColorStop(0.5, "#ffa8da"); gr.addColorStop(1, "#ff4fae"); } else { gr.addColorStop(0, "#ffffff"); gr.addColorStop(0.5, "#cfe3ff"); gr.addColorStop(1, "#78aaff"); }
+      g.lineWidth = 35; g.strokeStyle = hk === "g" ? "#5a0f3f" : hk === "c" ? "#2a1048" : "#0d1f4a"; g.strokeText(S.title, 0, 0);
       g.lineWidth = 13; g.strokeStyle = "#fff"; g.strokeText(S.title, 0, 0);
       g.fillStyle = gr; g.fillText(S.title, 0, 0);
     }
@@ -6346,7 +6441,7 @@
     ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = a;
     ctx.drawImage(tc, -tc.width / 3.2, -tc.height / 3.2, tc.width / 1.6, tc.height / 1.6);
     ctx.globalCompositeOperation = "lighter";
-    for (let i = 0; i < 2; i++) ublit(hk === "g" ? A.starP : A.starB, (i ? 1 : -1) * (hw + 40), -30 + i * 50, 120 + 40 * Math.sin(t * 10 + i * 2), a, t * 3);
+    for (let i = 0; i < 2; i++) ublit(hk === "g" || (hk === "c" && !i) ? A.starP : A.starB, (i ? 1 : -1) * (hw + 40), -30 + i * 50, 120 + 40 * Math.sin(t * 10 + i * 2), a, t * 3);
     ctx.restore();
   }
   // a frozen monster's block of ice, fitted round its frame (drawn at (x, y) with scale mul): it grows on in a blink,
@@ -6621,6 +6716,7 @@
     ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
     // the ultimate's name, big on the screen (the partner's a little smaller)
     if (G.ult) drawUltTitle(UFX.p, W, H, 1);
+    else if (G.combo) drawUltTitle(UFX.cb, W, H, 1.15);   // (the sisters' combo's: the biggest)
     else if (Q && NET.role && Q.ultT > 0 && !G.combo) drawUltTitle(UFX.q, W, H, 0.72);
     drawWalkFade(W, H);
     if (G.fade > 0) { ctx.fillStyle = `rgba(11,7,16,${G.fade})`; ctx.fillRect(0, 0, W, H); }
@@ -10148,7 +10244,7 @@
     buildLevel(0); G.mode = "title"; ready = true;
     renderHeroes(); updateXpHud();
     $("loading").hidden = true; $("startBtn").hidden = false; $("coopBtn").hidden = false;
-    setTimeout(() => { try { ufxArt(); ufxBoomArt(); } catch (_) {} }, 300);   // (the ultimates' pictures painted on the title screen, not as one starts)
+    setTimeout(() => { try { ufxArt(); ufxBoomArt("g"); ufxBoomArt("s"); } catch (_) {} }, 300);   // (the ultimates' pictures painted on the title screen, not as one starts)
   }
   // test hooks for automated checks. __sksp.autopilot = true makes this girl walk the path on her own.
   const API = window.__sksp = {
