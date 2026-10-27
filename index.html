@@ -360,7 +360,7 @@
   let META = null, ready = false;
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261027.1536", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261027.1623", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -685,8 +685,11 @@
       // (decoGap); a lighter ground with fewer, softer seams (seamA), dots and ponds. Màn 1-3 keep the defaults.)
       deco: [["lv_dead_tree", 1, 1.15], ["lv_boulders", 3, 1.12], ["lv_fire_crystal", 1, 1.12], ["lv_flower_rock", 1, 1.12], ["lv_volcano", 1, 1.12], ["lv_brazier", 1, 1.12], ["lv_chain_fence", 1, 1.12]],
       decoN: 1100, decoSkip: 0.55, decoGap: 150,
+      // its lava pools (placeLavaPools): the painted pool beside and across the path, some pulsing; touching one = fainting. (So the
+      // flat orange ponds are gone (nPond 0): every lava pool on this map is one that hurts.)
+      lavaPools: true,
       gr: { base: "#4a3b36", patch: ["#5a4640", "#3f3330", "#6b4a3a", "#4e3d37"], blade: ["#55463f", "#7a3b1f", "#3a302c"], dot: ["#ff7a2a", "#ffb03a", "#ff4a1a", "#6b5a55", "#8a7a70", "#ffd36a"], nDot: 25,
-        stone: ["#766760", "#655850", "#84736c"], gap: "#8c3a1c", edge: "#140e0c", sea: "#ffc23a", seaEdge: "#3a1a12", pond: "#ff5a1a", nPond: 12, seam: ["#ff5a1a", "#ffc23a"], nSeam: 3, seamA: [0.1, 0.45, 0.8] } },
+        stone: ["#766760", "#655850", "#84736c"], gap: "#8c3a1c", edge: "#140e0c", sea: "#ffc23a", seaEdge: "#3a1a12", pond: "#ff5a1a", nPond: 0, seam: ["#ff5a1a", "#ffc23a"], nSeam: 3, seamA: [0.1, 0.45, 0.8] } },
   ];
   // what follows level i: the level its `next` names (by id; -1 while that map is not in the game yet), else the one after it in LEVELS;
   // -1: none, the "Còn tiếp…" screen. Màn 2 -> Màn 3 (Núi Tuyết, id "snow") -> Màn 4 (Núi Dung Nham, id "lava", `last`) -> "Còn tiếp…"
@@ -1018,6 +1021,9 @@
         G.ponds.push({ x, y, r, sq: 0.55 + RP() * 0.25 });
       }
     }
+    // Núi Dung Nham's lava pools (levels with `lavaPools`); no star or candy left lying in lava
+    G.lpools = placeLavaPools(L, path, endI); G.lpT = 0; G.lpSafe = null; G.lpSide = 0;
+    if (G.lpools.length) G.items = G.items.filter((it) => !G.lpools.some((o) => lpNear(o, it.x, it.y, 60)));
     // bucket everything the ground painter needs per chunk
     G.chunkData = new Map();
     const bucket = (x0, y0, x1, y1, key, item) => {
@@ -1039,6 +1045,7 @@
       if (G.arena && d2(x, y, G.arena.x, G.arena.y) < (G.arena.r + 160) ** 2) return false;
       for (const k of keepOut) if (d2(x, y, k.x, k.y) < 260 * 260) return false;
       if (G.ponds && G.ponds.some((p) => d2(x, y, p.x, p.y) < (p.r + 60) ** 2)) return false;   // not in the shallows
+      if (G.lpools.some((o) => lpNear(o, x, y, LP_KEEP))) return false;   // nor in or by the lava: the way round it stays open
       const gap = name === "tree" || name === "cd_lolly_tree" || name === "pr_palm" ? 170 : L.decoGap || 95;   // (decoGap: a level's own spacing)
       for (const d of decoNear(x, y, gap)) if (d2(x, y, d.x, d.y) < gap * gap) return false;
       return true;
@@ -1058,6 +1065,7 @@
     G.lamps = [];
     for (let s = 300, side = 1; s < path.len - 200; s += 1100, side = -side) {
       const [x, y] = offAt(s, side, PATH_W / 2 + 55), d = { name: "lantern_on", x, y, m: 0.9, flip: side < 0, r: 22, lamp: true };
+      if (G.lpools.some((o) => lpNear(o, x, y, 120))) continue;   // (none in the lava)
       addDeco(d);
     }
     // reset the play state
@@ -1284,7 +1292,8 @@
     return [0, 0];
   }
   // test bot: walk the path toward the guide target; wait near a sealed gate; circle the boss at a safe distance
-  function autopilot() {
+  function autopilot() { const v = autopilotWay(); return G.lpools && G.lpools.length ? lpSteer(v) : v; }   // (round Núi Dung Nham's lava pools)
+  function autopilotWay() {
     const B = G.boss;
     let tx, ty, dx, dy, d;
     if (G.quiz && G.arena) { const [qx, qy] = quadCentre(G.quiz.ok); dx = qx - P.x; dy = qy - P.y; d = Math.hypot(dx, dy); return d < 40 ? [0, 0] : [dx / d, dy / d]; }
@@ -1344,10 +1353,13 @@
     burst(P.x, P.y - 110, 10, ["#ff9ab8", "#fff"], 260, 0.5);
     if (G.hearts <= 0) heroDown();
   }
-  function heroDown() {
+  function heroDown(why) {
     if (P.dead) return;
     P.dead = true; G.hearts = 0; renderHearts(); G.reviveT = FAINT_T; P.vx = P.vy = 0; SFX.hurt();
-    showBanner("Bé bị ngất rồi!", Q && NET.role ? "Bạn kia lại gần để cứu nhanh nhé" : "Chờ vòng tròn quay hết là bé tỉnh lại");
+    // (by lava: carried back to the nearest spot with no lava within LP_CLEAR, where she lies and gets up)
+    const safe = lavaSafeSpot(P.x, P.y);
+    if (safe) { burst(P.x, P.y - 80, 16, ["#fff4c2", "#ffd34d", "#ff9a5c"], 300, 0.5); P.x = safe[0]; P.y = safe[1]; burst(P.x, P.y - 80, 20, ["#fff4c2", "#ffd34d", "#ffffff"], 300, 0.6); }
+    showBanner(why === "lava" ? "Ối, dung nham nóng quá! Bé bị ngất rồi!" : "Bé bị ngất rồi!", Q && NET.role ? "Bạn kia lại gần để cứu nhanh nhé" : "Chờ vòng tròn quay hết là bé tỉnh lại");
   }
   // fainting: she lies dizzy for FAINT_T seconds; the partner standing close by revives her five times faster
   const FAINT_T = 10, RESCUE_R = 280;
@@ -1399,7 +1411,8 @@
       if (G.arenaLock && d > A.r - 60) { o.x = A.x + dx / d * (A.r - 60); o.y = A.y + dy / d * (A.r - 60); }
       else if (!A.open && d < A.r + 40) { o.x = A.x + dx / d * (A.r + 40); o.y = A.y + dy / d * (A.r + 40); }
     }
-    o.x = clamp(o.x, 80, WORLD - 80); o.y = clamp(o.y, 80, WORLD - 80);
+    const E = G.lvl && G.lvl.lavaPools ? 230 : 80;   // (Núi Dung Nham: the lava sea at the world's edge is a wall, never walked into)
+    o.x = clamp(o.x, E, WORLD - E); o.y = clamp(o.y, E, WORLD - E);
   }
 
   // ---- auto attack: Mochi fires a fan of little heart bolts that grows with her level;
@@ -2678,16 +2691,29 @@
   // a speech bubble of a few lines; the tail points down to the speaker, or up when he speaks from the sky
   // (dx: the bubble's body moved sideways from its tail, e.g. off a station it would cover; at most so far that the tail stays under it)
   // (minTop: a world y the bubble's top must stay below (a bubble over the head is pushed down to it, e.g. under the boss bar))
-  function talkBubble(lines, x, y, k, fs, up, dx, minTop) {
+  // (box: { L, R, B } the view in world units: the bubble is kept inside it; pushed down far over the speaker's face, its body moves
+  // aside, toward the middle of the view, its tail still on him)
+  function talkBubble(lines, x, y, k, fs, up, dx, minTop, box) {
     if (API.said) API.said.push(lines.join(" "));   // (tests: which bubbles are drawn)
     ctx.save(); ctx.globalAlpha = k; const s = 0.8 + 0.2 * k;
     ctx.font = `800 ${fs}px Grandstander, system-ui`;
     const lh = fs * 1.18, w = Math.max(...lines.map((l) => ctx.measureText(l).width)) + fs * 1.6, h = lines.length * lh + fs * 0.8;
-    if (!up && minTop !== undefined) y = Math.max(y, minTop + (h + 34) * s);
+    let push = 0;
+    if (!up && minTop !== undefined) { const y1 = Math.max(y, minTop + (h + 34) * s); push = y1 - y; y = y1; }
+    if (box) {
+      if (push > h * 0.5 * s && !dx) dx = (x < (box.L + box.R) / 2 ? 1 : -1) * (w / 2 - 50) * s;
+      const b0 = dx ? clamp(dx / s, Math.min(0, -w / 2 + 50), Math.max(0, w / 2 - 50)) : 0;
+      x = clamp(x, box.L + 16 - (b0 - w / 2) * s, Math.max(box.L + 16 - (b0 - w / 2) * s, box.R - 16 - (b0 + w / 2) * s));
+      if (box.B !== undefined) y = Math.min(y, box.B - 16 - 6 * s);
+    }
     if (API.saidBox) API.saidBox.push([lines.join(" "), VIEWT.zs ? ((y - (up ? -34 : h + 34) * s - VIEWT.T) * VIEWT.zs + VIEWT.offY) / DPR : 0, k]);   // (tests: [text, its top in css px, alpha])
     ctx.translate(x, y); ctx.scale(s, s);
     if (API.saidPx) API.saidPx.push([lines.join(" "), fs * s]);
     const y0 = up ? 34 : -h - 34, bx = dx ? clamp(dx / s, Math.min(0, -w / 2 + 50), Math.max(0, w / 2 - 50)) : 0;
+    if (API.saidRect && VIEWT.zs) {   // (tests: [text, left, top, right, bottom (its tail's tip), alpha] in css px)
+      const cx = (wx) => ((wx - VIEWT.L) * VIEWT.zs + VIEWT.offX) / DPR, cy = (wy) => ((wy - VIEWT.T) * VIEWT.zs + VIEWT.offY) / DPR;
+      API.saidRect.push([lines.join(" "), cx(x + (bx - w / 2) * s), cy(y + Math.min(y0, up ? -6 : y0) * s), cx(x + (bx + w / 2) * s), cy(y + (up ? y0 + h : 6) * s), k]);
+    }
     ctx.fillStyle = "#fff"; ctx.strokeStyle = "rgba(60,30,80,.55)"; ctx.lineWidth = 6;
     rrect(ctx, bx - w / 2, y0, w, h, Math.min(40, h / 2)); ctx.fill(); ctx.stroke();
     const ty = up ? 36 : -36, tip = up ? -6 : 6;
@@ -2699,7 +2725,7 @@
     ctx.restore();
   }
   // the world view's top (world y), zoom and letterbox, set each frame by render: a screen y in css px is at T + (y * DPR - offY) / zs
-  const VIEWT = { T: 0, zs: 0, offY: 0 };
+  const VIEWT = { T: 0, zs: 0, offY: 0, L: 0, offX: 0 };
   // the bottom of the boss's name and health bar (css px; the stub page has no layout: 15 u, u = min(1vh, 1.6vw), as the css places it)
   function bossBarBottom() {
     const el = $("bossbar");
@@ -2707,26 +2733,26 @@
     return 15 * Math.min(window.innerHeight / 100, window.innerWidth * 1.6 / 100);
   }
   // drawn over the scene: what he says in his films, and his laugh during the quiz
-  function drawBossTalk(L, T, R) {
+  // (every bubble of his stays below his name and health bar at the top of the screen and inside the view: Dad saw his laugh under the bar)
+  function drawBossTalk(L, T, R, Bt) {
     const B = G.boss, BD = G.lvl && G.lvl.boss; if (!B || !BD) return;
     const c = G.bcut, head = B.headY === undefined ? B.y - 520 : B.headY;
+    const minTop = VIEWT.zs ? VIEWT.T + ((bossBarBottom() + 10) * DPR - VIEWT.offY) / VIEWT.zs : undefined, box = { L, R, B: Bt };
     if (c && c.ph === "intro" && BD.say && c.t >= BI_SAY && c.t < BI_END - 0.3) {
       const k = Math.min(clamp((c.t - BI_SAY) / 0.25, 0, 1), clamp((BI_END - 0.3 - c.t) / 0.25, 0, 1));
-      talkBubble(BD.say, B.x, head - 20, k, 46 * WT);
+      talkBubble(BD.say, B.x, head - 20, k, 46 * WT, false, 0, minTop, box);
     } else if (c && c.ph === "die" && BD.bye && c.t >= BD_SAY && c.t < BD_FALL) {
       const k = Math.min(clamp((c.t - BD_SAY) / 0.25, 0, 1), clamp((BD_FALL - c.t) / 0.2, 0, 1));
-      talkBubble(BD.bye, B.x + Math.sin(c.t * 13) * 4, head - 20, k, 46 * WT);
+      talkBubble(BD.bye, B.x + Math.sin(c.t * 13) * 4, head - 20, k, 46 * WT, false, 0, minTop, box);
     } else if (B.alive && B.st === "morph" && BD.morph && B.t >= 0.15 && B.t < MORPH_T - 0.1) {
       // changing form: he growls his line, shaking with rage
       const k = Math.min(clamp((B.t - 0.15) / 0.2, 0, 1), clamp((MORPH_T - 0.1 - B.t) / 0.2, 0, 1));
-      // (kept below his name and health bar at the top of the screen: with his head near the top it would cover them)
-      const minTop = VIEWT.zs ? VIEWT.T + ((bossBarBottom() + 10) * DPR - VIEWT.offY) / VIEWT.zs : undefined;
-      talkBubble(BD.morph, B.x + Math.sin(G.t * 40) * 5, head - 20, k, 54 * WT, false, 0, minTop);
+      talkBubble(BD.morph, B.x + Math.sin(G.t * 40) * 5, head - 20, k, 54 * WT, false, 0, minTop, box);
     } else if (B.alive && G.quiz && G.quiz.ph !== "down" && BD.ha) {
       // he laughs from beside the fence: the bubble over his head, leaning in toward the arena
       const sd = B.x < G.arena.x ? 1 : -1, k = G.quiz.ph === "up" ? clamp(G.quiz.t / 0.3, 0, 1) : 1;
       const big = bossLaughing(B) ? 1 + 0.07 * Math.abs(Math.sin(G.t * 14)) : 1;
-      talkBubble([BD.ha], B.x + sd * 130 + Math.sin(G.t * 40) * 4, head + 10, k, 62 * WT * big);   // (62: as big on the screen as before under the quiz's lighter zoom)
+      talkBubble([BD.ha], B.x + sd * 130 + Math.sin(G.t * 40) * 4, head + 10, k, 62 * WT * big, false, 0, minTop, box);   // (62: as big on the screen as before under the quiz's lighter zoom)
     }
   }
   function updateBossBar() { if (G.boss) { $("bfill").style.width = (100 * Math.max(0, G.boss.hp) / G.boss.max) + "%"; $("bossbar").classList.toggle("p2", G.boss.phase === 2); } }
@@ -3829,6 +3855,222 @@
       fx("fx_flame", p.x + Math.sin(G.t * 11 + j + p.i) * 8, p.y - 20 - j * 85 * hk, sc * (1 - j * 0.22) * fl * (0.4 + 0.6 * hk), Math.min(1, 1.3 * hk), Math.sin(G.t * 7 + j) * 0.1, j === 1, 1.1 + 0.2 * hk);
     }
   }
+  // ---------------------------------------------------------------- Núi Dung Nham's lava pools (a level with `lavaPools`): Dad's
+  // "hồ dung nham chảy, đi qua chạm phải là bị ngất". The painted lava pool (lv_lava_pool) lies beside and across the path; code adds
+  // the light (a flowing glow, bubbles, heat shimmer, embers). Her feet in the lava drawn -> she faints at once (heroDown), less a small
+  // forgiving margin (LP_M). Some pulse: rest small, warn (glow, bubbles, a dashed ring at how far it will reach) for LP_WARN s, grow,
+  // stay big, sink back. Laid out from the level's seed and its path (both co-op pages build the same); pulses run on G.lpT, the host's
+  // clock (sent to the guest); the host decides who touched it, as with the boss's hazards. The way past is never shut: every pulsing
+  // pool at its biggest still leaves >= LP_GAP of open ground (no props there either).
+  // { id, x, y (the middle of its lava), W (the painting's width at its biggest), pulse, kLo (its smallest), ph (its pulse's phase) }
+  const LP_ART = "lv_lava_pool", LP_AR = 168 / 287;   // (the painting's height / width: fixed, so the layout never waits on the atlas)
+  const LP_CX = 0.475, LP_CY = 0.46, LP_RX = 0.345, LP_RY = 0.245;   // its lava in the painting: an ellipse, in shares of its width / height
+  const LP_M = 14, LP_CLEAR = 320, LP_GAP = 200, LP_PAIR = 210, LP_INTRUDE = 30, LP_CROSS = 40, LP_KEEP = 420;
+  const LP_LOW = 2.6, LP_WARN = 1.2, LP_GROW = 1.0, LP_HIGH = 2.4, LP_SHRINK = 1.2, LP_PERIOD = LP_LOW + LP_GROW + LP_HIGH + LP_SHRINK;
+  // where along the path (share of its length) and what: side (beside it, lapping LP_INTRUDE onto its edge), cross (over the path all but
+  // LP_CROSS of it: the way round is the open ground beside it, kept free of props for LP_KEEP), pair (one each side, LP_PAIR between
+  // them), pulse (at its biggest like a cross; at its smallest it leaves half the path or more open: wait for it, or go round)
+  const LP_SITES = [[0.14, "side"], [0.21, "cross"], [0.28, "pulse"], [0.35, "pair"], [0.42, "pulse"], [0.49, "side"], [0.56, "cross"], [0.63, "pulse"], [0.7, "pair"], [0.77, "pulse"], [0.84, "side"], [0.9, "pulse"]];
+  const LP_W = { side: 480, cross: 520, pair: 440, pulse: 560 };
+  // its lava as drawn at scale k: the ellipse's half-axes
+  const lpEll = (o, k = 1) => ({ rx: LP_RX * o.W * k, ry: LP_RY * o.W * LP_AR * k });
+  const lpPh = (o, T) => { const t = (T + o.ph) % LP_PERIOD; return t < 0 ? t + LP_PERIOD : t; };
+  // its scale now (1: its biggest)
+  function lpScale(o, T) {
+    if (!o.pulse) return 1;
+    const t = lpPh(o, T), lo = o.kLo;
+    if (t < LP_LOW) return lo;
+    if (t < LP_LOW + LP_GROW) return lo + (1 - lo) * ss(0, 1, (t - LP_LOW) / LP_GROW);
+    if (t < LP_LOW + LP_GROW + LP_HIGH) return 1;
+    return 1 - (1 - lo) * ss(0, 1, (t - LP_LOW - LP_GROW - LP_HIGH) / LP_SHRINK);
+  }
+  // its warning (0: none): builds up over the last LP_WARN s of its rest, and shows on while it grows
+  function lpWarn(o, T) {
+    if (!o.pulse) return 0;
+    const t = lpPh(o, T);
+    return t >= LP_LOW - LP_WARN && t < LP_LOW + LP_GROW ? clamp((t - (LP_LOW - LP_WARN)) / LP_WARN, 0.05, 1) : 0;
+  }
+  // do feet at (x, y) touch its lava at time T? (inside the drawn ellipse less LP_M)
+  function lpHit(o, x, y, T) {
+    const e = lpEll(o, lpScale(o, T)), rx = e.rx - LP_M, ry = e.ry - LP_M;
+    if (rx <= 0 || ry <= 0) return false;
+    const a = (x - o.x) / rx, b = (y - o.y) / ry; return a * a + b * b < 1;
+  }
+  // is (x, y) within m of its lava at its biggest? (the ellipse grown by m)
+  const lpNear = (o, x, y, m) => { const e = lpEll(o, 1), a = (x - o.x) / (e.rx + m), b = (y - o.y) / (e.ry + m); return a * a + b * b < 1; };
+  // how far (x, y) is from its lava at its biggest (0 inside; sampled round its edge)
+  function lpDist(o, x, y) {
+    const e = lpEll(o, 1), a = (x - o.x) / e.rx, b = (y - o.y) / e.ry; if (a * a + b * b < 1) return 0;
+    if (Math.abs(x - o.x) > e.rx + 2000 || Math.abs(y - o.y) > e.ry + 2000) return 2000;
+    let m = Infinity; for (let i = 0; i < 48; i++) { const t = i / 48 * TAU; m = Math.min(m, Math.hypot(o.x + Math.cos(t) * e.rx - x, o.y + Math.sin(t) * e.ry - y)); }
+    return Math.max(0, m - 4);
+  }
+  const lavaDistAt = (x, y) => { let m = Infinity; for (const o of G.lpools || []) m = Math.min(m, lpDist(o, x, y)); return m; };
+  // where a line (x, y) + (nx, ny) * u crosses its lava at its biggest: [u0, u1] or null
+  function lpSpan(o, x, y, nx, ny) {
+    const e = lpEll(o, 1), px = (x - o.x) / e.rx, py = (y - o.y) / e.ry, qx = nx / e.rx, qy = ny / e.ry;
+    const a = qx * qx + qy * qy, b = 2 * (px * qx + py * qy), c = px * px + py * py - 1, D = b * b - 4 * a * c;
+    if (D <= 0) return null; const s = Math.sqrt(D); return [(-b - s) / (2 * a), (-b + s) / (2 * a)];
+  }
+  // the widest open stretch across the path at sample i (|u| <= half), with the lava of `list` at its biggest
+  function lpOpen(i, list, half) {
+    const p = G.path, [dx, dy] = pathDir(i), nx = -dy, ny = dx, cut = [];
+    for (const o of list) { const s = lpSpan(o, p.x[i], p.y[i], nx, ny); if (s) cut.push(s); }
+    cut.sort((a, b) => a[0] - b[0]);
+    let from = -half, best = 0;
+    for (const [a, b] of cut) { if (a > from) best = Math.max(best, Math.min(a, half) - from); from = Math.max(from, b); if (from >= half) break; }
+    return Math.max(best, half - from);
+  }
+  // lay them out (buildLevel, after the camps, chests and items; before the props): its own random stream, so nothing else moves
+  function placeLavaPools(L, path, endI) {
+    const out = []; if (!L.lavaPools) return out;
+    const RL = mulberry(L.seed + 404), A = G.arena, len = path.len, HALF = PATH_W / 2;
+    const pt = (s) => { const i = clamp(Math.round(s / STEP), 0, endI); return [path.x[i], path.y[i]]; };
+    const cageAt = (L.pets || []).map((k) => pt(PETS[k].at * len));
+    const nearPath = (o, i, K) => { const e = lpEll(o, 1); for (let j = 0; j < path.n; j++) if (Math.abs(j - i) > K && d2(o.x, o.y, path.x[j], path.y[j]) < (e.rx + HALF + 150) ** 2) return true; return false; };
+    const fits = (o, i, K, placed) => {
+      const e = lpEll(o, 1), R = e.rx;
+      if (o.x < 400 || o.y < 400 || o.x > WORLD - 400 || o.y > WORLD - 400) return false;
+      if (d2(o.x, o.y, path.x[0], path.y[0]) < (R + 1400) ** 2) return false;   // (not at the start)
+      if (A && d2(o.x, o.y, A.x, A.y) < (A.r + 500 + R) ** 2) return false;   // (nor in or near the boss arena)
+      if (G.camps.some((c) => d2(o.x, o.y, c.x, c.y) < (R + 320) ** 2)) return false;
+      if (G.chests.some((c) => d2(o.x, o.y, c.x, c.y) < (R + 230) ** 2)) return false;
+      if (cageAt.some(([x, y]) => d2(o.x, o.y, x, y) < (R + 560) ** 2)) return false;
+      if (placed.some((q) => d2(o.x, o.y, q.x, q.y) < (R + lpEll(q, 1).rx + 300) ** 2)) return false;
+      return !nearPath(o, i, K);
+    };
+    for (const [f, kind] of LP_SITES) {
+      const sd = RL() < 0.5 ? -1 : 1, ph = RL() * LP_PERIOD, W = LP_W[kind];
+      let got = null;
+      for (let k = 0; k <= 32 && !got; k++) {
+        const s = f * len + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 40, i = Math.round(s / STEP);
+        if (i < 2 || i > endI - 2) continue;
+        const [dx, dy] = pathDir(i), nx = -dy, ny = dx, base = { W, art: LP_ART }, e = lpEll(base, 1), h = Math.sqrt((e.rx * nx) ** 2 + (e.ry * ny) ** 2);
+        // across the path: only where it runs steeply enough that the pool reaches well over it
+        if ((kind === "cross" || kind === "pulse") && h < 0.62 * e.rx) continue;
+        const offs = kind === "side" ? [sd * (HALF - LP_INTRUDE + h)] : kind === "pair" ? [LP_PAIR / 2 + h, -(LP_PAIR / 2 + h)] : [sd * (-HALF + LP_CROSS + h)];
+        const list = offs.map((u) => ({ ...base, x: path.x[i] + nx * u, y: path.y[i] + ny * u, pulse: kind === "pulse", kLo: 0.3, ph: kind === "pulse" ? ph : 0, kind }));
+        const K = Math.ceil((e.rx + 450) / STEP);
+        if (!list.every((o) => fits(o, i, K, out))) continue;
+        // the way past stays open all along it (every pool near at its biggest)
+        const all = [...out, ...list]; let open = true;
+        for (let j = Math.max(1, i - K); j <= Math.min(path.n - 2, i + K) && open; j++) if (lpOpen(j, all, HALF + 250) < LP_GAP - 10) open = false;
+        if (open) got = list;
+      }
+      if (got) for (const o of got) { o.id = out.length; out.push(o); }
+    }
+    return out;
+  }
+  // the path samples a fainted girl may lie on: none with lava within LP_CLEAR
+  function lpSafeSamples() {
+    const p = G.path, s = new Uint8Array(p.n);
+    for (let i = 0; i < p.n; i++) s[i] = lavaDistAt(p.x[i], p.y[i]) >= LP_CLEAR ? 1 : 0;
+    return s;
+  }
+  // where she lies after fainting near lava: the nearest safe path point, back the way she came first (null: she is safe where she is)
+  function lavaSafeSpot(x, y) {
+    if (!G.lpools || !G.lpools.length || lavaDistAt(x, y) >= LP_CLEAR) return null;
+    const p = G.path, safe = G.lpSafe || (G.lpSafe = lpSafeSamples()), ns = nearestSample(x, y, 2400), j = ns.i >= 0 ? ns.i : clamp(P.prog, 0, p.n - 1);
+    for (let k = 0; k < p.n; k++) for (const i of [j - k, j + k]) if (i >= 0 && i < p.n && safe[i]) return [p.x[i], p.y[i]];
+    return null;
+  }
+  // her feet in lava: she faints at once (her blinking guard after a hit or after getting up keeps her safe, as from any hurt)
+  function lavaFaint() {
+    if (P.dead || P.inv > 0 || G.ult || P.winT) return;
+    G.lavaFaints = (G.lavaFaints || 0) + 1;
+    play("fire"); burst(P.x, P.y - 60, 22, LAVA_COLS, 420, 0.7);
+    heroDown("lava");
+  }
+  // the host: who touched lava (hurt); both pages: the clock and the embers
+  function updateLavaPools(dt, hurt) {
+    if (!G.lpools || !G.lpools.length) return;
+    G.lpT += dt;
+    if (hurt) for (const g of girls()) {
+      if (g.dead || !G.lpools.some((o) => lpHit(o, g.x, g.y, G.lpT))) continue;
+      if (g === P) lavaFaint();
+      else if (!(g.inv || g.ultT > 0 || g.win || g.hostInv > 0)) { g.hostInv = 2; netEmit("hurt", { to: NET.partner, fx: g.x | 0, fy: g.y | 0, web: 0, lava: 1 }); }
+    }
+    // embers rising off the pools in view
+    const cx = G.camX + VW / 2, cy = G.camY + VH / 2;
+    for (const o of G.lpools) {
+      if (G.parts.length > 340 || Math.abs(o.x - cx) > VW / 2 + 400 || Math.abs(o.y - cy) > VH / 2 + 400) continue;
+      const k = lpScale(o, G.lpT), w = lpWarn(o, G.lpT), e = lpEll(o, k);
+      if (Math.random() < (0.18 + 0.5 * w) * dt * 60) {
+        const a = Math.random() * TAU, d = Math.sqrt(Math.random()) * 0.8;
+        G.parts.push({ type: "dot", x: o.x + Math.cos(a) * e.rx * d, y: o.y + Math.sin(a) * e.ry * d, vx: rnd(-25, 25), vy: -rnd(70, 170), life: rnd(0.6, 1.2), max: 1.2, r: rnd(3, 7), col: LAVA_COLS[Math.floor(Math.random() * LAVA_COLS.length)], g: -40 });
+      }
+    }
+  }
+  // the test bot: steer round the lava (each pool at its biggest, grown by her body and a little more): feel ahead along the way it
+  // wants to go, turning a little at a time (away from the pool in the way first) until the way is clear
+  function lpBlocked(x, y, m) { for (const o of G.lpools) if (lpNear(o, x, y, m)) return o; return null; }
+  function lpSteer(v) {
+    if (!G.lpools || !G.lpools.length || P.dead || !(v[0] || v[1])) return v;
+    if (!G.lpools.some((o) => d2(o.x, o.y, P.x, P.y) < (lpEll(o, 1).rx + 700) ** 2)) return v;
+    const m = HERO_R + 26, inn = lpBlocked(P.x, P.y, m - 12);
+    if (inn) { const e = lpEll(inn, 1); return norm((P.x - inn.x) / (e.rx * e.rx), (P.y - inn.y) / (e.ry * e.ry)); }
+    const clear = (a) => { const c = Math.cos(a), s = Math.sin(a); for (let t = 25; t <= 225; t += 25) if (lpBlocked(P.x + c * t, P.y + s * t, m)) return false; return true; };
+    const a0 = Math.atan2(v[1], v[0]);
+    if (clear(a0)) { G.lpSide = 0; return v; }
+    // which way round: the side kept for a while, else away from the pool in the way
+    let sg = G.lpSide;
+    if (!sg) { let hit = null; for (let t = 25; t <= 225 && !hit; t += 25) hit = lpBlocked(P.x + Math.cos(a0) * t, P.y + Math.sin(a0) * t, m); sg = hit && (Math.cos(a0) * (hit.y - P.y) - Math.sin(a0) * (hit.x - P.x)) > 0 ? -1 : 1; G.lpSide = sg; }
+    for (let k = 1; k <= 12; k++) for (const s of [sg, -sg]) { const a = a0 + s * k * 0.26; if (clear(a)) return [Math.cos(a), Math.sin(a)]; }
+    return v;
+  }
+  // flat on the ground (with the arena and the hazards): the painting, its light, its bubbles; a pulsing one's warning
+  function drawLavaPools(L, R, T, B) {
+    if (!G.lpools || !G.lpools.length) return;
+    const f = FR[LP_ART];
+    for (const o of G.lpools) {
+      const k = lpScale(o, G.lpT), w = lpWarn(o, G.lpT), e = lpEll(o, k), Wd = o.W * k, Hd = Wd * LP_AR, big = lpEll(o, 1);
+      const x0 = o.x - LP_CX * Wd, y0 = o.y - LP_CY * Hd;
+      if (o.x + big.rx * 1.6 < L || o.x - big.rx * 1.6 > R || o.y + big.ry * 2.6 < T || o.y - big.ry * 3.5 > B) continue;
+      if (API.drawn) API.drawn.push(["lpool", o.id, o.x, o.y, e.rx, e.ry, w > 0 ? "warn" : "on", k]);
+      const fl = 0.85 + 0.15 * Math.sin(G.t * 3.1 + o.id) * Math.sin(G.t * 1.7 + o.id * 2);
+      // its heat lighting the ground round it
+      ctx.save(); ctx.globalCompositeOperation = "lighter";
+      ctx.translate(o.x, o.y); ctx.scale(1, e.ry / e.rx); glow(0, 0, e.rx * 1.7, "255,90,20", (0.22 + 0.25 * w) * fl); ctx.restore();
+      // the painting
+      if (f) ctx.drawImage(f.img, f.sx, f.sy, f.w, f.h, x0, y0, Wd, Hd);
+      else { ctx.fillStyle = "#ff6a1a"; ctx.beginPath(); ctx.ellipse(o.x, o.y, e.rx, e.ry, 0, 0, TAU); ctx.fill(); }
+      ctx.save(); ctx.globalCompositeOperation = "lighter";
+      // the lava flowing: two hot patches drifting round inside it, brighter as it warns
+      for (let i = 0; i < 2; i++) {
+        const a = G.t * (0.35 + i * 0.12) * (i ? -1 : 1) + o.id * 1.3 + i * 2.6, px = o.x + Math.cos(a) * e.rx * 0.38, py = o.y + Math.sin(a) * e.ry * 0.3;
+        ctx.save(); ctx.translate(px, py); ctx.scale(1, 0.55); glow(0, 0, e.rx * 0.6, i ? "255,170,60" : "255,220,120", (0.22 + 0.3 * w) * fl); ctx.restore();
+      }
+      if (w > 0 && f) { ctx.globalAlpha = 0.18 + 0.32 * w * (0.6 + 0.4 * Math.sin(G.t * 12)); ctx.drawImage(f.img, f.sx, f.sy, f.w, f.h, x0, y0, Wd, Hd); ctx.globalAlpha = 1; }
+      // bubbles swelling and popping (more and faster as it warns)
+      const nb = 4 + Math.round(6 * w);
+      for (let i = 0; i < nb; i++) {
+        const per = 1.3 + (i % 3) * 0.35 - 0.5 * w, tt = G.t / per + i * 0.37 + o.id * 0.11, c = Math.floor(tt), q = tt - c;
+        const hs = Math.sin((c + 1) * 12.9898 + i * 78.233 + o.id * 37.7) * 43758.5453, u = hs - Math.floor(hs), hv = Math.sin((c + 1) * 4.1414 + i * 9.17 + o.id) * 9631.27, v = hv - Math.floor(hv);
+        const ba = u * TAU, bd = Math.sqrt(v) * 0.72, bx = o.x + Math.cos(ba) * e.rx * bd, by = o.y + Math.sin(ba) * e.ry * bd, br = (6 + 10 * v + 8 * w) * k;
+        if (q < 0.8) { ctx.globalAlpha = 0.55; ctx.fillStyle = "#ffe08a"; ctx.beginPath(); ctx.arc(bx, by, br * (0.3 + q), 0, TAU); ctx.fill(); }
+        else { ctx.globalAlpha = 0.7 * (1 - q) / 0.2; ctx.strokeStyle = "#fff4c2"; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(bx, by, br * 1.1 + (q - 0.8) * 60, (br * 1.1 + (q - 0.8) * 60) * 0.5, 0, 0, TAU); ctx.stroke(); }
+      }
+      // heat shimmer: faint wavering streaks rising off it
+      ctx.globalAlpha = 0.07 + 0.08 * w; ctx.strokeStyle = "#ffd9a0"; ctx.lineWidth = 10; ctx.lineCap = "round";
+      for (let i = 0; i < 3; i++) {
+        const sx = o.x + (i - 1) * e.rx * 0.5, rise = (G.t * 40 + i * 37) % 90;
+        ctx.beginPath(); ctx.moveTo(sx, o.y - rise);
+        for (let j = 1; j <= 4; j++) ctx.lineTo(sx + Math.sin(G.t * 3 + j * 1.3 + i) * 10, o.y - rise - j * 32);
+        ctx.stroke();
+      }
+      ctx.restore();
+      // a pulsing pool about to grow: how far its lava will reach (as the boss's warnings: a dark edge under white dashes), ripples out to it
+      if (w > 0) {
+        ctx.save(); const pu = 0.5 + 0.5 * Math.sin(G.t * 10), a = Math.min(1, 0.35 + w);
+        ctx.globalAlpha = (0.12 + 0.12 * pu) * a; ctx.fillStyle = LAVA_WARN; ctx.beginPath(); ctx.ellipse(o.x, o.y, big.rx, big.ry, 0, 0, TAU); ctx.fill();
+        ctx.globalAlpha = 0.5 * a; ctx.strokeStyle = "#2a0d06"; ctx.lineWidth = 15; ctx.stroke();
+        ctx.globalAlpha = 0.9 * a; ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 8; ctx.setLineDash([30, 18]); ctx.lineDashOffset = -G.t * 90; ctx.stroke(); ctx.setLineDash([]);
+        ctx.strokeStyle = "#ff8a2a"; ctx.lineWidth = 7;
+        for (let i = 0; i < 2; i++) { const q = (G.t * 0.9 + i / 2) % 1; ctx.globalAlpha = 0.6 * (1 - q) * a; ctx.beginPath(); ctx.ellipse(o.x, o.y, e.rx + (big.rx - e.rx) * q, e.ry + (big.ry - e.ry) * q, 0, 0, TAU); ctx.stroke(); }
+        ctx.restore();
+      }
+    }
+  }
   // ---------------------------------------------------------------- quakes: the ground cracks, glows, then bursts open
   // k: "crack" (the ground opens under it) or "bomb" (lobbed from sx, sy, lands when t reaches w)
   function addQuake(x, y, r, w, k = "crack", sx = 0, sy = 0) {
@@ -3989,15 +4231,16 @@
     if (L && L.src !== src && G.t - L.t <= 2) { mult = 5; G.ultLast = null; } else G.ultLast = { src, t: G.t };
     // the combo's damage lands at the burst of the sisters' scene (the world waits until then)
     if (mult > 1) return comboUlt(true, () => ultHit(cx, cy, hw, hh, true));
-    ultHit(cx, cy, hw, hh, false);
+    ultHit(cx, cy, hw, hh, false, UFX[src === "q" ? "q" : "p"].chip);
   }
-  function ultHit(cx, cy, hw, hh, all) {
+  // chip: what her hearts already took off the boss in this ultimate (ufxImpact): the blast takes the rest of its 12 %
+  function ultHit(cx, cy, hw, hh, all, chip = 0) {
     for (const m of G.mons) {
       if (!m.alive || (!all && !(Math.abs(m.x - cx) < hw && Math.abs(m.y - cy) < hh))) continue;
       killMon(m, false);
     }
     G.foes = G.foes.filter((f) => !(Math.abs(f.x - cx) < hw && Math.abs(f.y - cy) < hh));
-    const B = G.boss; if (B && B.alive && Math.abs(B.x - cx) < hw + 100 && Math.abs(B.y - cy) < hh + 100) damageBoss(ultCap(B, Math.ceil(B.max * (all ? 0.35 : 0.12)), 0.5), B.x, B.y, false, true);
+    const B = G.boss; if (B && B.alive && Math.abs(B.x - cx) < hw + 100 && Math.abs(B.y - cy) < hh + 100) damageBoss(ultCap(B, Math.max(0, Math.ceil(B.max * (all ? 0.35 : 0.12)) - chip), 0.5), B.x, B.y, false, true);
   }
   // both girls' ultimates landing close together (within 3 s) never take more than `frac` of a boss's health between them
   // (counted as all health lost since the first of them, so bolts in between are included)
@@ -4357,7 +4600,7 @@
       for (const s of G.shots) if (s.life > 0 && f.life > 0 && d2(s.x, s.y, f.x, f.y) < 50 * 50) { s.life = 0; f.life = 0; burst(f.x, f.y - 90, 10, ["#9dff6a", "#fff"], 200, 0.4); play("hit"); }
     }
     G.foes = G.foes.filter((f) => f.life > 0);
-    updateRings(dt, true); updateQuakes(dt, true); updateWaters(dt, true); updateLavas(dt, true);
+    updateRings(dt, true); updateQuakes(dt, true); updateWaters(dt, true); updateLavas(dt, true); updateLavaPools(dt, true);
     // portal / arena
     if (G.portal) {
       G.portal.t += dt;
@@ -5129,7 +5372,16 @@
   // Each page also plays the partner's show from her reported clock (UFX.q). Kept light for the iPad: a fixed number of sprites a
   // frame (at most ULT_DRAW_CAP), glow sprites painted once (UART), nothing new allocated per frame, a few pooled particles.
   const ULT_FLASH_T = 0.12, ULT_FLASH_A = 0.25, ULT_BIG_A = 0.55;   // the flash: 0.12 of the clock (0.19 s), alpha 0.25; big lights over her: alpha <= 0.55
-  const ULT_BOOM = 1.5, ULT_END = 2.6, ULT_DRAW_CAP = 200, ULT_PART_CAP = 60, ULT_SHAKE = 10, UFX_N = 24;
+  const ULT_BOOM = 1.5, ULT_END = 2.6, ULT_DRAW_CAP = 360, ULT_PART_CAP = 60, ULT_SHAKE = 10;
+  // the drops (Mochi's hearts / Matcha's meteors): n of them, one every `gap` of the ult clock from t0, each falling for `dur`.
+  // Mochi's (Dad: "rơi nhanh gấp 2 lần, dày đặc gấp 5 lần"): 24 hearts one every 0.04 falling 0.3 -> 120 one every 0.008 falling 0.15
+  // (15.5 -> 77.5 hearts a second, 0.48 -> 0.24 s from the sky to the ground); Matcha's meteors as they were
+  const UFX_RAIN = { g: { n: 120, gap: 0.008, t0: 0.24, dur: 0.15 }, s: { n: 24, gap: 0.04, t0: 0.3, dur: 0.2 } }, UFX_N = 120;
+  // each of Mochi's hearts bursts the ground where it lands, like the bosses' quakes (their qk_boom frames, painted pink once):
+  // a pool of UFX_E bursts per show, each living UB_LIFE of the clock (its burst the first UB_BURST); a heart landing within
+  // UB_JOIN of a burst just begun joins it (it grows), and when all are busy the oldest (fading) one is taken over.
+  // Each burst hurts the monsters within UB_HIT (and chips the boss a little: ufxImpact)
+  const UFX_E = 24, UB_LIFE = 0.36, UB_BURST = 0.2, UB_R = 85, UB_JOIN = 110, UB_HIT = 120;
   const ULT_TITLE = { g: "Bùng Nổ Trái Tim!", s: "Mưa Sao Băng!" };
   const ULT_RGB = { g: "255,120,200", s: "150,200,255" };
   const UPOP = { g: ["#ffb3e0", "#ff7cc8", "#fff0f8"], s: ["#cfe4ff", "#8fc1ff", "#ffffff"] };
@@ -5138,16 +5390,20 @@
   // the blast's light shake: <= 10 px, gone in 0.25 s (the game takes 40 px off a second); none with "reduce motion"
   function ultShake(k = 1) { if (!reducedMotion()) G.shake = Math.max(G.shake, ULT_SHAKE * k); }
   // one girl's show: where each drop (a heart / a meteor) lands, its state (0 waiting, 1 falling, 2 landed), and what the tests read
-  function ufxNew() { return { on: false, hk: "g", t: 0, boomed: false, rm: false, vis: true, tx: new Float32Array(UFX_N), ty: new Float32Array(UFX_N), mon: new Uint8Array(UFX_N), st: new Uint8Array(UFX_N), landed: 0, onMon: 0, parts: 0, drawn: 0, maxW: 0, bigA1: 0, flash: 0, title: "", titleA: 0 }; }
+  // (ex, ey, et, es: each ground burst's place, start on the ult clock (-1: free) and size; eN: how many are on now)
+  function ufxNew() {
+    return { on: false, hk: "g", t: 0, boomed: false, rm: false, vis: true, tx: new Float32Array(UFX_N), ty: new Float32Array(UFX_N), mon: new Uint8Array(UFX_N), st: new Uint8Array(UFX_N), landed: 0, onMon: 0, parts: 0, drawn: 0, maxW: 0, bigA1: 0, flash: 0, title: "", titleA: 0,
+      ex: new Float32Array(UFX_E), ey: new Float32Array(UFX_E), et: new Float32Array(UFX_E).fill(-1), es: new Float32Array(UFX_E), eN: 0, booms: 0, merged: 0, chip: 0, sndT: -1, nearA: 0 };
+  }
   const UFX = { p: ufxNew(), q: ufxNew() };   // p: this page's girl, q: the partner
   const UCAND = [];                           // (reused: the monsters the drops aim at)
-  function ufxEnd(S) { S.on = false; S.drawn = 0; S.flash = 0; S.titleA = 0; UCAND.length = 0; }
+  function ufxEnd(S) { S.on = false; S.drawn = 0; S.flash = 0; S.titleA = 0; S.et.fill(-1); S.eN = 0; S.nearA = 0; UCAND.length = 0; }
   // drop i starts falling at ufxT0 and lands ufxDur later (all before the blast)
-  const ufxT0 = (hk, i) => (hk === "g" ? 0.24 : 0.3) + i * 0.04, ufxDur = (hk) => (hk === "g" ? 0.3 : 0.2);
-  // a few sparkles into the particle pool (each show adds at most ULT_PART_CAP, never past the pool's own limits)
-  function ufxPop(S, x, y, n) {
+  const ufxT0 = (hk, i) => UFX_RAIN[hk].t0 + i * UFX_RAIN[hk].gap, ufxDur = (hk) => UFX_RAIN[hk].dur;
+  // a few sparkles into the particle pool (each show adds at most ULT_PART_CAP, never past the pool's own limits; lim: fewer)
+  function ufxPop(S, x, y, n, lim = ULT_PART_CAP) {
     const cols = UPOP[S.hk];
-    for (let i = 0; i < n && S.parts < ULT_PART_CAP && G.parts.length < 470; i++, S.parts++) {
+    for (let i = 0; i < n && S.parts < lim && G.parts.length < 470; i++, S.parts++) {
       const a = Math.random() * TAU, v = rnd(160, 520);
       G.parts.push({ type: "dot", x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 120, life: rnd(0.4, 0.75), max: 0.75, r: rnd(3, 7), col: cols[i % 3], g: 500 });
     }
@@ -5157,20 +5413,33 @@
     if (!(t > 0)) { if (S.on) ufxEnd(S); return; }
     if (!S.on || hk !== S.hk || t < S.t - 0.5) {   // a new ultimate
       S.on = true; S.hk = hk; S.boomed = false; S.st.fill(0); S.landed = S.onMon = S.parts = 0; S.title = ULT_TITLE[hk]; S.rm = reducedMotion();
+      S.et.fill(-1); S.eN = S.booms = S.merged = S.chip = 0; S.sndT = -1;
     }
     S.t = t;
     S.vis = own || (Math.abs(x - (G.camX + VW / 2)) < VW / 2 + 200 && Math.abs(y - (G.camY + VH / 2)) < VH / 2 + 300);
-    const hw = VW / 2 + 120, hh = VH / 2 + 160, dur = ufxDur(hk);
+    const hw = VW / 2 + 120, hh = VH / 2 + 160, dur = ufxDur(hk), nd = UFX_RAIN[hk].n;
+    if (hk === "g") {   // (the ground bursts that are over free their place)
+      let n = 0;
+      for (let k = 0; k < UFX_E; k++) if (S.et[k] >= 0) { if (t - S.et[k] >= UB_LIFE || t < S.et[k]) S.et[k] = -1; else n++; }
+      S.eN = n;
+    }
     let nc = -1;
-    for (let i = 0; i < UFX_N; i++) {
+    for (let i = 0; i < nd; i++) {
       const t0 = ufxT0(hk, i);
       if (S.st[i] === 0 && t >= t0) {
-        if (nc < 0) { UCAND.length = 0; for (const m of G.mons) if (m.alive && Math.abs(m.x - cx) < hw && Math.abs(m.y - cy) < hh) UCAND.push(m); nc = UCAND.length; }
+        if (nc < 0) {
+          UCAND.length = 0; for (const m of G.mons) if (m.alive && Math.abs(m.x - cx) < hw && Math.abs(m.y - cy) < hh) UCAND.push(m);
+          const B = G.boss; if (hk === "g" && bossOpen(B) && Math.abs(B.x - cx) < hw && Math.abs(B.y - cy) < hh) UCAND.push(B);   // (Mochi's hearts rain on the boss too)
+          nc = UCAND.length;
+        }
         S.st[i] = 1;
         if (nc) { const m = UCAND[(i * 7) % nc]; S.tx[i] = m.x + ((i * 37) % 60) - 30; S.ty[i] = m.y + ((i * 23) % 30) - 15; S.mon[i] = 1; }
         else { S.tx[i] = cx - VW * 0.46 + ((i * 0.618034 + 0.13) % 1) * VW * 0.92; S.ty[i] = cy - VH * 0.37 + 80 + ((i * 0.754877 + 0.31) % 1) * VH * 0.74; S.mon[i] = 0; }
       }
-      if (S.st[i] === 1 && t >= t0 + dur) { S.st[i] = 2; S.landed++; if (S.mon[i]) S.onMon++; ufxPop(S, S.tx[i], S.ty[i] - 60, 2); }
+      if (S.st[i] === 1 && t >= t0 + dur) {
+        S.st[i] = 2; S.landed++; if (S.mon[i]) S.onMon++;
+        if (hk === "g") ufxImpact(S, S.tx[i], S.ty[i], t, own); else ufxPop(S, S.tx[i], S.ty[i] - 60, 2);
+      }
     }
     if (!S.boomed && t >= ULT_BOOM) {
       S.boomed = true;
@@ -5180,6 +5449,47 @@
     const b = t - ULT_BOOM;
     S.flash = b >= 0 && b < ULT_FLASH_T ? (1 - b / ULT_FLASH_T) * ULT_FLASH_A * (S.rm ? 0.5 : 1) : 0;   // (its alpha)
     S.titleA = ss(0.15, 0.3, t) * (1 - ss(2.1, 2.45, t));
+  }
+  // one of Mochi's hearts lands on (x, y): it hurts what is there (on this page when its world is this page's: alone, the host),
+  // and bursts the ground (a new burst, or joined to one just begun beside it), with a little tremor and, now and then, a thud
+  function ufxImpact(S, x, y, t, own) {
+    if (NET.role !== "guest" && (own || NET.role === "host")) {
+      for (const m of G.mons) {
+        if (!m.alive) continue;
+        const dx = m.x - x, dy = (m.y - y) / 0.62;   // (flattened onto the ground, as the bosses' quakes)
+        if (dx * dx + dy * dy < UB_HIT * UB_HIT) { m.hp -= Math.ceil(m.max * 0.45); m.flash = 0.12; if (m.hp <= 0) killMon(m, false); }
+      }
+      // the boss: a little each (at most 4 % of his health a show, taken out of the blast's 12 %: in all the same as before);
+      // never while he changes form or asks his question (bossOpen), never past his quiz mark nor his last bit of health
+      const B = G.boss;
+      if (bossOpen(B) && Math.abs(B.x - x) < UB_HIT + 80 && Math.abs(B.y - y) < UB_HIT) {
+        const d = Math.max(1, Math.ceil(B.max * 0.004));
+        if (S.chip + d <= Math.ceil(B.max * 0.04) && B.hp - d > 0 && !(B.quizHp && B.quizHp.length && B.hp - d <= B.quizHp[0])) { S.chip += d; damageBoss(d, x, y, true); }
+      }
+    }
+    let join = -1, jd = UB_JOIN * UB_JOIN, slot = 0, slotT = 1e9;
+    for (let k = 0; k < UFX_E; k++) {
+      const e = S.et[k];
+      if (e < 0) { if (slotT >= 0) { slot = k; slotT = -1; } continue; }
+      if (t - e < 0.1) { const dx = S.ex[k] - x, dy = S.ey[k] - y, d = dx * dx + dy * dy; if (d < jd) { jd = d; join = k; } }
+      if (e < slotT) { slot = k; slotT = e; }
+    }
+    if (join >= 0) { S.es[join] = Math.min(1.6, S.es[join] + 0.15); S.merged++; return; }
+    if (S.et[slot] < 0) S.eN++;
+    S.ex[slot] = x; S.ey[slot] = y; S.et[slot] = t; S.es[slot] = 1; S.booms++;
+    ufxPop(S, x, y - 60, 1, ULT_PART_CAP - 14);   // (the blast keeps its 14)
+    if (own || S.vis) { ultShake(0.4); if (t - S.sndT > 0.15) { S.sndT = t; SFX.slam(); } }
+  }
+  // the bosses' quake burst, its crater, a rock and a puff of dust, painted pink once (when their frames are loaded)
+  let UBA = null;
+  function ufxBoomArt() {
+    if (UBA) return UBA;
+    if (!FR.qk_boom0 || !FR.qk_boom1 || !FR.qk_boom2 || !FR.qk_boom3) return null;
+    const pk = "#ff4fb4", b2 = FR.qk_boom2;
+    UBA = { boom: [0, 1, 2, 3].map((i) => colorFrame("qk_boom" + i, pk, 0.85)), crater: FR.qk_crater ? colorFrame("qk_crater", "#ff7cc8", 0.45) : null,
+      rock: FR.qk_rock1 ? colorFrame("qk_rock1", "#ff5fae", 0.6) : null, smoke: FR.fx_smoke ? colorFrame("fx_smoke", "#ffd0ea", 0.5) : null,
+      m: UB_R * 2.4 / (b2.w * b2.s) };   // (sized as the bosses' bursts: 2.4 times its reach wide)
+    return UBA;
   }
   // the glow sprites, painted once
   let UART = null;
@@ -5234,16 +5544,16 @@
       heart: heart("255,190,230", "255,70,165"), heartL: heart("255,240,248", "255,140,205"),
       heartRing: mk(256, 256, (g) => { g.lineJoin = "round"; g.shadowColor = "rgba(255,80,185,1)"; g.shadowBlur = 24; heartPath(g, 128, 128, 210); g.strokeStyle = "rgba(255,125,210,1)"; g.lineWidth = 13; g.stroke(); g.shadowBlur = 0; g.strokeStyle = "#fff"; g.lineWidth = 4; g.stroke(); }),
       starP: star("255,110,200"), starB: star("140,190,255"), starW: star("235,245,255"),
-      ringP: ring("255,120,200", "heart"), ringB: ring("150,200,255", "star"), ringB0: ring("170,210,255", null),
+      ringP: ring("255,120,200", "heart"), ringP0: ring("255,130,205", null), ringB: ring("150,200,255", "star"), ringB0: ring("170,210,255", null),
       raysP: rays("255,120,200"), raysB: rays("150,200,255"), trailP: trail("255,140,210"), trailB: trail("150,200,255"),
       tg: {}, tw: {}, tok: {},
     };
     return UART;
   }
-  let ufxN = 0, ufxW = 0, ufxBig = 0;   // sprites drawn, the widest, the most opaque big one (what the tests check)
+  let ufxN = 0, ufxW = 0, ufxBig = 0, ufxLim = 1e9;   // sprites drawn, the widest, the most opaque big one (what the tests check); the show's cap
   // a sprite centred on (x, y), w wide (sy squashes it onto the ground; rot turns it in that plane)
   function ublit(c, x, y, w, a, rot, sy) {
-    if (!(a > 0.01) || !(w > 1)) return;
+    if (!(a > 0.01) || !(w > 1) || ufxN >= ufxLim) return;
     ufxN++; if (w > ufxW) ufxW = w; if (w > VW * 0.3 && a > ufxBig) ufxBig = a;
     const h = w * c.height / c.width;
     ctx.globalAlpha = a > 1 ? 1 : a;
@@ -5252,36 +5562,51 @@
   }
   // a streak with its bright head on (x, y), flying along angle ang (its tail behind)
   function ustreak(c, x, y, len, thick, ang, a) {
-    if (!(a > 0.01)) return;
+    if (!(a > 0.01) || ufxN >= ufxLim) return;
     ufxN++; ctx.globalAlpha = a > 1 ? 1 : a;
     ctx.save(); ctx.translate(x, y); ctx.rotate(ang); ctx.drawImage(c, -len, -thick / 2, len, thick); ctx.restore();
   }
-  function uglow(x, y, r, rgb, a) { if (a > 0.01) { ufxN++; ctx.globalAlpha = 1; glow(x, y, r, rgb, a); } }
+  function uglow(x, y, r, rgb, a) { if (a > 0.01 && ufxN < ufxLim) { ufxN++; ctx.globalAlpha = 1; glow(x, y, r, rgb, a); } }
+  // a painted frame with its anchor on (x, y), scaled m (no save / restore)
+  function ufr(f, x, y, m, a) {
+    if (!f || !(a > 0.01) || ufxN >= ufxLim) return;
+    ufxN++; const k = f.s * m, w = f.w * k; if (w > ufxW) ufxW = w; if (w > VW * 0.3 && a > ufxBig) ufxBig = a;
+    ctx.globalAlpha = a > 1 ? 1 : a; ctx.drawImage(f.img, f.sx, f.sy, f.w, f.h, x - f.ax * k, y - f.ay * k, w, f.h * k);
+  }
+  // how much a ground burst at (X, Y) is dimmed: those whose fire would rise over her (x, y) are see-through (she stays seen)
+  const ufxDim = (X, Y, x, y) => (Math.abs(X - x) < 240 && Y > y - 220 && Y < y + 520 ? 0.4 : 1);
   // layer 0: on the ground, under everyone standing; layer 1: in the air, over them. own: this page's girl (the partner's: no dimming)
   function drawUltFx(S, x, y, t, cx, cy, layer, own) {
     if (!S.on) return;
     const n0 = ufxN, A = ufxArt();
     if (layer === 0) { S.drawn = 0; S.maxW = 0; }
-    ufxW = 0; ufxBig = 0;
+    ufxW = 0; ufxBig = 0; ufxLim = n0 + Math.max(0, ULT_DRAW_CAP - S.drawn);   // (never more than ULT_DRAW_CAP sprites a frame)
     ctx.save();
     if (S.hk === "g") drawUltMochi(S, A, x, y, t, cx, cy, layer, own); else drawUltMatcha(S, A, x, y, t, cx, cy, layer, own);
-    ctx.restore();
+    ctx.restore(); ufxLim = 1e9;
     S.drawn += ufxN - n0; S.maxW = Math.max(S.maxW, ufxW); if (layer === 1) S.bigA1 = ufxBig;
   }
   function drawUltMochi(S, A, x, y, t, cx, cy, layer, own) {
-    const env = ss(0, 0.4, t) * (1 - ss(2.15, 2.55, t)), fz = ultZ(t), hy = y - fz - 110 * CHAR_K, b = t - ULT_BOOM, dur = ufxDur("g");
+    const env = ss(0, 0.4, t) * (1 - ss(2.15, 2.55, t)), fz = ultZ(t), hy = y - fz - 110 * CHAR_K, b = t - ULT_BOOM, dur = ufxDur("g"), nd = UFX_RAIN.g.n;
     const rgb = ULT_RGB.g, top = hy - 160 * CHAR_K, wmax = VW * 1.3;
     if (layer === 0) {
       if (own) { ctx.globalAlpha = 0.42 * env; ctx.fillStyle = "#2a0726"; ctx.fillRect(cx - VW * 0.6, cy - VH * 0.6, VW * 1.2, VH * 1.2); }
+      // each heart's ground burst (the bosses' quake look, in pink): the crater it leaves, then its shockwave racing over the ground
+      const UB = ufxBoomArt();
+      if (UB && UB.crater) for (let k = 0; k < UFX_E; k++) {
+        const e0 = S.et[k]; if (e0 < 0) continue;
+        const q = (t - e0) / UB_LIFE; if (q < 0 || q >= 1) continue;
+        ufr(UB.crater, S.ex[k], S.ey[k], UB_R * 2.1 * S.es[k] / (UB.crater.w * UB.crater.s), Math.min(1, (1 - q) * 1.8) * 0.8);
+      }
       ctx.globalCompositeOperation = "lighter";
+      for (let k = 0; k < UFX_E; k++) {
+        const e0 = S.et[k]; if (e0 < 0) continue;
+        const q = (t - e0) / UB_LIFE; if (q < 0 || q >= 1) continue;
+        const w = ss(0, 0.6, q); ublit(A.ringP0, S.ex[k], S.ey[k], (70 + 320 * w) * S.es[k], (1 - w) * 0.9, 0, 0.55);
+      }
       uglow(x, y - 10, 340, rgb, 0.3 * env);
       ublit(A.ringP, x, y, 560 * CHAR_K * (0.6 + 0.4 * env), 0.9 * env, t * 0.9, 0.5);
       for (let i = 0; i < 10; i++) { const a = i / 10 * TAU + t * 1.3; ublit(A.heartL, x + Math.cos(a) * 250 * CHAR_K, y + Math.sin(a) * 125 * CHAR_K - 14, 40 * env, 0.85 * env); }
-      for (let i = 0; i < UFX_N; i++) {   // each heart that landed: a heart ripple on the ground
-        if (S.st[i] !== 2) continue;
-        const q = (t - ufxT0("g", i) - dur) / 0.4; if (q < 0 || q >= 1) continue;
-        ublit(A.heartRing, S.tx[i], S.ty[i], 70 + 230 * q, 1 - q, 0, 0.55);
-      }
       if (b > 0) {
         for (let j = 0; j < 2; j++) { const q = (b - j * 0.14) / 0.9; if (q > 0 && q < 1) ublit(A.heartRing, x, y, Math.min(wmax, 300 + q * wmax), (1 - q) * 0.9, 0, 0.55); }
         // (the blast's rays and heart rings stay under her and the monsters, see-through: nobody vanishes in the light)
@@ -5290,7 +5615,34 @@
       }
       return;
     }
+    // the ground bursts, over the monsters standing there: a puff of dust and a rock thrown out (solid), then the burst's fire
+    // and its light, and two hearts flung up (light); the debris flies on arcs worked out from the burst's age (nothing kept)
+    const UB = ufxBoomArt(); S.nearA = 0;
+    if (UB) for (let k = 0; k < UFX_E; k++) {
+      const e0 = S.et[k]; if (e0 < 0) continue;
+      const age = t - e0, q = age / UB_LIFE; if (q < 0 || q >= 1) continue;
+      const s = S.es[k], X = S.ex[k], Y = S.ey[k], dim = ufxDim(X, Y, x, y), tau = age / ULT_PACE;
+      ufr(UB.smoke, X + ((k * 37) % 60) - 30, Y - 30 - 140 * q, (1 + 1.6 * q) * s, 0.6 * (1 - q) * dim);
+      const a = k * 2.39, v = 240 + ((k * 53) % 200), z = (760 + ((k * 31) % 300)) * tau - 1100 * tau * tau;
+      if (z > 0) ufr(UB.rock, X + Math.cos(a) * v * tau, Y + Math.sin(a) * v * tau * 0.5 - z, 0.5 * s, dim);
+    }
     ctx.globalCompositeOperation = "lighter";
+    for (let k = 0; k < UFX_E; k++) {
+      const e0 = S.et[k]; if (e0 < 0) continue;
+      const age = t - e0, q = age / UB_LIFE; if (q < 0 || q >= 1) continue;
+      const s = S.es[k], X = S.ex[k], Y = S.ey[k], dim = ufxDim(X, Y, x, y), tau = age / ULT_PACE, kb = age / UB_BURST;
+      if (kb < 1) {
+        const fa = Math.min(1, (1 - kb) * 2.5) * 0.85 * dim;
+        uglow(X, Y - UB_R * 0.5 * s, UB_R * (1.1 + 0.5 * kb) * s, rgb, 0.6 * (1 - kb) * dim);
+        if (UB) { const f = UB.boom[Math.min(3, (kb * 4) | 0)], m = UB.m * s; ufr(f, X, Y + UB_R * 0.25 * s - f.h * f.s * m / 2, m, fa); }
+        else ublit(A.raysP, X, Y - 70, 220 * s, fa, kb);
+        if (dim < 1 && fa > S.nearA) S.nearA = fa;
+      }
+      for (let p = 0; p < 2; p++) {
+        const a = k * 2.39 + 1.6 + p * 2.6, v = 200 + ((k * 71 + p * 97) % 220), z = (900 + ((k * 43 + p * 59) % 350)) * tau - 1100 * tau * tau, ha = (1 - q) * dim;
+        if (z > 0) { ublit(A.heartL, X + Math.cos(a) * v * tau, Y + Math.sin(a) * v * tau * 0.5 - z, 34, ha); if (dim < 1 && ha > S.nearA) S.nearA = ha; }
+      }
+    }
     uglow(x, hy, 320, rgb, 0.3 * env);
     // the heart over her, beating faster as it fills; it bursts at the blast
     const beat = Math.pow(Math.max(0, Math.sin(t * (9 + t * 6))), 6), hs = (170 + 60 * beat) * ss(0.1, 0.5, t), ha = b > 0 ? ULT_BIG_A * (1 - b / 0.3) : env, hm = b > 0 ? 1 + b * 4 : 1;
@@ -5305,23 +5657,18 @@
       const a = env * Math.pow(Math.max(0, Math.sin(t * 7 + i * 2.3)), 2);
       ublit(i % 2 ? A.starP : A.starW, cx - VW * 0.46 + ((i * 0.618034 + 0.4) % 1) * VW * 0.92, cy - VH * 0.42 + ((i * 0.754877 + 0.1) % 1) * VH * 0.8, 46 + (i % 3) * 16, a, t * 2 + i);
     }
-    // the falling hearts' trails and glows, then the hearts themselves (solid), then the sparkle where each lands
-    for (let i = 0; i < UFX_N; i++) {
+    // the falling hearts' trails and glows, then the hearts themselves (solid); where each lands: its ground burst (above)
+    for (let i = 0; i < nd; i++) {
       if (S.st[i] !== 1) continue;
       const k = clamp((t - ufxT0("g", i)) / dur, 0, 1), X = S.tx[i] + Math.sin(i * 1.7 + t * 8) * 26 * (1 - k), Y = S.ty[i] - 70 - 1050 * (1 - k * k);
       ustreak(A.trailP, X, Y - 20, 300, 30, Math.PI / 2, 0.85); uglow(X, Y, 90, rgb, 0.7);
-    }
-    for (let i = 0; i < UFX_N; i++) {
-      if (S.st[i] !== 2) continue;
-      const q = (t - ufxT0("g", i) - dur) / 0.35; if (q < 0 || q >= 1) continue;
-      ublit(A.starP, S.tx[i], S.ty[i] - 70, 170 * (1 - q * 0.6), 1 - q, q * 2);
     }
     if (b > 0) {
       for (let i = 1; i < 32; i += 2) { const C = ufxConf(i, x, hy, b, 520); ublit(A.starP, C[0], C[1], C[2] * 1.4, C[3] * ULT_BIG_A, b * 6 + i); }
     }
     ctx.globalCompositeOperation = "source-over";
     ublit(A.heart, x, top, hs * hm, ha);
-    for (let i = 0; i < UFX_N; i++) {
+    for (let i = 0; i < nd; i++) {
       if (S.st[i] !== 1) continue;
       const k = clamp((t - ufxT0("g", i)) / dur, 0, 1), X = S.tx[i] + Math.sin(i * 1.7 + t * 8) * 26 * (1 - k), Y = S.ty[i] - 70 - 1050 * (1 - k * k);
       ublit(i % 3 ? A.heart : A.heartL, X, Y, 84 + (i % 3) * 14, 1, Math.sin(t * 6 + i) * 0.35);
@@ -5336,7 +5683,7 @@
     return UCONF;
   }
   function drawUltMatcha(S, A, x, y, t, cx, cy, layer, own) {
-    const env = ss(0, 0.4, t) * (1 - ss(2.15, 2.55, t)), fz = ultZ(t), hy = y - fz - 110 * CHAR_K, b = t - ULT_BOOM, dur = ufxDur("s");
+    const env = ss(0, 0.4, t) * (1 - ss(2.15, 2.55, t)), fz = ultZ(t), hy = y - fz - 110 * CHAR_K, b = t - ULT_BOOM, dur = ufxDur("s"), nd = UFX_RAIN.s.n;
     const rgb = ULT_RGB.s, wmax = VW * 1.3;
     if (layer === 0) {
       if (own) { ctx.globalAlpha = 0.55 * env; ctx.fillStyle = "#06102c"; ctx.fillRect(cx - VW * 0.6, cy - VH * 0.6, VW * 1.2, VH * 1.2); }   // (night falls)
@@ -5344,7 +5691,7 @@
       uglow(x, y - 10, 340, rgb, 0.3 * env);
       ublit(A.ringB, x, y, 600 * CHAR_K * (0.6 + 0.4 * env), 0.9 * env, t * 0.7, 0.5);
       ublit(A.ringB0, x, y, 380 * CHAR_K * (0.6 + 0.4 * env), 0.6 * env, -t * 1.1, 0.5);
-      for (let i = 0; i < UFX_N; i++) {   // each meteor that landed: a ring rippling out over the ground, and its light
+      for (let i = 0; i < nd; i++) {   // each meteor that landed: a ring rippling out over the ground, and its light
         if (S.st[i] !== 2) continue;
         const q = (t - ufxT0("s", i) - dur) / 0.45; if (q < 0 || q >= 1) continue;
         ublit(A.ringB0, S.tx[i], S.ty[i], 90 + 330 * q, 1 - q, 0, 0.5); uglow(S.tx[i], S.ty[i], 170 * (1 - q * 0.5), rgb, (1 - q) * 0.6);
@@ -5376,13 +5723,13 @@
       ublit(i % 2 ? A.starB : A.starW, x + Math.cos(a) * R, ccy + Math.sin(a) * R, 70 + 18 * Math.sin(t * 9 + i), sa, t * 1.5 + i);
     }
     // the meteors: a long silver-blue trail, a glow and a bright star head
-    for (let i = 0; i < UFX_N; i++) {
+    for (let i = 0; i < nd; i++) {
       if (S.st[i] !== 1) continue;
       const k = clamp((t - ufxT0("s", i)) / dur, 0, 1), e = k * k, X = S.tx[i] + METEOR_DX * (1 - e), Y = S.ty[i] - 60 - METEOR_DY * (1 - e);
       ustreak(A.trailB, X, Y, 560, 46, METEOR_ANG, 1); uglow(X, Y, 120, rgb, 0.85); ublit(A.starW, X, Y, 130, 1, t * 8 + i);
     }
     // where each landed: a flash of light, then a glint that keeps twinkling until the end
-    for (let i = 0; i < UFX_N; i++) {
+    for (let i = 0; i < nd; i++) {
       if (S.st[i] !== 2) continue;
       const q = (t - ufxT0("s", i) - dur) / 0.3;
       if (q >= 0 && q < 1) { ublit(A.raysB, S.tx[i], S.ty[i] - 60, 200 + 220 * q, (1 - q) * 0.6, q); ublit(A.starW, S.tx[i], S.ty[i] - 60, 260 * (1 - q * 0.5), 0.8 * (1 - q), q * 2); }
@@ -5596,7 +5943,7 @@
     ctx.setTransform(zs, 0, 0, zs, offX + (VW / 2 - (G.camX + VW / 2 - shx) * zm) * sc, offY + (VH / 2 - (G.camY + VH / 2 - shy) * zm) * sc);
     // what is on screen (wider when zoomed out)
     const hw = VW / 2 / zm, hh = VH / 2 / zm, L = G.camX + VW / 2 - hw, R = G.camX + VW / 2 + hw, T = G.camY + VH / 2 - hh, B = G.camY + VH / 2 + hh;
-    VIEWT.T = T; VIEWT.zs = zs; VIEWT.offY = offY;   // (world y <-> screen y for things kept clear of the HUD)
+    VIEWT.T = T; VIEWT.zs = zs; VIEWT.offY = offY; VIEWT.L = L; VIEWT.offX = offX;   // (world y <-> screen y for things kept clear of the HUD)
     // ground chunks (a couple of new ones painted per frame)
     chunkBudget = 2;
     chunkCap = Math.max(16, (Math.floor(R / CH) - Math.floor(L / CH) + 1) * (Math.floor(B / CH) - Math.floor(T / CH) + 1) + 4);
@@ -5606,7 +5953,7 @@
       else { ctx.fillStyle = G.lvl.gr.base; ctx.fillRect(ix * CH, iy * CH, CH + CH_PAD, CH + CH_PAD); }
     }
     // flat things
-    drawArena(); drawRings(); drawQuizFloor(); drawGuard();
+    drawArena(); drawLavaPools(L, R, T, B); drawRings(); drawQuizFloor(); drawGuard();
     drawPickups(L, R, T, B);
     drawGuide();
     if (G.ult) drawUltFx(UFX.p, P.x, P.y, G.ult.t, G.ult.cx, G.ult.cy, 0, true);
@@ -5674,7 +6021,7 @@
     drawQuakesAir(); drawMeteors();
     drawBlizzard(L, R, T, B);
     drawQuizRain();
-    drawBossTalk(L, T, R);
+    drawBossTalk(L, T, R, B);
     drawWalkTalk(); drawSay();
     drawRescue();
     drawParts(L, R, T, B);
@@ -5711,6 +6058,7 @@
       b.strokeStyle = G.lvl.gr.stone[0]; b.lineWidth = 6; b.lineJoin = b.lineCap = "round"; b.beginPath();
       b.moveTo(p.x[0] * k, p.y[0] * k); for (let i = 1; i < p.n; i++) b.lineTo(p.x[i] * k, p.y[i] * k); b.stroke();
       if (G.arena) { b.fillStyle = G.lvl.gr.stone[1]; b.beginPath(); b.arc(G.arena.x * k, G.arena.y * k, G.arena.r * k, 0, TAU); b.fill(); }
+      b.fillStyle = "#ff6a1a"; for (const o of G.lpools || []) { const e = lpEll(o, 1); b.beginPath(); b.ellipse(o.x * k, o.y * k, Math.max(3, e.rx * k), Math.max(2, e.ry * k), 0, 0, TAU); b.fill(); }   // (the lava pools)
     }
     g.clearRect(0, 0, S, S); g.drawImage(miniBase, 0, 0);
     const dot = (x, y, r, col, line) => { g.beginPath(); g.arc(x * k, y * k, r, 0, TAU); g.fillStyle = col; g.fill(); if (line) { g.lineWidth = 2.5; g.strokeStyle = line; g.stroke(); } };
@@ -8804,7 +9152,7 @@
       } else if (msg.topic === "shoo") shoo(num(d.x), num(d.y));
       else if (msg.topic === "portal") { if (G.portal && G.portal.open && !P.winT) enterPortal(); }
     } else if (d.to === NET.me && G.mode === "play") {
-      if (msg.topic === "hurt") { if (d.web) webHero(); else hurtHero(num(d.fx), num(d.fy)); }
+      if (msg.topic === "hurt") { if (d.lava) lavaFaint(); else if (d.web) webHero(); else hurtHero(num(d.fx), num(d.fy)); }   // (lava: the host saw her feet in a lava pool)
       else if (msg.topic === "pick") {
         const x = num(d.x), y = num(d.y);
         if (DTYPES.includes(d.ty)) pickDrop({ type: d.ty, x, y });
@@ -8866,6 +9214,7 @@
       v: G.rings.map((w) => [w.x | 0, w.y | 0, w.r | 0, Math.round(w.life * 10), Math.round(w.delay * 10)]),
       wa: G.waters.map((w) => [w.id, WA_KINDS.indexOf(w.k), w.x | 0, w.y | 0, Math.round(w.t * 20), Math.round(w.w * 20), Math.round(w.end * 20), w.r | 0, w.ax, w.dir]),   // the captain's sea, the yeti's snow (see seaMove, snowMove)
       lz: G.lavas.map((o) => [o.id, LKINDS.indexOf(o.k), o.x | 0, o.y | 0, Math.round(o.t * 20), Math.round(o.w * 20), Math.round(o.end * 20), o.r | 0, Math.round(o.a * 1000), o.d0 | 0, o.L | 0, o.ring ? o.ring[0] | 0 : -1, o.ring ? o.ring[1] | 0 : -1, o.v | 0]),   // the lava demon's fire (see lavaMove)
+      lp: Math.round((G.lpT || 0) * 20),   // the lava pools' clock (their pulses), in 1/20 s
       it: bitsOf(G.items), ch: bitsOf(G.chests), cg: bitsOf(G.cages),
       sp: onShip() ? shipState() : 0,   // the ship (host-owned), compact: see shipState
       sc: G.story ? 1 : 0,   // (the host's page shows a story card: the guest's world waits too)
@@ -9059,6 +9408,8 @@
       }
       G.lavas = list;
     }
+    // the lava pools' pulses: the host's clock (run on here between updates; brought back if it drifted)
+    if (typeof w.lp === "number" && G.lpools && G.lpools.length) { const t = num(w.lp) / 20; if (Math.abs((G.lpT || 0) - t) > 0.2) G.lpT = t; }
     // items, chests, cages, gate, score
     const flags = (s, list, onOpen) => { if (typeof s === "string") list.forEach((o, i) => { const v = s[i] === "1"; if (v && !(o.got || o.open) && onOpen) onOpen(o); if ("got" in o) o.got = v; else o.open = v; }); };
     flags(w.it, G.items, null);
@@ -9093,7 +9444,7 @@
       f.x += f.vx * dt; f.y += f.vy * dt;
       if (f.type === "fire" && Math.random() < 0.7) G.parts.push({ type: "dot", x: f.x, y: f.y - 90, vx: rnd(-30, 30), vy: rnd(-30, 30), life: 0.35, max: 0.35, r: rnd(4, 9), col: Math.random() < 0.5 ? "#9dff6a" : "#e6ffb0" });
     }
-    updateRings(dt, false); updateQuakes(dt, false); updateWaters(dt, false); updateLavas(dt, false);
+    updateRings(dt, false); updateQuakes(dt, false); updateWaters(dt, false); updateLavas(dt, false); updateLavaPools(dt, false);
     if (G.quiz) { G.quiz.t += dt; quizLocal(dt); } else updateQuizHud();
     for (const c of G.chests) c.t += dt;
     if (G.portal) {
@@ -9201,6 +9552,7 @@
     buildLevel(0); G.mode = "title"; ready = true;
     renderHeroes(); updateXpHud();
     $("loading").hidden = true; $("startBtn").hidden = false; $("coopBtn").hidden = false;
+    setTimeout(() => { try { ufxArt(); ufxBoomArt(); } catch (_) {} }, 300);   // (the ultimates' pictures painted on the title screen, not as one starts)
   }
   // test hooks for automated checks. __sksp.autopilot = true makes this girl walk the path on her own.
   const API = window.__sksp = {
@@ -9219,8 +9571,9 @@
     scene, SCENE_RETRY,
     refreshFrames: () => DIRN.clear(),   // call after adding frames to FR at run time
     audio: () => ({ ctx: AC && AC.state, samples: Object.keys(SAMPLE).length, music: !!musicSrc, track: musicNow, want: musicWanted() }),
-    heroFrame4, monFrame, guideTarget, heroStats, lavaMove, xpNeed, gainXp, addEnergy, startUlt, rescuePet, ultBlast, ultFx: () => UFX, ULT_DRAW_CAP, ULT_PART_CAP, ultLight, viewSize: () => ({ VW, VH }), startBoss, pets: () => PETE,
-    groundPaints: () => groundPaints, viewBox, saidPx: null, saidBox: null, touch: undefined,   // (touch: true / false overrides the touch-screen check (COARSE); groundPaints: ground chunks painted so far; saidPx: an array -> talkBubble records [text, its drawn font size in world px])
+    lpools: () => G.lpools || [], LP: { M: LP_M, CLEAR: LP_CLEAR, GAP: LP_GAP, WARN: LP_WARN, PERIOD: LP_PERIOD }, lpEll, lpScale, lpWarn, lpHit,
+    heroFrame4, monFrame, guideTarget, heroStats, lavaMove, xpNeed, gainXp, addEnergy, startUlt, rescuePet, ultBlast, ultFx: () => UFX, ULT_DRAW_CAP, ULT_PART_CAP, UFX_E, UFX_RAIN, ultLight, viewSize: () => ({ VW, VH }), startBoss, pets: () => PETE,
+    groundPaints: () => groundPaints, viewBox, saidPx: null, saidBox: null, saidRect: null, touch: undefined,   // (touch: true / false overrides the touch-screen check (COARSE); groundPaints: ground chunks painted so far; saidPx: an array -> talkBubble records [text, its drawn font size in world px])
     spawnMon: (kind, x, y) => spawnMon(kind, x === undefined ? P.x + 400 : x, y === undefined ? P.y : y),
     damageBoss: (n) => damageBoss(n, 0, 0, false, true),
     // with hold = true the world only moves on step(): exact moments for screenshots
