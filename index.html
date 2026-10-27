@@ -259,7 +259,7 @@
     <div class="heroes" id="heroes"></div>
     <div class="help"><span>Cần trái: <b>đi khắp nơi</b></span><span>Bé <b>tự bắn</b> quái gần nhất</span><span>Đầy năng lượng: <b>Tuyệt chiêu</b></span></div>
     <p id="loading">Đang tải hình ảnh…</p>
-    <div class="startsel" id="startSel" role="group" aria-label="Bản thử: chọn màn"><span>Bản thử: chọn màn</span><button id="selMan1">Màn 1</button><button id="selMan2">Màn 2: Đảo Cướp Biển</button><button id="selMan3">Màn 3: Núi Tuyết</button><button id="selMan4">Màn 4: Núi Dung Nham</button></div>
+    <div class="startsel" id="startSel" role="group" aria-label="Bản thử: chọn màn"><span>Bản thử: chọn màn</span><button id="selMan1">Màn 1</button><button id="selMan2">Màn 2: Đảo Cướp Biển</button><button id="selMan3">Màn 3: Núi Tuyết</button><button id="selMan4">Màn 4: Núi Dung Nham</button><button id="selMan5">Màn 5: Lâu Đài</button></div>
     <div class="row"><button class="btn" id="startBtn" hidden>Chơi một mình</button><button class="btn ghost" id="coopBtn" hidden>Chơi 2 người</button></div>
   </div>
   <div class="ver"><span id="verNum"></span><button id="verBtn">Kiểm tra bản mới</button></div>
@@ -283,10 +283,10 @@
 
 <div class="screen" id="winScreen" hidden>
   <div class="card">
-    <h1>Còn <span>tiếp…</span></h1>
+    <h1 id="winTitle">Còn <span>tiếp…</span></h1>
     <p id="winText"></p>
     <p id="winStats"></p>
-    <button class="btn" id="againBtn">Chơi lại</button>
+    <button class="btn" id="againBtn">Chơi lại</button><button class="btn" id="endHomeBtn" hidden>Về trang chính</button>
   </div>
 </div>
 
@@ -360,7 +360,7 @@
   let META = null, ready = false;
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261027.1956", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261027.2009", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -671,10 +671,10 @@
     // Màn 4: a volcano. The boss is a lava demon who rains burning rocks, spreads a lava pool from where he stands and sends lanes of fire
     // columns at the girls (the lava hazards, G.lavas: see lavaMove); his second form adds the eruption. Phong Cận hangs in a cage of black
     // iron (lava_cage). Dark rock ground with glowing seams (gr.seam), lava pools and a lava sea at the edge of the world (the pond / sea
-    // colours). After Màn 3 (Núi Tuyết, id "snow"); the last level so far: its end is the "Còn tiếp…" screen.
-    { id: "lava", name: "Màn 4: Núi Dung Nham", seed: 4409, path: "river", arena: true, last: true,
+    // colours). After Màn 3 (Núi Tuyết, id "snow"); his gate leads into Màn 5 (Lâu Đài Phù Thủy Xám, id "castle").
+    { id: "lava", name: "Màn 4: Núi Dung Nham", seed: 4409, path: "river", arena: true,
       intro: "Phong Cận đang bị nhốt ở Núi Dung Nham! Cẩn thận đá nóng, đánh bại <b>Quỷ Dung Nham</b> và cứu anh Phong nhé.",
-      end: "Quỷ Dung Nham đã bị đánh bại và Phong Cận đã được cứu! Cả nhóm SKSP sắp đoàn tụ. Còn tiếp: Lâu Đài Phù Thủy Xám!",
+      end: "Quỷ Dung Nham đã bị đánh bại và Phong Cận đã được cứu! Cả nhóm SKSP đã đoàn tụ. Sắp tới: Lâu Đài Phù Thủy Xám!",
       boss: { art: "lava_boss", name: "Quỷ Dung Nham", hp: 70, tip: "Quỷ Dung Nham gọi mưa đá nóng, hồ dung nham và cột lửa!", summon: "lava_bat", style: "lava", fence: "lv_chain_fence",
         quiz: { op: "-", lim: 20, T: [5, 8], n: [2, 2], hz: "qk_rock2" },
         laugh: "laugh0", ha: "Hừ hừ hừ!", say: ["Hừ hừ! Ta là Quỷ Dung Nham!", "Lửa sẽ thiêu rụi tất cả!"], morph: ["Grừừ! Núi lửa, phun trào đi!"], bye: ["Ôi... lửa của ta...", "tắt mất rồi...", "Phù thủy Xám Xịt sẽ trả thù!"] },
@@ -690,9 +690,27 @@
       lavaPools: true,
       gr: { base: "#4a3b36", patch: ["#5a4640", "#3f3330", "#6b4a3a", "#4e3d37"], blade: ["#55463f", "#7a3b1f", "#3a302c"], dot: ["#ff7a2a", "#ffb03a", "#ff4a1a", "#6b5a55", "#8a7a70", "#ffd36a"], nDot: 25,
         stone: ["#766760", "#655850", "#84736c"], gap: "#8c3a1c", edge: "#140e0c", sea: "#ffc23a", seaEdge: "#3a1a12", pond: "#ff5a1a", nPond: 0, seam: ["#ff5a1a", "#ffc23a"], nSeam: 3, seamA: [0.1, 0.45, 0.8] } },
+    // Màn 5, the last map: the grey witch's castle (nobody caged: all four SKSP friends are with the girls already). The boss is Phù thủy
+    // Xám Xịt (style "hex": the old flying monster kind "witch" keeps its name), who calls ghosts and crows out of purple circles, sends slow
+    // magic orbs after the girls, vanishes in smoke and comes back at a warned spot, and sets magic circles burning on the floor; her second
+    // form adds shadow clones and a ring of circles (the hexes, G.hexes: see hexMove). After her: the finale film and the end screen
+    // (`finale`). Ground: dusky purple flagstones, lighter than Map 4's rock so the girls stand out (its own calm prop fill, as Map 4's).
+    { id: "castle", name: "Màn 5: Lâu Đài Phù Thủy Xám", seed: 5507, path: "river", arena: true, last: true, finale: true,
+      intro: "Đây là lâu đài của Phù thủy Xám Xịt! Cả nhóm SKSP đã đoàn tụ. Cùng nhau đánh bại <b>Phù thủy Xám Xịt</b> nhé!",
+      end: "Cảm ơn Mochi và Matcha đã cứu cả nhóm SKSP!",
+      boss: { art: "castle_boss", name: "Phù thủy Xám Xịt", hp: 80, tip: "Phù thủy gọi hồn ma, bắn cầu phép, biến mất và vẽ vòng phép!", summon: "castle_bat", style: "hex", fence: "cs_fence",
+        quiz: { op: "±", lim: 20, T: [5, 8], n: [2, 2], hz: "qk_bomb" },
+        laugh: "laugh1", ha: "Hi hi hi!", say: ["Hừm! Các ngươi dám tới đây sao?", "Ta sẽ biến tất cả thành đá!"], morph: ["Hừm! Giờ thì nếm phép thật của ta!"], bye: ["Không... sức mạnh của ta...", "Thôi được, ta thua rồi..."] },
+      quota: 150, spawn: [0.9, 1.85], camps: 10, pets: [], arenaFloor: "arena_castle",
+      kinds: [["castle_zombie", 3, 0], ["castle_skeleton", 2, 0], ["castle_mummy", 2, 0.05], ["castle_bat", 2, 0.12]],
+      deco: [["cs_candelabra", 2, 1.12], ["cs_pillar", 2, 1.15], ["cs_cauldron", 1, 1.12], ["cs_bookshelf", 1, 1.12], ["cs_lamp", 2, 1.12], ["cs_fence", 1, 1.12], ["cs_gargoyle", 1, 1.12], ["cs_pumpkins", 2, 1.12]],
+      decoN: 1100, decoSkip: 0.55, decoGap: 150,
+      gr: { base: "#5b5170", patch: ["#665b7c", "#524866", "#6e6284", "#5f5476"], blade: ["#6f6386", "#7d6a96", "#4c4360"], dot: ["#ffd36a", "#d6b8ff", "#9d8ab8", "#ffe9a8", "#bfa6e6", "#ffffff"], nDot: 25,
+        stone: ["#a39bb0", "#948ba3", "#b2aabd"], gap: "#463c58", edge: "#241d30", sea: "#6c4f98", seaEdge: "#2a2038", pond: "#7d62ad", nPond: 10 } },
   ];
   // what follows level i: the level its `next` names (by id; -1 while that map is not in the game yet), else the one after it in LEVELS;
-  // -1: none, the "Còn tiếp…" screen. Màn 2 -> Màn 3 (Núi Tuyết, id "snow") -> Màn 4 (Núi Dung Nham, id "lava", `last`) -> "Còn tiếp…"
+  // -1: none (the last map: its finale, or the "Còn tiếp…" screen). Màn 2 -> Màn 3 (Núi Tuyết, id "snow") -> Màn 4 (Núi Dung Nham, id
+  // "lava") -> Màn 5 (Lâu Đài Phù Thủy Xám, id "castle", `last`, `finale`) -> the finale film and the end screen
   function nextLevelAfter(i) {
     const L = LEVELS[i]; if (!L || L.last) return -1;
     if (L.next) return LEVELS.findIndex((o) => o.id === L.next);
@@ -710,6 +728,7 @@
     { hp: 6.3, spd: 1.06 },
     { hp: 9.4, spd: 1.10 },
     { hp: 13.4, spd: 1.14 },
+    { hp: 18.2, spd: 1.18 },
   ];
   const tierOf = () => TIERS[Math.min(G.level, TIERS.length - 1)];
 
@@ -732,7 +751,9 @@
   const SNOW_LIKE = { snow_zombie: "zombie", snow_skeleton: "skeleton", snow_mummy: "mummy", snow_bat: "bat" };
   // Núi Dung Nham's four breeds (art `lava_<kind>_d<dir>_w<i>`): a magma golem, a fire imp, a salamander, a fire bat
   const LAVA_LIKE = { lava_zombie: "zombie", lava_skeleton: "skeleton", lava_mummy: "mummy", lava_bat: "bat" };
-  const ART_LIKE = { ...CANDY_LIKE, ...PIRATE_LIKE, ...SNOW_LIKE, ...LAVA_LIKE };
+  // Lâu Đài Phù Thủy Xám's (art `castle_<kind>_d<dir>_w<i>`): a ghost (it floats: HOVER), a rag doll, a dark knight, a crow
+  const CASTLE_LIKE = { castle_zombie: "zombie", castle_skeleton: "skeleton", castle_mummy: "mummy", castle_bat: "bat" };
+  const ART_LIKE = { ...CANDY_LIKE, ...PIRATE_LIKE, ...SNOW_LIKE, ...LAVA_LIKE, ...CASTLE_LIKE };
   for (const [k, o] of Object.entries(ART_LIKE)) MON[k] = { ...MON[o], like: o };
   const likeOf = (m) => m.c.like || m.kind;
   // elemental spells from monster drops: fire burns fast, poison drains slowly, ice slows. While one is held the auto-attack also fires faster.
@@ -1077,7 +1098,7 @@
       addDeco(d);
     }
     // reset the play state
-    G.nextId = 1; G.mons = []; G.shots = []; G.pshots = []; G.foes = []; clearCps(); G.parts = []; G.drops = []; G.gems = []; G.rings = []; G.quakes = []; G.waters = []; G.lavas = [];
+    G.nextId = 1; G.mons = []; G.shots = []; G.pshots = []; G.foes = []; clearCps(); G.hexes = []; G.parts = []; G.drops = []; G.gems = []; G.rings = []; G.quakes = []; G.waters = []; G.lavas = [];
     G.shopDone = false; G.shopPhase = 0; G.m2 = false;   // (a new level has no shop phase left over from the last one)
     G.story = null; G.storyWait = 0; $("storyCard").hidden = true;   // (a story card is shown after the build, by whoever built it for an arrival)
     G.boss = null; G.ult = null; G.quiz = null; G.bcut = null; G.bcutSeen = null; G.rescue = null; G.leaps = 0; G.qzN = 0; $("quiz").hidden = true; G.arenaLock = false; G.lt = 0; G.lvKills = 0; G.spawnAcc = 0; G.surgeT = 35; G.gateMsg = false; G.tierMsg = false; TIER_FR.clear();
@@ -1307,7 +1328,7 @@
     if (G.quiz && G.arena) { const [qx, qy] = quadCentre(G.quiz.ok); dx = qx - P.x; dy = qy - P.y; d = Math.hypot(dx, dy); return d < 40 ? [0, 0] : [dx / d, dy / d]; }
     { const cd = creepDodge(); if (cd) return cd; }   // (out of the monsters' warnings first)
     if (B && B.alive && B.st !== "enter") {
-      const wet = waterDodge() || lavaDodge() || quakeDodge(); if (wet) return wet;   // (out of the captain's warned water, the lava demon's warned fire, the warned cracks and landing spots first)
+      const wet = waterDodge() || lavaDodge() || hexDodge() || quakeDodge(); if (wet) return wet;   // (out of the captain's warned water, the lava demon's warned fire, the warned cracks and landing spots first)
       dx = B.x - P.x; dy = B.y - P.y; d = Math.hypot(dx, dy) || 1;
       const w = d > 560 ? 1 : d < 400 ? -1 : 0;
       return norm(dx / d * w - dy / d * 0.8, dy / d * w + dx / d * 0.8);
@@ -1348,7 +1369,8 @@
   // an ice spike, a falling rock) 2, his big moves 3, his second form's big moves 4. Each boss hazard carries its move's cost (`cost`, set
   // where it is made: bossHit of the move he is making); the host applies it to both girls (the guest's page is told how many: "hurt" n).
   const BOSS_HIT = { contact: 2, furrow: 2, crows: 1, lolli: 3, geyser: 2, whirl: 2, tsunami: 3, tsunami2: 4, icespikes: 2, blizzard: 0, snowball: 3, avalanche: 4,
-    meteors: 2, lavapool: 3, firepillar: 3, eruption: 4, leap: 2, spit: 2, charge: 2, meteor: 2, bombs: 2 };
+    meteors: 2, lavapool: 3, firepillar: 3, eruption: 4, leap: 2, spit: 2, charge: 2, meteor: 2, bombs: 2,
+    summon: 2, orbs: 2, teleport: 3, circle: 3, clones: 2, ring: 4 };   // (the grey witch: her summon circles themselves never hurt; a clone's orb 2)
   const bossHit = (mv) => BOSS_HIT[mv] ?? BOSS_HIT.contact;
   // her guard after a hit: 1.3 s after a monster's, a little longer after a bigger one (time to step out of what hit her)
   const hurtInv = (n) => 1.3 + 0.2 * (Math.max(1, n) - 1);
@@ -1455,7 +1477,7 @@
   }
   // the boss can be shot only on the ground, out of his entrance and his quiz (up in the air his ground spot is empty)
   // (nor while he changes into his second form: bolts fly past him then)
-  const bossOpen = (B) => !!B && B.alive && B.st !== "enter" && B.st !== "quiz" && B.st !== "morph" && !(B.jz > 60);
+  const bossOpen = (B) => !!B && B.alive && B.st !== "enter" && B.st !== "quiz" && B.st !== "morph" && B.st !== "tele" && !(B.jz > 60);   // (nor while the grey witch is gone in smoke)
   // his body's radius on the ground (the second form stands 15 % bigger)
   const bossR = (B) => 120 * (B && B.phase === 2 ? BOSS2_K : 1);
   // where a shot flying z above the ground meets o on the ground plane: its feet, or for a flyer (drawn hgt up) the spot
@@ -1758,6 +1780,7 @@
     { share: 0.6, cd: [5, 7.5], tele: 3 },
     { share: 0.75, cd: [4.2, 6.2], tele: 3 },
     { share: 0.9, cd: [3.2, 4.8], tele: 4 },   // Màn 4: busy
+    { share: 1.0, cd: [3.0, 4.5], tele: 4 },   // Màn 5: the castle: every one of them
   ];
   const creepLv = () => CREEP_LV[clamp(G.level | 0, 0, CREEP_LV.length - 1)];
   // (in the boss's arena his own moves fill the ground: two at most from his monsters then)
@@ -1782,6 +1805,12 @@
     lava_skeleton:   { sk: "fireball", art: ["fx_bolt_fire"], w: 0.7, L: 900, hw: 60, v: 1000, d: [240, 820], keep: 420, sz: 1.1, shake: 1 },
     lava_mummy:      { sk: "trail", r: 62, warm: 0.6, burn: 3.0, step: 95, max: 5 },
     lava_bat:        { sk: "boom", w: 0.9, air: 0.6, r: 170, d: [0, 640], keep: 300 },   // (it glows, then flies at her marked spot and bursts there)
+    // Màn 5 castle: the ghost blinks (fades out, slips through the air and comes back on her marked spot) | the rag doll throws a pin | the
+    // dark knight charges down a lane behind his shield | the crow climbs, marks her spot and dives onto it
+    castle_zombie:   { sk: "blink", w: 1.0, air: 0.5, r: 140, hz: 20, d: [180, 640], fx: ["#f6ecff", "#dcc2ff", "#b98aff", "#ffffff"] },
+    castle_skeleton: { sk: "lob", art: ["fx_aura_shard"], w: 0.9, r: 105, d: [260, 760], keep: 400, sz: 95, z0: 150, spin: 11, col: "200,170,255", fx: ["#dff3ff", "#b98aff", "#ffffff"] },
+    castle_mummy:    { sk: "charge", w: 0.9, L: 820, hw: 85, v: 1000, d: [200, 760], shake: 1 },
+    castle_bat:      { sk: "dive", w: 0.9, air: 0.4, r: 120, d: [0, 800], keep: 300, fx: ["#3a2a55", "#b98aff", "#ffe066", "#1e1530"] },
   };
   const SKILL_ST = new Set(["skw", "sk", "howl"]);   // skw: winding up (its warning shows), sk: doing it, howl: the wolf's howl
   const CPK = ["lob", "lane", "ring", "cone", "fire"];
@@ -1873,7 +1902,7 @@
     m.st = "skw"; m.t = 0; m.vx = m.vy = 0; m.sx = m.x; m.sy = m.y; setFace(m, ux, uy);
     if (sk === "lob") m.cp = addCp("lob", m.kind, T.x, T.y, { m, sx: m.x, sy: m.y, r: S.r, w: S.w, t: -LOB_WIND, tie: 0 });
     else if (sk === "charge" || sk === "roll" || sk === "fireball") m.cp = addCp("lane", m.kind, m.x, m.y, { m, a, L: laneLen(m.x, m.y, a, S.L), r: S.hw, w: S.w, v: S.v, tie: sk === "fireball" ? S.w : Infinity });
-    else if (sk === "jump" || sk === "pounce" || sk === "dive" || sk === "boom" || sk === "slam") {
+    else if (sk === "jump" || sk === "pounce" || sk === "blink" || sk === "dive" || sk === "boom" || sk === "slam") {
       const k = Math.min(1, S.d[1] / Math.max(d, 1));
       m.cp = addCp("ring", m.kind, m.x + (T.x - m.x) * k, m.y + (T.y - m.y) * k, { m, sx: m.x, sy: m.y, r: S.r, w: S.w, tie: S.w });
     }
@@ -1909,7 +1938,7 @@
         if (m.st === "skw") { if (t >= S.w) { m.st = "sk"; m.t = 0; m.cp = null; if (hearIt(m.x, m.y)) play("fire"); } }
         else if (t > 0.3) endSkill(m);
         break;
-      case "jump": case "pounce": case "dive": {
+      case "jump": case "pounce": case "blink": case "dive": {
         const k = clamp((t - (S.w - S.air)) / S.air, 0, 1);
         if (k > 0) { m.x = m.sx + (o.x - m.sx) * k; m.y = m.sy + (o.y - m.sy) * k; }
         if (t >= S.w) {
@@ -2020,7 +2049,7 @@
       if (roomy) burst(p.x, p.y - 30, 14, S.fx || ["#ffffff"], 320, 0.5); dust(p.x, p.y, 4); play("pop");
       const sb = S.slow && frOf("fxsn_burst0", "fxsn_shards"); if (sb && roomy) G.parts.push({ type: "fx", name: sb, x: p.x, y: p.y - p.r * 0.5, sc: p.r / 150, life: 0.45, max: 0.45, grow: 0.4 });
     }
-    else if (sk === "jump" || sk === "pounce" || sk === "dive") { dust(p.x, p.y, sk === "dive" ? 4 : 9); if (roomy && S.fx) burst(p.x, p.y - 40, 12, S.fx, 300, 0.5); G.shake = Math.max(G.shake, sk === "jump" ? 7 : 4); play(sk === "dive" ? "swoosh" : "slam"); }
+    else if (sk === "jump" || sk === "pounce" || sk === "blink" || sk === "dive") { dust(p.x, p.y, sk === "dive" || sk === "blink" ? 4 : 9); if (roomy && S.fx) burst(p.x, p.y - 40, 12, S.fx, 300, 0.5); G.shake = Math.max(G.shake, sk === "jump" ? 7 : 4); play(sk === "dive" ? "swoosh" : "slam"); }
     else if (sk === "slam" || sk === "boom") {
       G.parts.push({ type: "qboom", x: p.x, y: p.y, r: p.r * 0.75, life: 0.6, max: 0.6, bomb: sk === "boom" });
       dust(p.x, p.y, 8); G.shake = Math.max(G.shake, 10); play(sk === "boom" ? "boom" : "slam");
@@ -3053,7 +3082,9 @@
     if (box) {
       if (push > h * 0.5 * s && !dx) dx = (x < (box.L + box.R) / 2 ? 1 : -1) * (w / 2 - 50) * s;
       const b0 = dx ? clamp(dx / s, Math.min(0, -w / 2 + 50), Math.max(0, w / 2 - 50)) : 0;
-      x = clamp(x, box.L + 16 - (b0 - w / 2) * s, Math.max(box.L + 16 - (b0 - w / 2) * s, box.R - 16 - (b0 + w / 2) * s));
+      // (as high as the hearts, magic and level bars at the top left: kept to their right)
+      const bL = box.hudR !== undefined && y - (h + 34) * s < box.hudB ? Math.max(box.L, box.hudR) : box.L;
+      x = clamp(x, bL + 16 - (b0 - w / 2) * s, Math.max(bL + 16 - (b0 - w / 2) * s, box.R - 16 - (b0 + w / 2) * s));
       if (box.B !== undefined) y = Math.min(y, box.B - 16 - 6 * s);
     }
     if (API.saidBox) API.saidBox.push([lines.join(" "), VIEWT.zs ? ((y - (up ? -34 : h + 34) * s - VIEWT.T) * VIEWT.zs + VIEWT.offY) / DPR : 0, k]);   // (tests: [text, its top in css px, alpha])
@@ -3082,12 +3113,20 @@
     if (el && !el.hidden && el.getBoundingClientRect) { const r = el.getBoundingClientRect(); if (r.bottom > 0) return r.bottom; }
     return 15 * Math.min(window.innerHeight / 100, window.innerWidth * 1.6 / 100);
   }
+  // the hearts / magic / level column at the top left (css px: its right and bottom edges; the stub page has no layout: 30 u x 19 u)
+  function hudLeftBox() {
+    const col = $("ebar") && $("ebar").parentElement && $("ebar").parentElement.parentElement;
+    if (col && col.getBoundingClientRect) { const r = col.getBoundingClientRect(); if (r.right > 0) return { right: r.right, bottom: r.bottom }; }
+    const u = Math.min(window.innerHeight / 100, window.innerWidth * 1.6 / 100);
+    return { right: 30 * u, bottom: 19 * u };
+  }
   // drawn over the scene: what he says in his films, and his laugh during the quiz
   // (every bubble of his stays below his name and health bar at the top of the screen and inside the view: Dad saw his laugh under the bar)
   function drawBossTalk(L, T, R, Bt) {
     const B = G.boss, BD = G.lvl && G.lvl.boss; if (!B || !BD) return;
     const c = G.bcut, head = B.headY === undefined ? B.y - 520 : B.headY;
     const minTop = VIEWT.zs ? VIEWT.T + ((bossBarBottom() + 10) * DPR - VIEWT.offY) / VIEWT.zs : undefined, box = { L, R, B: Bt };
+    if (VIEWT.zs && !$("hud").hidden) { const hb = hudLeftBox(); box.hudR = VIEWT.L + ((hb.right + 8) * DPR - VIEWT.offX) / VIEWT.zs; box.hudB = VIEWT.T + ((hb.bottom + 8) * DPR - VIEWT.offY) / VIEWT.zs; }   // (clear of the left HUD too)
     if (c && c.ph === "intro" && BD.say && c.t >= BI_SAY && c.t < BI_END - 0.3) {
       const k = Math.min(clamp((c.t - BI_SAY) / 0.25, 0, 1), clamp((BI_END - 0.3 - c.t) / 0.25, 0, 1));
       talkBubble(BD.say, B.x, head - 20, k, 46 * WT, false, 0, minTop, box);
@@ -3128,9 +3167,12 @@
       if (d > 230) { B.x += dx / d * sp * dt; B.y += dy / d * sp * dt; }
       // (the captain's next move waits until his sea is calm; the yeti's until his snowballs and spikes are gone: he goes on through his blizzard;
       // the lava demon's until his fire is out)
-      if (((d < 420 && B.t > 0.6 / k) || B.t > 3.0 / k) && !(style === "captain" && G.waters.length) && !(style === "yeti" && G.waters.some((w) => w.k !== "blizzard")) && !(style === "lava" && G.lavas.length)) bossPrep(B, style, T, dx / d, dy / d, fast);
+      if (((d < 420 && B.t > 0.6 / k) || B.t > 3.0 / k) && !(style === "captain" && G.waters.length) && !(style === "yeti" && G.waters.some((w) => w.k !== "blizzard")) && !(style === "lava" && G.lavas.length) && !(style === "hex" && G.hexes.length)) bossPrep(B, style, T, dx / d, dy / d, fast);
     } else if (B.st === "prep") {
       if (B.t > 0.9 / k) bossAct(B, T, fast);
+    } else if (B.st === "tele") {
+      // the grey witch, gone in smoke: back at the spot that glows once its warning is over
+      if (B.t >= (B.tw || 1) || B.t > 4) { B.x = B.ix; B.y = B.iy; B.st = "slam"; B.t = 0; }
     } else if (B.st === "leap") {
       // the spider queen's pounce: an arc onto the cracking ground she aimed at
       const k = clamp(B.t / 0.9, 0, 1);
@@ -3142,7 +3184,7 @@
       for (const g of girls()) if (d2(g.x, g.y, B.x, B.y) < 150 * 150) hurtTarget(g, B.x, B.y, false, bossHit("charge"));
       if (B.t > 0.85 || Math.hypot(B.x - A.x, B.y - A.y) > A.r - 170) { B.st = "slam"; B.t = 0; crossQuake(B.x, B.y, fast ? 8 : 4); SFX.slam(); G.shake = Math.max(G.shake, 16); }
     } else if (B.st === "slam") {
-      if (B.t > 0.9 / k) { B.st = "rest"; B.t = 0; B.cycle++; if (B.cycle % 3 === 0 && style !== "furrow") summonBats(B); }
+      if (B.t > 0.9 / k) { B.st = "rest"; B.t = 0; B.cycle++; if (B.cycle % 3 === 0 && style !== "furrow" && style !== "hex") summonBats(B); }   // (the grey witch calls hers as a move)
     } else if (B.st === "rest") {
       if (B.t > 1.0 / k) { B.st = "walk"; B.t = 0; }
     }
@@ -3150,13 +3192,13 @@
     if (ad > A.r - 150) { B.x = A.x + ax * (A.r - 150); B.y = A.y + ay * (A.r - 150); }
     // body contact
     const br = bossR(B);
-    if (!(B.jz > 60)) for (const g of girls()) if (d2(g.x, g.y, B.x, B.y) < br * br) hurtTarget(g, B.x, B.y, false, BOSS_HIT.contact);
+    if (!(B.jz > 60) && B.st !== "tele") for (const g of girls()) if (d2(g.x, g.y, B.x, B.y) < br * br) hurtTarget(g, B.x, B.y, false, BOSS_HIT.contact);
   }
   // ---------------------------------------------------------------- his change into the second form (the host runs it; both pages show it)
   function startMorph(B) {
     B.st = "morph"; B.t = 0; B.vx = B.vy = 0; B.hurtPose = 0; B.move = null; B.mfx = {};
     // nothing of his first form can hurt any more: its warnings and shots go (the film's flash covers it)
-    G.quakes = G.quakes.filter((q) => q.done); G.foes = []; G.waters = []; G.lavas = []; clearCps();
+    G.quakes = G.quakes.filter((q) => q.done); G.foes = []; G.waters = []; G.lavas = []; clearCps(); G.hexes = [];
     G.shake = Math.min(Math.max(G.shake, 8), 10);
   }
   function updateMorph(B, dt) {
@@ -3223,15 +3265,17 @@
   }
   // seconds per question: one number, or [without, with] carrying / borrowing
   const quizT = (cfg, q) => (Array.isArray(cfg.T) ? cfg.T[q.carry ? 1 : 0] : q.carry ? Math.max(7, cfg.T * 2) : cfg.T);   // a carry question on a 10 level gets 7 s
+  // (op "±": the questions take turns, + then −, counted over the whole fight (Màn 5))
+  const quizCfg = (cfg) => (cfg.op === "±" ? { ...cfg, op: (G.qzN || 0) % 2 ? "-" : "+" } : cfg);
   function startQuiz(B) {
-    const cfg = G.lvl.boss.quiz, q = makeSum(cfg);
+    const cfg = quizCfg(G.lvl.boss.quiz), q = makeSum(cfg);
     B.st = "quiz"; B.t = 0; B.jz = 0;
     // one leap, one or two questions in a row (the fence stays up between them)
     // (a level that says quiz.n asks that many questions on each leap; otherwise one or two)
     G.leaps++;
     const asks = Array.isArray(cfg.n) ? Math.max(1, cfg.n[Math.min(G.leaps, cfg.n.length) - 1] | 0) : 1 + (Math.random() < 0.5 ? 1 : 0);
     G.quiz = { ph: "up", t: 0, T: quizT(cfg, q), hz: cfg.hz, ...q, drops: [], hit: false, lastSec: -1, n: (G.qzN = (G.qzN || 0) + 1), left: asks - 1 };
-    G.quakes = []; G.foes = []; G.waters = []; G.lavas = []; clearCps();
+    G.quakes = []; G.foes = []; G.waters = []; G.lavas = []; clearCps(); G.hexes = [];
     G.shake = 14; dust(B.x, B.y, 20);
     quizAnnounce("up");
   }
@@ -3241,7 +3285,7 @@
   }
   // the next question of the same leap: he stays up in the sky, the fence stays up
   function nextQuestion(z) {
-    const cfg = G.lvl.boss.quiz; let q = makeSum(cfg);
+    const cfg = quizCfg(G.lvl.boss.quiz); let q = makeSum(cfg);
     for (let i = 0; i < 6 && q.a === z.a && q.b === z.b; i++) q = makeSum(cfg);
     Object.assign(z, q, { ph: "next", t: 0, T: quizT(cfg, q), drops: [], hit: false, lastSec: -1, n: (G.qzN = (G.qzN || 0) + 1), left: z.left - 1 });
     quizAnnounce("next");
@@ -3382,8 +3426,8 @@
     for (let i = 0; i < 3; i++) { const a = G.t * 4 + i * TAU / 3; fx("fx_twinkle", hx + Math.cos(a) * 55, hy - 30 + Math.sin(a) * 18, 0.8, 1, G.t * 6); }
   }
   // each boss winds up its own move (B.move), aimed where the girl stands now
-  const BMOVES = ["furrow", "crows", "leap", "spit", "charge", "meteor", "bombs", "tsunami", "geyser", "whirl", "lolli", "tsunami2", "snowball", "icespikes", "blizzard", "avalanche", "meteors", "lavapool", "firepillar", "eruption"];
-  const PH2_MOVES = { furrow: ["furrow", "lolli", "furrow", "crows"], captain: ["tsunami", "geyser", "whirl", "tsunami2"], yeti: ["snowball", "icespikes", "blizzard", "avalanche"], lava: ["meteors", "firepillar", "lavapool", "eruption"] };
+  const BMOVES = ["furrow", "crows", "leap", "spit", "charge", "meteor", "bombs", "tsunami", "geyser", "whirl", "lolli", "tsunami2", "snowball", "icespikes", "blizzard", "avalanche", "meteors", "lavapool", "firepillar", "eruption", "summon", "orbs", "teleport", "circle", "clones", "ring"];
+  const PH2_MOVES = { furrow: ["furrow", "lolli", "furrow", "crows"], captain: ["tsunami", "geyser", "whirl", "tsunami2"], yeti: ["snowball", "icespikes", "blizzard", "avalanche"], lava: ["meteors", "firepillar", "lavapool", "eruption"], hex: ["clones", "ring", "orbs", "teleport", "circle", "summon"] };
   const isSea = (mv) => WKINDS.includes(mv) || mv === "tsunami2";
   const YMOVES = ["snowball", "icespikes", "blizzard"], isSnow = (mv) => YMOVES.includes(mv) || mv === "avalanche";
   // each boss's own light (his wind-up, his second form's glow, the change's magic): the candy boss pink, the captain sea blue, the yeti ice,
@@ -3392,6 +3436,7 @@
     captain: { rgb: "120,220,255", cols: ["#e9fbff", "#9fe3ff", "#58cfd8", "#4aa8ff"] },
     yeti: { rgb: "170,225,255", cols: ["#ffffff", "#dff3ff", "#9fd8ff", "#6fb8f0"] },
     lava: { rgb: "255,120,40", cols: ["#fff4c2", "#ffd36a", "#ff6a1a", "#ff2a1a"] },
+    hex: { rgb: "190,110,255", cols: ["#f6ecff", "#dcc2ff", "#b98aff", "#9a5cff"] },
     _: { rgb: "255,90,200", cols: ["#fff4fb", "#ff9ad5", "#ff4fa8", "#b04dff"] },
   };
   const bossLook = () => BOSS_LOOK[(G.lvl && G.lvl.boss && G.lvl.boss.style) || "_"] || BOSS_LOOK._;
@@ -3400,7 +3445,7 @@
     const c = B.cycle, c2 = B.cycle - (B.cycle0 || 0);
     // (his second form adds a move: the candy boss's ring of lollipops, the captain's double tsunami, the lava demon's eruption)
     if (B.phase === 2 && PH2_MOVES[style]) B.move = PH2_MOVES[style][c2 % PH2_MOVES[style].length];
-    else B.move = style === "furrow" ? (c % 3 === 2 ? "crows" : "furrow") : style === "spider" ? (c % 2 ? "spit" : "leap") : style === "knight" ? "charge" : style === "captain" ? WKINDS[c % 3] : style === "yeti" ? YMOVES[c % 3] : style === "lava" ? LAVA_MOVES[c % 3] : (c % 2 ? "bombs" : "meteor");
+    else B.move = style === "furrow" ? (c % 3 === 2 ? "crows" : "furrow") : style === "spider" ? (c % 2 ? "spit" : "leap") : style === "knight" ? "charge" : style === "captain" ? WKINDS[c % 3] : style === "yeti" ? YMOVES[c % 3] : style === "lava" ? LAVA_MOVES[c % 3] : style === "hex" ? HEX_MOVES[c % 4] : (c % 2 ? "bombs" : "meteor");
     if (B.move === "leap") {
       const A = G.arena, [nx, ny] = norm(T.x - A.x, T.y - A.y), r = Math.min(Math.hypot(T.x - A.x, T.y - A.y), A.r - 200);
       B.ix = A.x + nx * r; B.iy = A.y + ny * r; addQuake(B.ix, B.iy, 210, (fast ? 0.6 : 0.9) + 0.9);
@@ -3444,6 +3489,7 @@
     } else if (isSea(B.move)) seaMove(B, T, fast);
     else if (isSnow(B.move)) snowMove(B, T, fast);
     else if (isLava(B.move)) lavaMove(B, T, fast);
+    else if (isHex(B.move)) hexMove(B, T, fast);
   }
   // the candy boss's second form: he spins and flings a ring of big lollipops around himself, out to where she stands; each one's
   // landing spot glows first (>= 0.8 s) and there is room for a girl between any two (stepping in or out of the ring is safe too)
@@ -4234,6 +4280,318 @@
       fx("fx_flame", p.x + Math.sin(G.t * 11 + j + p.i) * 8, p.y - 20 - j * 85 * hk, sc * (1 - j * 0.22) * fl * (0.4 + 0.6 * hk), Math.min(1, 1.3 * hk), Math.sin(G.t * 7 + j) * 0.1, j === 1, 1.1 + 0.2 * hk);
     }
   }
+  // ---------------------------------------------------------------- Phù thủy Xám Xịt's magic (style "hex"), one move after another:
+  // summon: purple circles glow on the floor away from the girls, then a ghost or a crow steps out of each (a wave of her monsters);
+  // orbs: 3 (her second form 4) magic orbs gather round her staff, then fly after the girls, slower than they walk and turning slowly, for a
+  //   few seconds, then pop: a girl who keeps moving is never caught; one that touches a girl pops on her;
+  // teleport: she vanishes in smoke; a magic circle glows where she will come back (where the girl stood) and bursts as she appears in it;
+  // circle: a magic circle under each girl (and one more) glows, then erupts in purple fire;
+  // her second form (faster, warnings >= WARN_MIN): + clones (two shadow copies of her appear beside her and each casts a weaker orb while
+  //   she casts one; only she can be hurt) and ring (a ring of circles round each girl: the middle and the gaps between them are safe).
+  // As the captain's sea and the lava demon's fire: each shows for w s before it can hurt, and hurts only inside what it showed.
+  // Its look is painted: the old atlas's magic circle, bubble ring, orb, witch-fire, fire pillar and smoke turned to her purple (hexArt),
+  // a piece of her own second-form painting (the burst of purple fire at her feet), her frames for the clones; code adds light and sparks.
+  // { id, k (HKINDS), x, y, t, w, end, r, vx, vy (an orb's flight), cx, cy (an orb: what it gathered round / a ring circle: the ring's
+  //   middle), v (an orb's speed), fly (its flight time), n / m (an orb: its place among m), weak (a clone's orb), mon (summon: 0 ghost, 1 crow) }
+  const HKINDS = ["sum", "orb", "tele", "circle", "clone"], HEX_MOVES = ["summon", "orbs", "teleport", "circle"];
+  const isHex = (mv) => HEX_MOVES.includes(mv) || mv === "clones" || mv === "ring";
+  const HEX_W1 = 1.1, HEX_W2 = WARN_MIN + 0.05, HEX_ON = 0.4, HEX_RGB = "190,110,255", HEX_COLS = ["#f6ecff", "#dcc2ff", "#b98aff", "#9a5cff", "#ffb3e6"];
+  const SUM_R = 120, SUM_MAX = 8, SUM_KINDS = ["castle_zombie", "castle_bat"];
+  const ORB_R = 50, ORB_V = 205, ORB_V2 = 230, ORB_VW = 180, ORB_TURN = 1.5, ORB_FLY = 3.6, ORB_FLYW = 2.8, ORB_Z = 95, ORB_RING = 175, ORB_GZ = 330, ORB_STEP = 0.15;
+  const TELE_R = 170, TELE_OUT = 0.35, TELE_IN = 0.25, CIR_R = 200, RING_R = 360, RING_N = 6, RING_CR = 115, RING_SHARE = 150, CLONE_T = 2.6, HEX_LIFT = 46;
+  Object.assign(OBST, { cs_candelabra: 26, cs_pillar: 46, cs_cauldron: 44, cs_bookshelf: 48, cs_lamp: 20, cs_gargoyle: 46, cs_pumpkins: 44 });   // (what blocks a walker)
+  function addHex(k, x, y, o) { const h = { id: G.nextId++, k, x, y, t: 0, w: 1, end: 2, r: 100, vx: 0, vy: 0, cx: x, cy: y, v: 0, fly: 0, n: 0, m: 1, weak: 0, mon: 0, cost: bossHit(G.boss && G.boss.move), ...o }; G.hexes.push(h); return h; }
+  // her second form floats (her painting ends in smoke): drawn this far above the ground, bobbing
+  const hexLift = (B) => (G.lvl && G.lvl.boss && G.lvl.boss.style === "hex" && B && B.phase === 2 && B.alive ? HEX_LIFT + Math.sin(G.t * 2.2) * 10 : 0);
+  // how much of her shows: she fades into smoke as she teleports away and out of it where she comes back
+  const hexVis = (B) => (!B || !B.alive ? 1 : B.st === "tele" ? clamp(1 - B.t / TELE_OUT, 0, 1) : B.move === "teleport" && B.st === "slam" ? clamp(B.t / TELE_IN, 0, 1) : 1);
+  // orbs gather round (cx, cy): n of them, the first launching after w s, the others ORB_STEP after one another
+  function hexOrbs(cx, cy, n, w, weak, fast) {
+    for (let i = 0; i < n; i++) {
+      const fly = weak ? ORB_FLYW : ORB_FLY, ow = w + i * ORB_STEP;
+      addHex("orb", cx, cy, { cost: weak ? BOSS_HIT.clones : BOSS_HIT.orbs, w: ow, r: weak ? ORB_R * 0.8 : ORB_R, end: ow + fly + 0.3, fly, v: weak ? ORB_VW : fast ? ORB_V2 : ORB_V, n: i, m: n, weak: weak ? 1 : 0, cx, cy });
+    }
+  }
+  // where an orb is while it gathers (both pages work it out from its clock): circling the staff, ORB_RING out
+  function orbGather(o) { const a = o.n / o.m * TAU + o.t * 2.4; return [o.cx + Math.cos(a) * ORB_RING, o.cy + Math.sin(a) * ORB_RING * 0.45]; }
+  function hexMove(B, T, fast) {
+    const A = G.arena, gs = girls().filter((g) => !g.dead), who = gs.length ? gs : [T], lim = A.r - 170, w = fast ? HEX_W2 : HEX_W1;
+    const inside = (x, y) => Math.hypot(x - A.x, y - A.y) < lim;
+    const into = (x, y) => { const dx = x - A.x, dy = y - A.y, d = Math.hypot(dx, dy); return d > lim ? [A.x + dx / d * lim, A.y + dy / d * lim] : [x, y]; };
+    if (B.move === "summon") {
+      // (at most SUM_MAX of her monsters at once: a wave tops them up)
+      const room = Math.max(0, SUM_MAX - G.mons.filter((m) => m.alive && m.summoned).length), n = Math.min(room, fast ? 4 : 3), at = [];
+      for (let k = 0; at.length < n && k < 600; k++) {
+        const g = who[k % who.length], a = Math.random() * TAU, r = rnd(420, 660), x = g.x + Math.cos(a) * r, y = g.y + Math.sin(a) * r;
+        if (inside(x, y) && at.every(([px, py]) => Math.hypot(px - x, py - y) > 300) && who.every((q) => Math.hypot(q.x - x, q.y - y) > 380)) at.push([x, y]);
+      }
+      at.forEach(([x, y], i) => addHex("sum", x, y, { w: w + i * 0.15, r: SUM_R, end: w + i * 0.15 + 0.7, mon: i % 2 }));
+      SFX.swirl(); sample("laugh1", 0.5);
+    } else if (B.move === "orbs" || B.move === "clones") {
+      hexOrbs(B.x, B.y, B.move === "clones" ? 1 : fast ? 4 : 3, w, 0, fast);   // (with her clones: one of her own, one weaker from each copy)
+      if (B.move === "clones") {
+        // two shadow copies of her, one each side of her round the arena (each casts its own weaker orb once it is there)
+        const a0 = Math.atan2(B.y - A.y, B.x - A.x), d = clamp(Math.hypot(B.x - A.x, B.y - A.y), 320, lim - 60);
+        for (const s of [-1, 1]) { const [x, y] = into(A.x + Math.cos(a0 + s * 2.1) * d, A.y + Math.sin(a0 + s * 2.1) * d); addHex("clone", x, y, { w, r: 0, end: w + CLONE_T }); }
+      }
+      play("swoosh"); sample("bell", 0.45);
+    } else if (B.move === "teleport") {
+      // gone in smoke; back where the girl stands now (inside the fence), which glows first
+      const [x, y] = into(T.x, T.y);
+      addHex("tele", x, y, { w, r: TELE_R, end: w + 0.9 });
+      B.st = "tele"; B.t = 0; B.tw = w; B.ix = x; B.iy = y;
+      for (let i = 0; i < 7; i++) hexSmoke(B.x + rnd(-110, 110), B.y - rnd(40, 380), 1.1);
+      SFX.swoosh();
+    } else if (B.move === "circle") {
+      // one under each girl, and one or two more elsewhere (well away from them)
+      const at = who.map((g) => into(g.x, g.y));
+      for (let k = 0, n = at.length + (fast ? 2 : 1); at.length < n && k < 300; k++) {
+        const a = Math.random() * TAU, r = Math.sqrt(Math.random()) * lim, x = A.x + Math.cos(a) * r, y = A.y + Math.sin(a) * r;
+        if (at.every(([px, py]) => Math.hypot(px - x, py - y) > 2 * CIR_R + 120)) at.push([x, y]);
+      }
+      // (a circle under her takes CIR_R / her walk = 0.56 s to leave: in her second form still 1.0 s to see it coming)
+      const cw = Math.max(w, 1.0);
+      at.forEach(([x, y], i) => addHex("circle", x, y, { w: cw + i * 0.08, r: CIR_R, end: cw + i * 0.08 + 1.0 }));
+      SFX.slam(); G.shake = Math.max(G.shake, 8);
+    } else {
+      // the ring: RING_N circles round each girl (two side by side share one ring); a circle of one ring never lands on the other girl
+      const cs = [];
+      for (const g of who) {
+        const c = cs.find((o) => Math.hypot(g.x - o.x0, g.y - o.y0) < RING_SHARE);
+        if (c) { c[0] = (c.x0 + g.x) / 2; c[1] = (c.y0 + g.y) / 2; } else { const o = [g.x, g.y]; o.x0 = g.x; o.y0 = g.y; cs.push(o); }
+      }
+      for (const [cx, cy] of cs) {
+        const a0 = Math.random() * TAU;
+        for (let i = 0; i < RING_N; i++) {
+          const a = a0 + i * TAU / RING_N, x = cx + Math.cos(a) * RING_R, y = cy + Math.sin(a) * RING_R;
+          if (Math.hypot(x - A.x, y - A.y) > A.r - 60 || who.some((g) => Math.hypot(g.x - x, g.y - y) < RING_CR + 40)) continue;
+          addHex("circle", x, y, { w: w + i * 0.05, r: RING_CR, end: w + i * 0.05 + 1.0, cx, cy });
+        }
+      }
+      SFX.boom(); G.shake = Math.max(G.shake, 12);
+      G.parts.push({ type: "ring", x: B.x, y: B.y - 40, r: 80, vr: 1300, life: 0.6, max: 0.6, col: HEX_RGB });
+    }
+  }
+  // does o hurt someone standing at (x, y) now? (only inside what it shows, and only once its warning is over)
+  function hexHurts(o, x, y) {
+    const e = o.t - o.w; if (e < 0 || !G.arena) return false;
+    if (o.k === "orb") return e < o.fly && d2(x, y, o.x, o.y) < o.r * o.r;
+    if (o.k === "circle" || o.k === "tele") return e < HEX_ON && d2(x, y, o.x, o.y) < o.r * o.r;
+    return false;
+  }
+  // (host: hurt both girls, steer the orbs, call the monsters, cast the clones' orbs; the guest's page runs the clock, the flight and the look)
+  function updateHexes(dt, host) {
+    if (!G.hexes || !G.hexes.length) return;
+    const A = G.arena, born = [];
+    for (const o of G.hexes) {
+      const t0 = o.t; o.t += dt;
+      if (!A) continue;
+      const e = o.t - o.w;
+      if (o.k === "orb") {
+        if (e < 0) { [o.x, o.y] = orbGather(o); if (Math.random() < 0.3) hexSpark(o.x, o.y - 230); }
+        else if (e < o.fly) {
+          if (t0 < o.w) {   // launched: straight at the nearest girl first
+            const g = targetFor(o.x, o.y), a = Math.atan2(g.y - o.y, g.x - o.x); o.vx = Math.cos(a) * o.v; o.vy = Math.sin(a) * o.v; play("swoosh");
+          } else if (host) {   // then turning toward her, slowly
+            const g = targetFor(o.x, o.y), cur = Math.atan2(o.vy, o.vx);
+            let da = Math.atan2(g.y - o.y, g.x - o.x) - cur; while (da > Math.PI) da -= TAU; while (da < -Math.PI) da += TAU;
+            const a = cur + clamp(da, -ORB_TURN * dt, ORB_TURN * dt); o.vx = Math.cos(a) * o.v; o.vy = Math.sin(a) * o.v;
+          }
+          o.x += o.vx * dt; o.y += o.vy * dt;
+          if (Math.random() < 0.5) hexSpark(o.x - o.vx * 0.12, o.y - ORB_Z - o.vy * 0.12);
+          if (host && d2(o.x, o.y, A.x, A.y) > (A.r - 30) ** 2) orbPop(o);
+        } else if (t0 - o.w < o.fly) orbPop(o, true);
+      } else if (t0 < o.w && o.t >= o.w) hexStart(o, host, born);
+      if (o.k === "clone" && host && !o.cast && e >= 0.6) { o.cast = true; born.push([o.x, o.y]); }   // (after hers: one orb after another)
+      if (host) for (const g of girls()) if (!g.dead && hexHurts(o, g.x, g.y)) { hurtTarget(g, o.x, o.y, false, o.cost || BOSS_HIT.contact); if (o.k === "orb") { orbPop(o); break; } }
+    }
+    G.hexes = G.hexes.filter((o) => o.t < o.end);
+    for (const [x, y] of born) hexOrbs(x, y, 1, WARN_MIN, 1, true);   // (a clone's weaker orb, gathered >= WARN_MIN like every warning of her second form)
+  }
+  // an orb's end: it bursts into sparks (when it touches a girl, flies out to the fence, or its time is up: `late`)
+  function orbPop(o, late) {
+    if (!late) o.end = Math.min(o.end, o.t);
+    o.fly = Math.min(o.fly, Math.max(0, o.t - o.w));
+    burst(o.x, o.y - ORB_Z, 12, HEX_COLS, 280, 0.5);
+    G.parts.push({ type: "fx", name: FR.hx_orb ? "hx_orb" : "fx_twinkle", x: o.x, y: o.y - ORB_Z, sc: 0.9, life: 0.35, max: 0.35, grow: 1.6 });
+    if (d2(o.x, o.y, P.x, P.y) < 2000 * 2000) play("pop");
+  }
+  // the moment a warning is over: the circle erupts, the monster steps out, she comes back, the clone is there
+  function hexStart(o, host, born) {
+    const near = d2(o.x, o.y, P.x, P.y) < 2400 * 2400;
+    if (o.k === "sum") {
+      for (let i = 0; i < 5; i++) hexSmoke(o.x + rnd(-70, 70), o.y - rnd(10, 160), 1);
+      if (host && G.mons.length < MAX_MONS) { const m = spawnMon(SUM_KINDS[o.mon] || "castle_bat", o.x, o.y); m.summoned = true; }
+      if (near) play("pop");
+    } else if (o.k === "clone") {
+      for (let i = 0; i < 6; i++) hexSmoke(o.x + rnd(-90, 90), o.y - rnd(30, 420), 1.1);
+      if (near) SFX.swoosh();
+    } else {
+      // circle / tele: purple fire bursts up out of it
+      if (near) { SFX.slam(); play("fire"); G.shake = Math.max(G.shake, o.k === "tele" ? 12 : 9); }
+      burst(o.x, o.y - 60, 18, HEX_COLS, 420, 0.7);
+      if (o.k === "tele") for (let i = 0; i < 6; i++) hexSmoke(o.x + rnd(-100, 100), o.y - rnd(40, 360), 1.1);
+    }
+  }
+  // purple smoke (the painted puff, lit) and sparks
+  function hexSmoke(x, y, sc) { if (G.parts.length < 440) G.parts.push({ type: "fx", name: FR.hx_smoke ? "hx_smoke" : "fx_smoke", x, y, vx: rnd(-40, 40), vy: -rnd(30, 90), sc: sc * rnd(1.4, 2.2), rot: rnd(-0.4, 0.4), flip: Math.random() < 0.5, life: rnd(0.6, 0.9), max: 0.9, grow: 0.8 }); }
+  function hexSpark(x, y) { if (G.parts.length < 400) G.parts.push({ type: "dot", x: x + rnd(-14, 14), y: y + rnd(-14, 14), vx: rnd(-30, 30), vy: -rnd(20, 80), life: rnd(0.3, 0.6), max: 0.6, r: rnd(4, 8), col: HEX_COLS[Math.floor(Math.random() * HEX_COLS.length)] }); }
+  // the test bot: out of each warned circle it is in (or about to walk into); else, with orbs flying near, the way (of 24) that keeps it
+  // furthest from all of them a moment later, inside the fence and out of the circles; none: null
+  function hexDodge() {
+    const A = G.arena; if (!A || !G.hexes || !G.hexes.length) return null;
+    let ex = 0, ey = 0;
+    const B = G.boss, clear = (x, y) => !B || !B.alive || B.st === "tele" || d2(x, y, B.x, B.y) > (bossR(B) + 140) ** 2;   // (not into her)
+    const m = 80, room = (x, y) => d2(x, y, A.x, A.y) < (A.r - 110) ** 2 && clear(x, y);
+    for (const o of G.hexes) {
+      const e = o.t - o.w;
+      if ((o.k !== "circle" && o.k !== "tele") || e > HEX_ON) continue;
+      for (const [px, py] of [[P.x, P.y], [P.x + P.vx * 0.3, P.y + P.vy * 0.3]]) {
+        const dx = px - o.x, dy = py - o.y, d = Math.hypot(dx, dy), R = o.r + m;
+        if (d >= R) continue;
+        let [nx, ny] = d > 1 ? [dx / d, dy / d] : norm(A.x - o.x + 1, A.y - o.y);
+        if (!room(o.x + nx * R, o.y + ny * R)) {
+          let best = null, bd = Infinity;
+          for (let i = 0; i < 32; i++) { const a = i / 32 * TAU, x = o.x + Math.cos(a) * R, y = o.y + Math.sin(a) * R; if (!room(x, y)) continue; const q = d2(x, y, px, py); if (q < bd) { bd = q; best = [x, y]; } }
+          if (best) [nx, ny] = norm(best[0] - px, best[1] - py);
+        }
+        ex += nx * 3; ey += ny * 3; break;
+      }
+    }
+    if (ex || ey) return norm(ex, ey);
+    const orbs = G.hexes.filter((o) => o.k === "orb" && o.t - o.w > -0.3 && o.t - o.w < o.fly && d2(o.x, o.y, P.x, P.y) < 560 * 560);
+    if (!orbs.length) return null;
+    let best = null, bs = -Infinity;
+    for (let i = 0; i < 24; i++) {
+      const a = i / 24 * TAU, ux = Math.cos(a), uy = Math.sin(a);
+      let sc = Infinity;
+      for (const T of [0.35, 0.8]) {
+        const x = P.x + ux * 360 * T, y = P.y + uy * 360 * T;
+        for (const o of orbs) { const f = o.t >= o.w ? T : Math.max(0, T - (o.w - o.t)); sc = Math.min(sc, Math.hypot(x - o.x - o.vx * f, y - o.y - o.vy * f) - o.r); }
+        if (d2(x, y, A.x, A.y) > (A.r - 110) ** 2) sc -= 400;
+        if (!clear(x, y)) sc -= 300;
+        for (const o of G.hexes) if ((o.k === "circle" || o.k === "tele") && o.t - o.w < HEX_ON && d2(x, y, o.x, o.y) < (o.r + 60) ** 2) sc -= 300;
+      }
+      if (sc > bs) { bs = sc; best = [ux, uy]; }
+    }
+    return best;
+  }
+  // ---- her painted magic: frames of the old atlas turned to her purple once (a hue turn that keeps their painting), a piece of her own
+  // second-form painting, and her frames darkened for the clones (FR.hx_*). Pages without pixel access keep the frames' own colours.
+  let hexArtDone = false;
+  function hexArt() {
+    hexArtDone = true;
+    const make = (from, to, fn, crop) => {
+      const f = FR[from]; if (!f || FR[to]) return;
+      const [cx, cy, cw, ch] = crop || [0, 0, f.w, f.h], c = document.createElement("canvas"); c.width = cw; c.height = ch;
+      const g = c.getContext("2d"); g.drawImage(f.img, f.sx + cx, f.sy + cy, cw, ch, 0, 0, cw, ch);
+      try { const d = g.getImageData(0, 0, cw, ch), p = d.data; for (let i = 0; i < p.length; i += 4) if (p[i + 3]) fn(p, i); g.putImageData(d, 0, 0); } catch (e) {}
+      FR[to] = { img: c, sx: 0, sy: 0, w: cw, h: ch, s: f.s, ax: f.ax - cx, ay: f.ay - cy };
+    };
+    // the CSS hue-rotate matrix: green (120°) + 160° -> violet
+    const a = 160 * Math.PI / 180, C = Math.cos(a), S = Math.sin(a), M = [0.213 + C * 0.787 - S * 0.213, 0.715 - C * 0.715 - S * 0.715, 0.072 - C * 0.072 + S * 0.928,
+      0.213 - C * 0.213 + S * 0.143, 0.715 + C * 0.285 + S * 0.14, 0.072 - C * 0.072 - S * 0.283, 0.213 - C * 0.213 - S * 0.787, 0.715 - C * 0.715 + S * 0.715, 0.072 + C * 0.928 + S * 0.072];
+    const rot = (p, i) => { const r = p[i], g = p[i + 1], b = p[i + 2]; p[i] = r * M[0] + g * M[1] + b * M[2]; p[i + 1] = r * M[3] + g * M[4] + b * M[5]; p[i + 2] = r * M[6] + g * M[7] + b * M[8]; };
+    const lilac = (p, i) => { p[i] *= 0.92; p[i + 1] *= 0.74; p[i + 2] = Math.min(255, p[i + 2] * 1.12 + 10); };
+    make("fx_circle_s", "hx_circle", rot); make("fx_aura_poison", "hx_ring", rot); make("orb_poison", "hx_orb", rot); make("fx_witchfire", "hx_fire", rot);
+    make("fx_pillar", "hx_pillar", rot); make("fx_aura_wisp", "hx_wisp", rot); make("fx_smoke", "hx_smoke", lilac);
+    // the burst of purple fire and crystal shards at her feet in her second-form slam (its bottom 26 %)
+    const b = FR.castle_boss2_w2; if (b) make("castle_boss2_w2", "hx_burst", () => {}, [0, Math.round(b.h * 0.74), b.w, b.h - Math.round(b.h * 0.74)]);
+    for (const [from, to] of [["castle_boss2_w0", "hx_clone0"], ["castle_boss2_w1", "hx_clone1"]]) if (FR[from] && !FR[to]) FR[to] = colorFrame(from, "#5a2f99", 0.72);
+  }
+  // ground layer: her circles (the painted magic circle, turned and squared to the circle it hurts in; its edge and a ring closing in show
+  // where and when), the summon rings, the shadows of her orbs
+  const hexFr = (n) => FR[n] || null;
+  function hexCircle(name, x, y, r, a, rot) {
+    const f = hexFr(name); if (!f || a <= 0.01) return;
+    const m = r / (f.w * f.s * 0.5);   // (the painting's width is the circle's)
+    fx(f, x, y, m, a, rot, false, f.w / f.h);
+  }
+  function drawHexes() {
+    const A = G.arena; if (!A || !G.hexes || !G.hexes.length) return;
+    if (!hexArtDone) hexArt();
+    for (const o of G.hexes) {
+      const warn = o.t < o.w, k = clamp(o.t / Math.max(0.01, o.w), 0, 1), e = o.t - o.w, pulse = 0.5 + 0.5 * Math.sin(G.t * 12), fade = clamp((o.end - o.t) / 0.4, 0, 1);
+      if (API.drawn) API.drawn.push(["hex", o.k, o.id, warn ? "warn" : "on"]);
+      ctx.save(); ctx.beginPath(); ctx.arc(A.x, A.y, A.r - 6, 0, TAU); ctx.clip();
+      if (o.k === "circle" || o.k === "tele") {
+        const spin = (o.k === "tele" ? -0.9 : 0.6) * G.t;
+        if (warn) {
+          glow(o.x, o.y, o.r * 1.25, HEX_RGB, 0.25 + 0.2 * k);
+          hexCircle("hx_circle", o.x, o.y, o.r * 1.12, (0.55 + 0.35 * k) * (0.85 + 0.15 * pulse), spin);
+          // (the edge: what it hurts in; a ring closing in: how long until it does)
+          ctx.globalAlpha = 0.5; ctx.strokeStyle = "#2a1040"; ctx.lineWidth = 12; ctx.beginPath(); ctx.arc(o.x, o.y, o.r, 0, TAU); ctx.stroke();
+          ctx.globalAlpha = 0.85; ctx.strokeStyle = "#f3e2ff"; ctx.lineWidth = 6; ctx.setLineDash([26, 16]); ctx.lineDashOffset = -G.t * 80; ctx.stroke(); ctx.setLineDash([]);
+          ctx.globalAlpha = 0.75; ctx.strokeStyle = "#ff9ae6"; ctx.lineWidth = 9; ctx.beginPath(); ctx.arc(o.x, o.y, Math.max(4, o.r * (1 - k)), 0, TAU); ctx.stroke();
+        } else {
+          const f = clamp(1 - e / 0.7, 0, 1);
+          glow(o.x, o.y, o.r * 1.4, HEX_RGB, 0.7 * f);
+          hexCircle("hx_circle", o.x, o.y, o.r * 1.12, Math.min(1, f * 1.4), spin);
+          if (e > 0.3) { ctx.globalAlpha = 0.3 * fade; ctx.fillStyle = "#1c0f2a"; ctx.beginPath(); ctx.arc(o.x, o.y, o.r * 0.8, 0, TAU); ctx.fill(); }   // (scorched)
+        }
+      } else if (o.k === "sum") {
+        const f = warn ? 0.45 + 0.4 * k : clamp(1 - e / 0.6, 0, 1);
+        glow(o.x, o.y, o.r * 1.5, HEX_RGB, 0.3 * f);
+        hexCircle("hx_ring", o.x, o.y, o.r * 1.15, f, G.t * 1.2);
+        hexCircle("hx_circle", o.x, o.y, o.r * 0.9, f * 0.5, -G.t * 0.8);
+      } else if (o.k === "orb" && e >= 0 && e < o.fly) shadow(o.x, o.y, o.r * 0.7, o.r * 0.25, 0.22);
+      ctx.restore();
+    }
+  }
+  // what stands up out of the floor, for the y-sorted pass: the orbs (high up while they gather round her staff), the purple fire bursting
+  // out of a circle, the clones, and her shape fading in where she will come back
+  function hexPieces() {
+    const out = []; if (!G.arena || !G.hexes || !G.hexes.length) return out;
+    for (const o of G.hexes) {
+      const e = o.t - o.w;
+      if (o.k === "orb") { if (e < o.fly) out.push({ o, k: "orb", y: o.y }); }
+      else if ((o.k === "circle" || o.k === "tele") && e >= 0 && e < 0.75) out.push({ o, k: "burst", y: o.y + 1 });
+      else if (o.k === "clone") out.push({ o, k: "clone", y: o.y });
+      if (o.k === "tele" && e < 0) out.push({ o, k: "ghost", y: o.y });
+    }
+    return out;
+  }
+  function drawHexPiece(p) {
+    const o = p.o, e = o.t - o.w;
+    if (API.drawn) API.drawn.push(["hexPiece", o.id, p.k, o.x, o.y]);
+    if (p.k === "orb") {
+      // gathering: high at her staff, growing; flying: the painted orb at chest height, a tail of purple witch-fire behind it
+      const g = clamp(o.t / Math.max(0.2, o.w), 0, 1), z = e < 0 ? ORB_GZ + Math.sin(G.t * 4 + o.n) * 12 : lerp(ORB_GZ, ORB_Z, rsEase(clamp(e / 0.35, 0, 1))), s = (o.weak ? 0.75 : 1) * (e < 0 ? 0.5 + 0.5 * g : 1);
+      const x = o.x, y = o.y - z;
+      glow(x, y, 95 * s, HEX_RGB, 0.6);
+      if (e >= 0 && FR.hx_fire) fxDir("hx_fire", x - o.vx * 0.16, y - o.vy * 0.16, o.vx, o.vy, 1.6 * s, 0.95);
+      if (FR.hx_orb) { spr("hx_orb", x, y, false, 1.6 * s, 1, Math.sin(G.t * 3 + o.id) * 0.3); fx("hx_orb", x, y, 1.6 * s, 0.35 + 0.2 * Math.sin(G.t * 9 + o.id)); } else glow(x, y, 50 * s, "220,170,255", 1);   // (painted over the floor, then lit)
+      fx("fx_twinkle", x + Math.cos(G.t * 7 + o.id) * 40 * s, y + Math.sin(G.t * 7 + o.id) * 24 * s, 0.6 * s, 0.9, G.t * 5);
+      return;
+    }
+    if (p.k === "burst") {
+      // purple fire bursting up out of the circle: her own painted burst at the bottom, the fire pillar rising out of it, light
+      const k = clamp(e / 0.12, 0, 1), dn = clamp((e - HEX_ON) / 0.35, 0, 1), h = k * (1 - dn), sc = o.r / 200;
+      if (h <= 0) return;
+      glow(o.x, o.y - 120 * sc, o.r * 1.6, HEX_RGB, 0.8 * h);
+      const b = FR.hx_burst; if (b) { const m = (o.r * 2.2) / (b.w * b.s); ctx.save(); ctx.globalCompositeOperation = "lighter"; spr(b, o.x, o.y + 10, false, m, Math.min(1, h * 1.3)); ctx.restore(); }
+      const pf = FR.hx_pillar; if (pf) { const m = (o.r * 2.1) / (pf.w * pf.s); fx(pf, o.x, o.y - pf.h * pf.s * m * 0.5 * (0.6 + 0.4 * k), m, h, 0, false, 0.8 + 0.6 * k); }
+      for (let j = 0; j < 3; j++) fx("fx_twinkle", o.x + Math.cos(G.t * 9 + j * 2.1) * o.r * 0.6, o.y - 80 * sc - j * 60 * sc, 0.8 * sc, h, G.t * 6);
+      return;
+    }
+    // a clone (her shape in shadow, flickering) or her shape coming back where the circle glows
+    const B = G.boss, two = B && B.phase === 2;
+    const fr = p.k === "clone" ? FR[e >= 0 && e < 1.4 ? "hx_clone1" : "hx_clone0"] || FR.castle_boss2_w0 : FR[two ? "hx_clone0" : "castle_boss_w0"] || FR.castle_boss_w0;
+    if (!fr) return;
+    const a = p.k === "clone" ? (e < 0 ? clamp(o.t / Math.max(0.1, o.w), 0, 1) * 0.6 : clamp((o.end - o.t) / 0.4, 0, 1) * (0.62 + 0.12 * Math.sin(G.t * 13 + o.id))) : clamp(o.t / Math.max(0.1, o.w), 0, 1) * 0.4;
+    const lift = p.k === "clone" || two ? HEX_LIFT + Math.sin(G.t * 2.2 + o.id) * 10 : 0, flip = P.x < o.x;
+    shadow(o.x, o.y + 3, 120, 26, 0.25 * a);
+    glow(o.x, o.y - 260, 230, HEX_RGB, 0.35 * a);
+    spr(fr, o.x, o.y - lift, flip, 1, a);
+    if (p.k === "clone") fx("hx_wisp", o.x + rnd(-6, 6), o.y - 40, 1.6, 0.5 * a, Math.sin(G.t * 3) * 0.2);
+  }
+  // the candles of the castle's props light up a little (code light over their painted flames)
+  const CANDLES = { cs_candelabra: [[0, -0.86, 120]], cs_lamp: [[0.27, -0.6, 100]], cs_bookshelf: [[0.3, -0.72, 70]], cs_pumpkins: [[0, -0.42, 120]], cs_cauldron: [[0, -0.8, 90]] };
+  function candleGlow(d) {
+    const c = CANDLES[d.name], f = FR[d.name]; if (!c || !f) return;
+    const w = f.w * f.s * d.m, h = f.h * f.s * d.m;
+    for (const [fx0, fy, r] of c) glow(d.x + (d.flip ? -fx0 : fx0) * w, d.y + fy * h, r * d.m, d.name === "cs_cauldron" ? "150,255,90" : "255,200,110", 0.4 * (0.85 + 0.15 * Math.sin(G.t * 7 + d.x)) * (d.fa === undefined ? 1 : d.fa));
+  }
   // ---------------------------------------------------------------- Núi Dung Nham's lava pools (a level with `lavaPools`): Dad's
   // "hồ dung nham chảy, đi qua chạm phải là bị ngất". The painted lava pool (lv_lava_pool) lies beside and across the path; code adds
   // the light (a flowing glow, bubbles, heat shimmer, embers). Her feet in the lava drawn -> she faints at once (heroDown), less a small
@@ -4575,7 +4933,7 @@
     }
   }
   function damageBoss(dmg, x, y, dot, big) {
-    const B = G.boss; if (!B || !B.alive || B.st === "enter" || B.st === "quiz" || B.st === "morph") return;   // (nothing hurts him while he changes form)
+    const B = G.boss; if (!B || !B.alive || B.st === "enter" || B.st === "quiz" || B.st === "morph" || B.st === "tele") return;   // (nothing hurts him while he changes form)
     // the next quiz mark stops the health there and starts the quiz
     if (B.quizHp && B.quizHp.length && B.hp - dmg <= B.quizHp[0]) { B.hp = B.quizHp.shift(); updateBossBar(); startQuiz(B); return; }
     // a short guard after each hit so the fight lasts, however fast the bolts fly
@@ -4587,15 +4945,141 @@
       B.alive = false; B.die = 0; SFX.boom(); G.shake = 26;
       burst(B.x, B.y - 200, 60, ["#ffd34d", "#ff8a3d", "#fff4c2", "#ff9ad5"], 700, 1.4);
       for (const m of G.mons) if (m.alive) killMon(m, false);
-      G.quakes = G.quakes.filter((q) => q.done); G.foes = []; G.waters = []; G.lavas = []; clearCps();
+      G.quakes = G.quakes.filter((q) => q.done); G.foes = []; G.waters = []; G.lavas = []; clearCps(); G.hexes = [];
       startBossCut("die");
     }
   }
   function winGame() {
+    if (G.lvl && G.lvl.finale) { startFinale(); return; }   // the last map: the finale film, then the end screen
     G.won = true; P.winT = 99; SFX.win();
     $("againBtn").hidden = NET.role === "guest";
     setTimeout(showTrialEnd, 2200);
   }
+  // ---------------------------------------------------------------- the finale, after the last boss (a level with `finale`: Màn 5)
+  // A short victory film over the castle: the whole team walks in and cheers together on the screen (Mèo Simmy and Sammy Đào on the left,
+  // Mochi and Matcha in the middle with Coca and Cafe in front of them, Kairon and Phong Cận on the right), fireworks and confetti (code),
+  // a big "CHIẾN THẮNG!" and the thank-you line (the level's `end`). After FIN_END s (or a tap once FIN_SKIP s have gone) the end screen:
+  // "Hết", "Cảm ơn hai bé đã chơi!" and a button back to the title. Each co-op page plays it for itself (the host's world says `won`).
+  const FIN_END = 11, FIN_SKIP = 3, FIN_TITLE = 1.4, FIN_LINE = 2.8, FIN_IN = 1.7;
+  const FIN_TEAM = [["simmy", 0.12], ["sammy", 0.27], ["g", 0.43], ["s", 0.57], ["kairon", 0.73], ["phong", 0.88]];
+  const FIN_PETS = [["coca", 0.35], ["cafe", 0.65]];
+  const FIN_NAMES = { g: "Mochi", s: "Matcha", simmy: "Mèo Simmy", sammy: "Sammy Đào", kairon: "Kairon", phong: "Phong Cận" };
+  const FW_COLS = ["255,211,77", "255,154,213", "185,164,255", "124,242,198", "255,138,61", "150,210,255"];
+  const FIN = { t: 0, fw: [], cf: [], nextFw: 0 };
+  function startFinale() {
+    if (G.mode === "finale" || (G.won && G.mode === "win")) return;
+    G.won = true; P.winT = 99; P.vx = P.vy = 0; IN.ultPressed = false; G.ult = null;
+    G.mode = "finale"; FIN.t = 0; FIN.fw = []; FIN.cf = []; FIN.nextFw = 0.5;
+    closeStory(); for (const id of ["controls", "bossbar", "quiz", "pauseScreen", "hud"]) $(id).hidden = true;
+    for (let i = 0; i < 70; i++) FIN.cf.push(confetto(true));
+    SFX.win();
+  }
+  function confetto(any) {
+    return { x: Math.random(), y: any ? -Math.random() * 1.2 : -0.05 - Math.random() * 0.1, vy: rnd(0.12, 0.22), vx: rnd(-0.03, 0.03), rot: rnd(0, 6), vr: rnd(-6, 6), w: rnd(0.006, 0.011), col: ["#ffd34d", "#ff9ad5", "#b9a4ff", "#7cf2c6", "#ff8a3d", "#9fe3ff", "#ffffff"][Math.floor(Math.random() * 7)] };
+  }
+  function finaleTick(dt) {
+    FIN.t += dt; G.t += dt; G.frame++; updateParts(dt);
+    if (FIN.t >= FIN.nextFw && FIN.t < FIN_END - 1) {
+      // a rocket goes up from below and bursts in the sky (x, y: shares of the screen)
+      FIN.fw.push({ x: rnd(0.12, 0.88), y: rnd(0.1, 0.42), t: 0, up: rnd(0.45, 0.65), col: FW_COLS[Math.floor(Math.random() * FW_COLS.length)], n: 26 + Math.floor(Math.random() * 12), a0: Math.random() * TAU, sp: rnd(0.16, 0.24) });
+      FIN.nextFw = FIN.t + rnd(0.28, 0.6);
+    }
+    for (const f of FIN.fw) { const was = f.t < f.up; f.t += dt; if (was && f.t >= f.up) play("pop"); }
+    FIN.fw = FIN.fw.filter((f) => f.t < f.up + 1.5);
+    for (const c of FIN.cf) { c.y += c.vy * dt; c.x += c.vx * dt + Math.sin(FIN.t * 2 + c.rot) * 0.0006; c.rot += c.vr * dt; }
+    FIN.cf = FIN.cf.filter((c) => c.y < 1.1);
+    while (FIN.cf.length < 70 && FIN.t < FIN_END - 1.5) FIN.cf.push(confetto(false));
+    if (FIN.t >= FIN_END) showEnd();
+  }
+  function drawFinale(W, H) {
+    const t = FIN.t, g = ctx, u = Math.min(W, H * 1.6);
+    g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1; g.globalCompositeOperation = "source-over";
+    // the castle at night behind a purple veil
+    const veil = clamp(t / 0.9, 0, 1), bg = g.createLinearGradient(0, 0, 0, H);
+    bg.addColorStop(0, `rgba(16,8,38,${0.9 * veil})`); bg.addColorStop(0.65, `rgba(34,16,62,${0.78 * veil})`); bg.addColorStop(1, `rgba(52,26,84,${0.7 * veil})`);
+    g.fillStyle = bg; g.fillRect(0, 0, W, H);
+    // fireworks: a rising spark, then a ring of sparks falling a little, with a painted flash in the middle
+    g.save(); g.globalCompositeOperation = "lighter";
+    for (const f of FIN.fw) {
+      const cx = f.x * W, cy = f.y * H;
+      if (f.t < f.up) { const k = f.t / f.up, y = H * 1.02 + (cy - H * 1.02) * (1 - (1 - k) * (1 - k)); finGlow(g, cx, y, u * 0.012, f.col, 0.9); finGlow(g, cx, y + u * 0.03, u * 0.008, f.col, 0.4); continue; }
+      const e = f.t - f.up, a = clamp(1 - e / 1.5, 0, 1), R = f.sp * u * (1 - Math.exp(-e * 3.2));
+      if (e < 0.35) { const fr = FR.fx_rays; if (fr) { const m = u * 0.22 * (0.6 + e * 2) / (fr.w * fr.s); g.globalAlpha = (1 - e / 0.35) * 0.8; g.drawImage(fr.img, fr.sx, fr.sy, fr.w, fr.h, cx - fr.ax * fr.s * m, cy - fr.ay * fr.s * m, fr.w * fr.s * m, fr.h * fr.s * m); g.globalAlpha = 1; } }
+      for (let i = 0; i < f.n; i++) {
+        const an = f.a0 + i / f.n * TAU, x = cx + Math.cos(an) * R, y = cy + Math.sin(an) * R + e * e * u * 0.05;
+        finGlow(g, x, y, u * (0.011 + 0.006 * a), f.col, a);
+        if (i % 3 === 0) finGlow(g, x, y, u * 0.004, "255,255,255", a);
+        if (i % 5 === 0 && FR.fx_twinkle) { const tw = FR.fx_twinkle, m = u * 0.03 / (tw.w * tw.s); g.globalAlpha = a; g.drawImage(tw.img, tw.sx, tw.sy, tw.w, tw.h, x - tw.w * tw.s * m / 2, y - tw.h * tw.s * m / 2, tw.w * tw.s * m, tw.h * tw.s * m); g.globalAlpha = 1; }   // (painted sparkles among the sparks)
+      }
+    }
+    g.restore();
+    // confetti
+    for (const c of FIN.cf) { g.save(); g.translate(c.x * W, c.y * H); g.rotate(c.rot); g.fillStyle = c.col; g.globalAlpha = 0.9 * veil; g.fillRect(-c.w * u / 2, -c.w * u * 0.3, c.w * u, c.w * u * 0.6); g.restore(); }
+    g.globalAlpha = 1;
+    // the team: walking in from both sides, then cheering and hopping, on a warm pool of light
+    const ht = H * 0.4, gy = H * 0.93;
+    const lg = g.createRadialGradient(W / 2, gy - ht * 0.1, 10, W / 2, gy - ht * 0.1, W * 0.55); lg.addColorStop(0, `rgba(255,226,160,${0.32 * veil})`); lg.addColorStop(1, "rgba(255,226,160,0)");
+    g.fillStyle = lg; g.fillRect(0, 0, W, H);   // (the whole screen: the light fades out on its own, no edge)
+    const outfitOf = (c) => (c === hero ? P.outfit || "base" : Q && Q.hero === c ? Q.of || "base" : "base");
+    const at = (fx, i) => { const s = 0.15 + Math.abs(fx - 0.5) * 0.9, p = clamp((t - s) / FIN_IN, 0, 1), e = 1 - (1 - p) * (1 - p), from = fx < 0.5 ? -0.12 : 1.12; return { s, p, x: (from + (fx - from) * e) * W }; };
+    FIN_TEAM.forEach(([c, fx], i) => {
+      const { s, p, x } = at(fx, i), walking = p < 1, hop = walking ? 0 : Math.abs(Math.sin((t - s) * 5.5 + i * 0.9)) * ht * 0.035;
+      const th = ht * (ART_H[c] || 400) / 400, o = { face: walking ? 2 : 0, flip: walking && fx > 0.5, moving: walking, dist: (t - s) * 260, winT: walking ? 0 : 1 };
+      g.fillStyle = "rgba(0,0,0,.35)"; g.beginPath(); g.ellipse(x, gy, th * 0.2, th * 0.04, 0, 0, TAU); g.fill();
+      if (c === "g" || c === "s") drawHeroAt(g, c, outfitOf(c), o, x, gy - hop, th, false); else drawAllyAt(g, c, x, gy - hop, th, t, "base", o);
+      if (API.drawn) API.drawn.push(["finale", c, walking ? "walk" : "cheer"]);
+      if (!walking) { g.font = `800 ${Math.round(H * 0.03)}px Grandstander, system-ui, sans-serif`; g.textAlign = "center"; g.lineWidth = H * 0.008; g.strokeStyle = "rgba(40,16,70,.85)"; g.fillStyle = "#fff6e5"; g.strokeText(FIN_NAMES[c], x, gy + H * 0.045); g.fillText(FIN_NAMES[c], x, gy + H * 0.045); }
+    });
+    // Coca and Cafe in front, hopping for joy
+    FIN_PETS.forEach(([art, fx], i) => {
+      const { s, p, x } = at(fx, i), walking = p < 1, ph = walking ? 0 : Math.abs(Math.sin((t - s) * 7 + i * 1.7)) * ht * 0.06, py = gy + H * 0.02;
+      g.fillStyle = "rgba(0,0,0,.3)"; g.beginPath(); g.ellipse(x, py, ht * 0.09, ht * 0.02, 0, 0, TAU); g.fill();
+      if (drawPetAt(g, art, walking ? "w" + (Math.floor((t - s) * 9) % 4) : "joy", x, py - ph, ht) && API.drawn) API.drawn.push(["finale", art, walking ? "walk" : "joy"]);
+    });
+    // CHIẾN THẮNG! (pops in and bounces), then the thank-you line
+    const k = clamp((t - FIN_TITLE) / 0.55, 0, 1);
+    if (k > 0) {
+      const pop = k < 1 ? 1 + 0.35 * Math.sin(k * Math.PI) : 1 + 0.03 * Math.sin(t * 4), fs = Math.round(H * 0.14);
+      g.save(); g.translate(W / 2, H * 0.2); g.scale(pop * Math.min(1, k * 2), pop * Math.min(1, k * 2));
+      g.font = `800 ${fs}px Grandstander, system-ui, sans-serif`; g.textAlign = "center"; g.textBaseline = "middle";
+      const tw = g.measureText("CHIẾN THẮNG!").width, fit = Math.min(1, W * 0.9 / Math.max(1, tw)); g.scale(fit, fit);
+      g.shadowColor = "rgba(255,200,80,.9)"; g.shadowBlur = fs * 0.35; g.lineJoin = "round";
+      g.lineWidth = fs * 0.14; g.strokeStyle = "#4a1f78"; g.strokeText("CHIẾN THẮNG!", 0, 0);
+      const gr = g.createLinearGradient(0, -fs * 0.5, 0, fs * 0.5); gr.addColorStop(0, "#fff6c2"); gr.addColorStop(0.5, "#ffd34d"); gr.addColorStop(1, "#ff9a3d");
+      g.fillStyle = gr; g.fillText("CHIẾN THẮNG!", 0, 0);
+      g.restore();
+      if (API.said && k >= 1) API.said.push("CHIẾN THẮNG!");
+    }
+    const lk = clamp((t - FIN_LINE) / 0.6, 0, 1);
+    if (lk > 0) {
+      const line = (G.lvl && G.lvl.end) || "Cảm ơn Mochi và Matcha đã cứu cả nhóm SKSP!", fs = Math.round(H * 0.05);
+      g.save(); g.globalAlpha = lk; g.font = `800 ${fs}px Grandstander, system-ui, sans-serif`; g.textAlign = "center"; g.textBaseline = "middle";
+      const fit = Math.min(1, W * 0.92 / Math.max(1, g.measureText(line).width)); g.translate(W / 2, H * 0.32 + (1 - lk) * H * 0.02); g.scale(fit, fit);
+      g.lineJoin = "round"; g.lineWidth = fs * 0.2; g.strokeStyle = "rgba(40,16,70,.9)"; g.strokeText(line, 0, 0); g.fillStyle = "#ffffff"; g.fillText(line, 0, 0);
+      g.restore();
+      if (API.said && lk >= 1) API.said.push(line);
+    }
+  }
+  // a soft round light in screen space (the world's glow, without its camera)
+  function finGlow(g, x, y, r, rgb, a) {
+    let c = GLOWC[rgb];
+    if (!c) { glow(-1e6, -1e6, 1, rgb, 1); c = GLOWC[rgb]; }
+    if (!c || a <= 0.01) return;
+    const ga = g.globalAlpha; g.globalAlpha = ga * Math.min(1, a); g.drawImage(c, x - r, y - r, r * 2, r * 2); g.globalAlpha = ga;
+  }
+  // the end of the game: "Hết", a thank-you, and the way back to the title (on both co-op pages)
+  function showEnd() {
+    G.mode = "win"; G.won = true;
+    $("winTitle").textContent = "Hết";
+    $("winText").textContent = "Cảm ơn hai bé đã chơi!";
+    // (the monsters defeated over the whole adventure; a start from the picker has only this map's, none if she went straight to the
+    // witch: then the number is left out)
+    $("winStats").textContent = `Bé nhặt được ${G.stars} ngôi sao, lên tới cấp ${P.lv}` + (G.kills > 0 ? ` và hạ ${G.kills} yêu quái.` : ".");
+    $("againBtn").hidden = true; $("endHomeBtn").hidden = false;
+    $("winScreen").hidden = false; $("controls").hidden = true; $("bossbar").hidden = true; $("hud").hidden = true;
+  }
+  $("endHomeBtn").addEventListener("click", () => { $("winScreen").hidden = true; $("endHomeBtn").hidden = true; toTitle(); });
+  cv.addEventListener("pointerdown", () => { if (G.mode === "finale" && FIN.t > FIN_SKIP) showEnd(); });
 
   // ---------------------------------------------------------------- ultimate
   const ULT_PACE = 0.62;   // the ultimate's show runs slower than real time so it can be enjoyed
@@ -4936,7 +5420,7 @@
       updateParts(dt);
       return;
     }
-    if (API.autopilot && G.energy >= 100 && !G.waters.length && !G.lavas.length && !G.quiz && (aliveCount() > 14 || (G.boss && G.boss.alive && G.boss.st !== "enter"))) IN.ultPressed = true;   // (the bot does not freeze itself in its ultimate with the captain's water warned, nor in a quiz: frozen through the next question it misses it)
+    if (API.autopilot && G.energy >= 100 && !G.waters.length && !G.lavas.length && !(G.hexes && G.hexes.some((o) => o.k !== "sum")) && !G.quiz && (aliveCount() > 14 || (G.boss && G.boss.alive && G.boss.st !== "enter"))) IN.ultPressed = true;   // (the bot does not freeze itself in its ultimate with the captain's water warned, nor in a quiz: frozen through the next question it misses it)
     if (IN.ultPressed) { IN.ultPressed = false; startUlt(); }
     updateHero(dt); waterPull(dt);
     updateUlt(dt);
@@ -4997,7 +5481,7 @@
     }
     G.foes = G.foes.filter((f) => f.life > 0);
     updateCreepPieces(dt, true);   // (the monsters' own attacks)
-    updateRings(dt, true); updateQuakes(dt, true); updateWaters(dt, true); updateLavas(dt, true); updateLavaPools(dt, true);
+    updateRings(dt, true); updateQuakes(dt, true); updateWaters(dt, true); updateLavas(dt, true); updateLavaPools(dt, true); updateHexes(dt, true);
     // portal / arena
     if (G.portal) {
       G.portal.t += dt;
@@ -5365,7 +5849,7 @@
       return m.st === "atk" ? Math.sin(Math.PI * clamp(t / m.c.atk, 0, 1)) * 70 : 0;
     }
     if (m.st !== "skw") return 0;
-    if (sk === "jump" || sk === "pounce") { const k = (t - (S.w - S.air)) / S.air; return k > 0 && k < 1 ? Math.sin(Math.PI * k) * S.hz : 0; }
+    if (sk === "jump" || sk === "pounce" || sk === "blink") { const k = (t - (S.w - S.air)) / S.air; return k > 0 && k < 1 ? Math.sin(Math.PI * k) * S.hz : 0; }
     if (sk === "dive") { const up = Math.min(1, t / 0.4) * 110, k = clamp((t - (S.w - S.air)) / S.air, 0, 1); return up * (1 - k) - (m.hgt - 30) * k; }
     if (sk === "boom") return -(m.hgt - 90) * clamp((t - (S.w - S.air)) / S.air, 0, 1);
     if (sk === "slam") return t < S.w * 0.85 ? Math.min(1, t / (S.w * 0.7)) * 26 : 0;
@@ -5389,18 +5873,22 @@
     spr(f, sx, sy - 100 * mul, Math.cos(fa) < 0, k * (0.55 + 0.45 * Math.abs(Math.sin(fa))), 0.82, 0, 1.6);
     if (API.drawn) API.drawn.push(["shield", m.id]);
   }
+  const HOVER = { castle_zombie: 34 };   // monsters that float a little over the ground (drawn up there, a soft shadow below)
   function drawMon(m) {
     const [fn, flip] = monFrame(m); if (!FR[fn]) return;
     const f = m.c.like ? candyFrame(fn, CANDY_TINT[m.kind]) : tierFrame(fn), fly = m.c.fly;
     let y = m.y - m.hgt, a = 1, rot = 0, mul = CHAR_M * (m.elite ? 1.3 : 1), x = m.x;
     if (fly) y += (m.frz > 0 ? 0 : Math.sin(G.t * 3 + m.ph) * 10) - (m.st === "prep" ? 30 * Math.min(1, m.t / m.c.prep) : 0);
+    const hov = HOVER[m.kind] && m.alive && !(m.frz > 0) ? HOVER[m.kind] + Math.sin(G.t * 2.6 + m.ph) * 9 : 0; y -= hov;   // (the castle ghost floats over the floor)
+    // (the ghost's blink: it fades almost away while it slips through the air to her marked spot, and comes back there)
+    if (m.alive && m.st === "skw" && SKILL[m.kind] && SKILL[m.kind].sk === "blink") { const S0 = SKILL[m.kind], k = (m.t - (S0.w - S0.air)) / S0.air; if (k > 0 && k < 1) a *= 0.12 + 0.88 * Math.abs(Math.cos(Math.PI * k)); }
     if (!m.alive) { const t = m.die / 0.6; a = 1 - t; mul *= 1 - 0.4 * t; rot = (flip ? 1 : -1) * t * 0.8; y -= t * 40; }
     // its own attack (the creep skills): lifted by a hop / leap / dive, shaking as it winds up, a barrel rolling, squashed in a crouch
     const SK = SKILL[m.kind], lift = monLift(m), sq = monSquash(m), skw = m.alive && m.st === "skw";
     y -= lift;
     if (skw && SK.shake) x += Math.sin(G.t * 60) * 5 * Math.min(1, m.t / 0.3);
     const roll = m.alive && m.st === "sk" && SK && SK.sk === "roll";
-    shadow(m.x, m.y, m.r * (fly ? 0.8 : 1.15) * (1 - Math.min(0.4, Math.max(0, lift) / 500)), m.r * 0.32, (fly ? 0.18 : 0.3) * a);
+    shadow(m.x, m.y, m.r * (fly || hov ? 0.8 : 1.15) * (1 - Math.min(0.4, Math.max(0, lift) / 500)), m.r * 0.32, (fly || hov ? 0.18 : 0.3) * a);
     const cy = fly ? y : m.y - 95 - lift;
     if ((m.st === "prep" || skw) && m.alive && m.hurt <= 0) glow(x, cy, 130, "255,60,60", 0.25 + 0.2 * Math.sin(G.t * 25));
     if (skw && SK.sk === "boom") { const k = clamp(m.t / SK.w, 0, 1); glow(x, cy, 150 + 90 * k, "255,90,30", 0.3 + 0.55 * k); }
@@ -5411,7 +5899,7 @@
     if (m.alive) statusGlow(m, m.x, cy, 120);
     if (likeOf(m) === "vampire" && m.alive && m.st !== "prep" && m.st !== "atk" && m.hurt <= 0) y -= Math.abs(Math.sin(G.t * 3 + m.ph)) * 8;
     // walkers bob a little with each step
-    else if (!fly && m.alive && m.st === "walk" && likeOf(m) !== "spider") { const ph = m.dist / (WALK_DIST[m.kind] || 120) * TAU; y -= Math.abs(Math.sin(ph)) * 9; rot += Math.sin(ph) * 0.04 * (flip ? -1 : 1); }
+    else if (!fly && !hov && m.alive && m.st === "walk" && likeOf(m) !== "spider") { const ph = m.dist / (WALK_DIST[m.kind] || 120) * TAU; y -= Math.abs(Math.sin(ph)) * 9; rot += Math.sin(ph) * 0.04 * (flip ? -1 : 1); }
     if (m.elite && m.alive) glow(x, cy, 190, "255,205,70", 0.3 + 0.1 * Math.sin(G.t * 4 + m.ph));
     if (roll) {
       // the barrel rolls along its lane, turning round its middle
@@ -5445,7 +5933,7 @@
     const name = art === "boss" ? "boss_" + pose : `${art}${two ? "2" : ""}_w${wi}`;
     const f = FR[name], flip = B.dir < 0; if (!f) return;
     if (API.drawn) API.drawn.push(["boss", name]);
-    let y = B.y + (B.dropY || 0) - (B.jz || 0), sy = 1, x = B.x, rot = 0, sc = 1;
+    let y = B.y + (B.dropY || 0) - (B.jz || 0) - hexLift(B), sy = 1, x = B.x, rot = 0, sc = 1;   // (hexLift: the grey witch's second form floats)
     if (B.alive && B.st === "walk") y -= Math.abs(Math.sin(B.t * 6)) * 10;
     if (B.alive && B.st !== "enter") sy = 1 + Math.sin(G.t * 2) * 0.012;
     // changing form: he swells and trembles, then bursts out in his bigger painting (which grows the last bit into its full size)
@@ -5463,7 +5951,7 @@
     if (stag) { const w = clamp(B.die / 0.3, 0, 1); x += Math.sin(B.die * 15) * 12 * w; rot = Math.sin(B.die * 3.2) * 0.07 * w; }
     B.headY = y - f.ay * f.s * sc;
     shadow(B.x, B.y + 3, 150 * (B.phase === 2 ? BOSS2_K : 1) * (B.dropY < -200 || B.jz > 200 ? 0.6 : 1), 32, 0.35);
-    if (B.alive && B.st === "prep") glow(B.x, B.y - 220, 300, isSea(B.move) ? "90,190,255" : isSnow(B.move) ? "160,220,255" : "255,90,40", 0.25 + 0.15 * Math.sin(G.t * 20));
+    if (B.alive && B.st === "prep") glow(B.x, B.y - 220, 300, isSea(B.move) ? "90,190,255" : isSnow(B.move) ? "160,220,255" : isHex(B.move) ? HEX_RGB : "255,90,40", 0.25 + 0.15 * Math.sin(G.t * 20));
     if (B.alive) glow(B.x + (flip ? -1 : 1) * 30, y - 380, 110, "255,170,60", 0.3);
     else glow(B.x, B.y - 60, 200, "255,220,140", 0.35 * clamp(1 - Math.max(0, B.die - BD_FALL) / 2, 0, 1));
     if (stag) glow(B.x, B.y - 240, 340, "255,190,120", 0.3 + 0.2 * Math.sin(B.die * 9));
@@ -5813,6 +6301,7 @@
     d.fa = (d.fa === undefined ? 1 : d.fa) + (a - (d.fa === undefined ? 1 : d.fa)) * 0.15;
     spr(d.name, d.x, d.y, d.flip, d.m, d.fa);
     if (d.lamp) glow(d.x + (d.flip ? -1 : 1) * 48 * d.m, d.y - 160 * d.m, 130, "255,200,110", 0.42 * (0.9 + 0.1 * Math.sin(G.t * 6 + d.x)));
+    else if (CANDLES[d.name]) candleGlow(d);
   }
   // ground layer: things lying flat or hovering low, drawn under everyone
   // each level's boss floor is its own painted picture, fetched when that level is built
@@ -5858,7 +6347,7 @@
   }
   function drawRings() {
     const B = G.boss;
-    drawQuakes(); drawWaters(); drawLavas();
+    drawQuakes(); drawWaters(); drawLavas(); drawHexes();
     if (B && B.alive && B.st === "prep" && B.move === "charge") {
       ctx.save(); ctx.translate(B.x, B.y); ctx.rotate(Math.atan2(B.ay, B.ax)); ctx.globalAlpha = 0.16 + 0.12 * Math.sin(G.t * 22); ctx.fillStyle = "#ff3a2a"; ctx.fillRect(0, -90, 840, 180);
       ctx.globalAlpha = 0.7; ctx.strokeStyle = "#ffb060"; ctx.lineWidth = 5; ctx.setLineDash([22, 14]); ctx.strokeRect(0, -90, 840, 180); ctx.restore();
@@ -6649,6 +7138,7 @@
     if (G.quiz && G.arena) for (const o of fencePosts()) if (o.x > L - 200 && o.x < R + 200 && o.y > T - 20 && o.y < B + 300) add(o.y, 10, o);
     for (const o of waterPieces()) add(o.y, 11, o);   // (the captain's wall of water and geyser columns, among the standing things)
     for (const o of lavaPieces()) add(o.y, 12, o);   // (the lava demon's fire columns and his rocks coming down)
+    for (const o of hexPieces()) add(o.y, 13, o);   // (the grey witch's orbs, purple fire, clones)
     for (const c of G.chests) if (c.x > L - 150 && c.x < R + 150 && c.y > T - 50 && c.y < B + 200) add(c.y, 5, c);
     for (const c of G.cages) if (c.x > L - 150 && c.x < R + 150 && c.y > T - 50 && c.y < B + 300) add(c.y, 6, c);
     if (G.portal && G.portal.x > L - 250 && G.portal.x < R + 250 && G.portal.y > T - 50 && G.portal.y < B + 400) add(G.portal.y, 7, G.portal);
@@ -6667,7 +7157,7 @@
         case 1: drawMon(o); break;
         case 2: drawHero(); break;
         case 3: drawPartner(); break;
-        case 4: drawBoss(); break;
+        case 4: { const hv = hexVis(o); if (hv < 1) { if (hv > 0.01) { ctx.save(); ctx.globalAlpha *= hv; drawBoss(); ctx.restore(); } } else drawBoss(); break; }   // (the grey witch fades into / out of smoke)
         case 5: drawChest(o); break;
         case 6: drawCage(o); break;
         case 7: drawPortal(); break;
@@ -6675,6 +7165,7 @@
         case 10: drawFencePost(o); break;
         case 11: drawWaterPiece(o); break;
         case 12: drawLavaPiece(o); break;
+        case 13: drawHexPiece(o); break;
       }
       if (wa < 1) ctx.restore();
     }
@@ -6719,6 +7210,7 @@
     else if (G.combo) drawUltTitle(UFX.cb, W, H, 1.15);   // (the sisters' combo's: the biggest)
     else if (Q && NET.role && Q.ultT > 0 && !G.combo) drawUltTitle(UFX.q, W, H, 0.72);
     drawWalkFade(W, H);
+    if (G.mode === "finale") drawFinale(W, H);
     if (G.fade > 0) { ctx.fillStyle = `rgba(11,7,16,${G.fade})`; ctx.fillRect(0, 0, W, H); }
   }
   // ---- minimap: the path, treasures, the gate and the girls
@@ -6875,9 +7367,9 @@
   // beta: pick where to start from the home screen (kept in localStorage `sksp-start`); in co-op the host's choice goes to both pages
   // (Màn 1; "Màn 2: Đảo Cướp Biển" = the clothes shop, then the island). The ship is parked: a "ship" saved by the old "Màn 2: Trên tàu"
   // button (or anything else unknown) starts at Màn 1
-  // ("Màn 3: Núi Tuyết" / "Màn 4: Núi Dung Nham" start straight on that map with what the maps before it gave: their friends and letters,
+  // ("Màn 3: Núi Tuyết" / "Màn 4: Núi Dung Nham" / "Màn 5: Lâu Đài" start straight on that map with what the maps before it gave: their friends and letters,
   // LATER_STARS a map, her level)
-  const STARTS = { man1: "selMan1", man2: "selMan2", man3: "selMan3", man4: "selMan4" }, START_LV = { man3: 2, man4: levelIdx("lava") }, LATER_STARS = 100;
+  const STARTS = { man1: "selMan1", man2: "selMan2", man3: "selMan3", man4: "selMan4", man5: "selMan5" }, START_LV = { man3: 2, man4: levelIdx("lava"), man5: levelIdx("castle") }, LATER_STARS = 100;
   let startAt = "man1";
   function readStart() {
     startAt = "man1";
@@ -7332,6 +7824,7 @@
   // the "Còn tiếp…" screen at the end of the last level so far, shared with winGame
   function showTrialEnd() {
     G.won = true;
+    $("winTitle").innerHTML = "Còn <span>tiếp…</span>"; $("endHomeBtn").hidden = true;
     $("winText").textContent = (G.lvl && G.lvl.end) || "Cuộc phiêu lưu của các bé vẫn còn tiếp!";
     $("winStats").textContent = `Bé nhặt được ${G.stars} ngôi sao, lên tới cấp ${P.lv} và hạ ${G.kills} yêu quái.` + (NET.role === "guest" ? " Chờ bạn kia bấm Chơi lại nhé." : "");
     G.mode = "win"; $("winScreen").hidden = false; $("controls").hidden = true; $("bossbar").hidden = true; $("hud").hidden = true;
@@ -9603,7 +10096,7 @@
   // and reports its spell hits, ultimate and revive back as room events. Each camera follows its own girl.
   const FTYPES = ["fire", "web", "webball"];
   const MKINDS = Object.keys(MON), MST = ["walk", "prep", "atk", "rest", "web", "fly", "back", "skw", "sk", "howl"];   // (skw, sk, howl: the creep skills; appended)
-  const BST = ["enter", "walk", "prep", "slam", "rest", "leap", "dash", "quiz", "morph"], DTYPES = ["heart", "energy", "fire", "ice", "poison"], ELS = [null, "fire", "ice", "poison"];
+  const BST = ["enter", "walk", "prep", "slam", "rest", "leap", "dash", "quiz", "morph", "tele"], DTYPES = ["heart", "energy", "fire", "ice", "poison"], ELS = [null, "fire", "ice", "poison"];
   const NET = { hb: 0, room: null, state: "wait", me: null, role: null, partner: null, pp: null, applied: null, co: null,
     sendT: 0, startT: 0, goneT: 0, portalSent: false, lvBusy: false, hq: [], sq: [], fq: [] };   // hq/sq/fq: hits, shots and pet moves batched per send
   let Q = null;   // the other girl, as last reported in their presence
@@ -9762,7 +10255,7 @@
     const wasGuest = NET.role === "guest", msg = lost ? "Mất kết nối với bạn kia" : "Bạn kia đã rời phòng", ship = onShip();
     leaveCoop();
     if (ship) shipSolo();   // (on the ship either page goes on alone: its SHIP is the whole level)
-    if (wasGuest && G.mode !== "title" && !ship) { toTitle(); showBanner(msg, "Vào phòng lại nhé"); }
+    if (wasGuest && G.mode !== "title" && !ship && G.mode !== "finale" && !(G.mode === "win" && !$("endHomeBtn").hidden)) { toTitle(); showBanner(msg, "Vào phòng lại nhé"); }   // (the end of the game stays on its own end screen)
     else showBanner(msg, "Bé chơi tiếp một mình");
   }
   function onNet(msg) {
@@ -9890,6 +10383,7 @@
       wa: G.waters.map((w) => [w.id, WA_KINDS.indexOf(w.k), w.x | 0, w.y | 0, Math.round(w.t * 20), Math.round(w.w * 20), Math.round(w.end * 20), w.r | 0, w.ax, w.dir]),   // the captain's sea, the yeti's snow (see seaMove, snowMove)
       lz: G.lavas.map((o) => [o.id, LKINDS.indexOf(o.k), o.x | 0, o.y | 0, Math.round(o.t * 20), Math.round(o.w * 20), Math.round(o.end * 20), o.r | 0, Math.round(o.a * 1000), o.d0 | 0, o.L | 0, o.ring ? o.ring[0] | 0 : -1, o.ring ? o.ring[1] | 0 : -1, o.v | 0]),   // the lava demon's fire (see lavaMove)
       lp: Math.round((G.lpT || 0) * 20),   // the lava pools' clock (their pulses), in 1/20 s
+      hx: (G.hexes || []).map((o) => [o.id, HKINDS.indexOf(o.k), o.x | 0, o.y | 0, Math.round(o.t * 20), Math.round(o.w * 20), Math.round(o.end * 20), o.r | 0, o.vx | 0, o.vy | 0, o.cx | 0, o.cy | 0, o.v | 0, Math.round(o.fly * 20), (o.n & 7) | ((o.m & 7) << 3) | (o.weak ? 64 : 0) | (o.mon ? 128 : 0)]),   // the grey witch's magic (see hexMove)
       it: bitsOf(G.items), ch: bitsOf(G.chests), cg: bitsOf(G.cages),
       sp: onShip() ? shipState() : 0,   // the ship (host-owned), compact: see shipState
       sc: G.story ? 1 : 0,   // (the host's page shows a story card: the guest's world waits too)
@@ -9997,9 +10491,10 @@
       const B = G.boss, st = BST[si] || "walk";
       if (st === "slam" && B.st !== "slam") { SFX.slam(); G.shake = 24; dust(ix, iy, 26); }
       if (st === "enter" && dropY >= 0 && B.dropY < 0) { SFX.slam(); G.shake = 20; }
-      if (st === "morph" && B.st !== "morph") { B.mfx = {}; G.quakes = G.quakes.filter((q) => q.done); G.foes = []; G.waters = []; G.lavas = []; clearCps(); }   // (his change begins: as on the host)
+      if (st === "morph" && B.st !== "morph") { B.mfx = {}; G.quakes = G.quakes.filter((q) => q.done); G.foes = []; G.waters = []; G.lavas = []; clearCps(); G.hexes = []; }   // (his change begins: as on the host)
       B.phase = ph === 2 ? 2 : 1;
       if (B.tt) { const gap = Math.max(0.03, now - B.tt); B.evx = clamp((x - B.tx) / gap, -1500, 1500); B.evy = clamp((y - B.ty) / gap, -1500, 1500); }
+      if (B.st === "tele" && st !== "tele") { B.x = x; B.y = y; }   // (the grey witch is back from her smoke: there at once, no slide)
       B.tt = now; B.tx = x; B.ty = y; B.dir = dir < 0 ? -1 : 1; B.st = st; B.t = t10 / 10; B.hp = hp; B.dropY = dropY; B.ix = ix; B.iy = iy;
       B.jz = jz; if (bmax > 0) B.max = bmax; B.move = BMOVES[mv]; B.ax = ax / 100; B.ay = ay / 100;
       if (bits & 1) B.flash = 0.12; B.hurtPose = bits & 2 ? 0.1 : 0;
@@ -10101,6 +10596,27 @@
     }
     // the lava pools' pulses: the host's clock (run on here between updates; brought back if it drifted)
     if (typeof w.lp === "number" && G.lpools && G.lpools.length) { const t = num(w.lp) / 20; if (Math.abs((G.lpT || 0) - t) > 0.2) G.lpT = t; }
+    // the grey witch's magic: likewise; a flying orb follows the host's place and heading (this page flies it on in between), and one the
+    // host has popped (on a girl) bursts here too
+    if (Array.isArray(w.hx)) {
+      const have = new Map((G.hexes || []).map((o) => [o.id, o])), list = [];
+      for (const a of w.hx) {
+        if (!Array.isArray(a) || !HKINDS[num(a[1])]) continue;
+        const id = num(a[0]), t = num(a[4]) / 20, end = num(a[6]) / 20, bits = num(a[14]); let o = have.get(id);
+        if (!o) {
+          if (t > end - 0.3) continue;
+          o = { id, k: HKINDS[num(a[1])], x: num(a[2]), y: num(a[3]), t, w: num(a[5]) / 20, end, r: clamp(num(a[7]), 0, 900), vx: num(a[8]), vy: num(a[9]), cx: num(a[10]), cy: num(a[11]), v: num(a[12]), fly: num(a[13]) / 20,
+            n: bits & 7, m: Math.max(1, (bits >> 3) & 7), weak: bits & 64 ? 1 : 0, mon: bits & 128 ? 1 : 0 };
+        } else {
+          if (Math.abs(o.t - t) > 0.25) o.t = t;
+          if (o.k === "orb" && t >= o.w) { o.x += (num(a[2]) - o.x) * 0.35; o.y += (num(a[3]) - o.y) * 0.35; o.vx = num(a[8]); o.vy = num(a[9]); }
+          o.fly = num(a[13]) / 20; o.end = end;
+        }
+        list.push(o);
+      }
+      for (const o of G.hexes || []) if (o.k === "orb" && !list.includes(o) && o.t >= o.w && o.t - o.w < o.fly - 0.15) orbPop(o, true);
+      G.hexes = list;
+    }
     // items, chests, cages, gate, score
     const flags = (s, list, onOpen) => { if (typeof s === "string") list.forEach((o, i) => { const v = s[i] === "1"; if (v && !(o.got || o.open) && onOpen) onOpen(o); if ("got" in o) o.got = v; else o.open = v; }); };
     flags(w.it, G.items, null);
@@ -10136,7 +10652,7 @@
       if (f.type === "fire" && Math.random() < 0.7) G.parts.push({ type: "dot", x: f.x, y: f.y - 90, vx: rnd(-30, 30), vy: rnd(-30, 30), life: 0.35, max: 0.35, r: rnd(4, 9), col: Math.random() < 0.5 ? "#9dff6a" : "#e6ffb0" });
     }
     updateCreepPieces(dt, false);
-    updateRings(dt, false); updateQuakes(dt, false); updateWaters(dt, false); updateLavas(dt, false); updateLavaPools(dt, false);
+    updateRings(dt, false); updateQuakes(dt, false); updateWaters(dt, false); updateLavas(dt, false); updateLavaPools(dt, false); updateHexes(dt, false);
     if (G.quiz) { G.quiz.t += dt; quizLocal(dt); } else updateQuizHud();
     for (const c of G.chests) c.t += dt;
     if (G.portal) {
@@ -10222,6 +10738,7 @@
       }
       else if (G.mode === "shop") shopTick(dt);
       else if (G.mode === "runway") runwayTick(dt);
+      else if (G.mode === "finale") finaleTick(dt);
       else if (G.mode === "ship") { if (!API.hold) shipTick(dt); }
       else if (G.mode === "photo") {
         PH.t += dt;
@@ -10250,7 +10767,8 @@
   const API = window.__sksp = {
     G, P, IN, joy, keys, NET, FR, LEVELS, MON, HEROES, PETS, TIERS, startGame, buildLevel, toTitle, snowSlow, nextLevelAfter, levelIdx,
     autopilot: false,
-    trial: true,   // the game ends on the temporary "Còn tiếp…" screen for now (tests read this)
+    trial: false,   // the game has its real end now (Màn 5's finale and the end screen); sim.js / coop.js print WIN (tests read this)
+    fin: () => ({ t: FIN.t, fw: FIN.fw.length, cf: FIN.cf.length }), FIN_END, FIN_SKIP, showEnd, hexMove, hexDodge, HOVER, HEX: { ORB_R, ORB_V, ORB_V2, ORB_VW, ORB_TURN, TELE_R, CIR_R, RING_R, RING_CR, HEX_LIFT },
     getQ: () => Q,
     setHero: (k) => { hero = k === "s" ? "s" : "g"; loadOutfit(); loadPets(); renderHeroes(); },
     setOutfit, hasOutfit, CHAR_H, ART_H, CHAR_K, HERO_R, view: () => ({ VW, VH }), girlSpot, drawTeamScene, drawOpening,
