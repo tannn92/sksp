@@ -360,7 +360,7 @@
   let META = null, ready = false;
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261027.1623", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261027.1643", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -3125,7 +3125,26 @@
   // { id, k, x, y, t, w (the warning), end, r (lane half-width / circle / pull radius), ax (tsunami: 0 sweeps along x, 1 along y), dir (+1 / -1) }
   const WKINDS = ["tsunami", "geyser", "whirl"];
   const TSU_HW = 210, TSU_GAP = 280, TSU_V = 1500, TSU_WALL = 110, TSU_H = 200, GEY_R = 150, GEY_ON = 0.4, WHIRL_R = 600, WHIRL_CORE = 110, WHIRL_T = 4, WHIRL_PULL = 0.33 * 360;
-  const WATER_COLS = ["#ffffff", "#e9fbff", "#9fe3ff", "#58cfd8", "#4aa8ff"];
+  // the painted sea (ChatGPT, art4/world/fx_water_*.png, tools/g4_fx_water.py): the wave seen side-on (sweeping across the screen,
+  // painted going right), from the front (coming down the screen) and from behind (going up it), each rising -> cresting -> crashing;
+  // the geyser's column (burst, full, collapse) and its warning on the ground (a wet patch growing, water seeping through cracks);
+  // the whirlpool from above (forming, full, fading); a splash burst; a puddle, a foam trail and a flat splash ring left on the
+  // ground; droplets, foam and spray flying. The code only adds light, particles, the shake and the warnings' outlines and arrows.
+  const WFX = {
+    side: ["fxw_side0", "fxw_side1", "fxw_side2"], front: ["fxw_front0", "fxw_front1", "fxw_front2"], back: ["fxw_back0", "fxw_back1", "fxw_back2"],
+    gey: ["fxw_gey0", "fxw_gey1", "fxw_gey2"], warn: ["fxw_warn0", "fxw_warn1", "fxw_warn2"], whirl: ["fxw_whirl0", "fxw_whirl1", "fxw_whirl2"],
+    splash: ["fxw_splash0", "fxw_splash1", "fxw_splash2", "fxw_splash3"], fly: ["fxw_drop", "fxw_drops", "fxw_spray", "fxw_foam", "fxw_spray"],
+  };
+  const WATER_RGB = "110,225,240";   // (their light: the ghost captain's cyan)
+  // a painted droplet (or a few, a curl of spray, a puff of foam) flying off the water, falling back under gravity
+  function waterDrop(x, y, vx, vy, w, life = rnd(0.45, 0.8), name = WFX.fly[Math.floor(Math.random() * WFX.fly.length)]) {
+    if (G.parts.length < 470) G.parts.push({ type: "pfx", name, x, y, vx, vy, g: 1300, w, life, max: life, spin: name === "fxw_drop" ? 1 : 0, rot: rnd(-0.5, 0.5) });
+  }
+  // a painted splash bursting up where the water hits the ground (its 4 frames over its life), with droplets thrown out of it
+  function waterSplash(x, y, w, n = 8) {
+    if (G.parts.length < 480) G.parts.push({ type: "pfx", seq: WFX.splash, x, y, w, foot: true, grow: 0.25, life: 0.7, max: 0.7, flip: Math.random() < 0.5 });
+    for (let i = 0; i < n; i++) { const a = -Math.PI / 2 + rnd(-1.2, 1.2), v = rnd(260, 620); waterDrop(x + rnd(-w, w) * 0.25, y - rnd(20, w * 0.5), Math.cos(a) * v, Math.sin(a) * v, rnd(16, 32)); }
+  }
   function addWater(k, x, y, o) { const w = { id: G.nextId++, k, x, y, t: 0, w: 1, end: 2, r: 100, ax: 0, dir: 1, ...o }; G.waters.push(w); return w; }
   // a tsunami's frame: [along its sweep, across its lane] from the arena's middle / its lane's middle line; its front along the sweep
   const tsuAxes = (w, x, y) => (w.ax ? [y - G.arena.y, x - w.x] : [x - G.arena.x, y - w.y]);
@@ -3197,25 +3216,37 @@
     if (w.k === "spike") { SFX.shatter(); G.shake = Math.max(G.shake, 8); burst(w.x, w.y - 80, 18, SNOW_COLS, 520, 0.7); G.parts.push({ type: "ring", x: w.x, y: w.y, r: w.r * 0.5, vr: 420, life: 0.5, max: 0.5, col: "200,235,255" }); return; }
     if (w.k === "snowball") { G.shake = Math.max(G.shake, 8); return; }
     if (w.k === "blizzard") { G.shake = Math.max(G.shake, 5); noise(1.2, 0.12, 900, 0.5, 0, "lowpass"); return; }
-    if (w.k === "geyser") { play("splash"); G.shake = Math.max(G.shake, 7); burst(w.x, w.y - 60, 16, WATER_COLS, 520, 0.8); G.parts.push({ type: "ring", x: w.x, y: w.y, r: w.r * 0.5, vr: 420, life: 0.5, max: 0.5, col: "200,240,255" }); }
-    else if (w.k === "tsunami") G.shake = Math.max(G.shake, 10);
-    else G.parts.push({ type: "ring", x: w.x, y: w.y, r: WHIRL_CORE, vr: 900, life: 0.55, max: 0.55, col: "160,220,255" });
+    if (w.k === "geyser") {
+      // the column bursts: a painted splash at its foot, a flat ring of water running out along the ground, droplets thrown high
+      play("splash"); G.shake = Math.max(G.shake, 9);
+      waterSplash(w.x, w.y + w.r * 0.3, w.r * 1.5, 10);
+      if (G.parts.length < 480) G.parts.push({ type: "pfx", name: "fxw_ring", x: w.x, y: w.y, w: w.r * 1.6, h: w.r * 1.6, grow: 0.9, life: 0.5, max: 0.5 });
+    } else if (w.k === "tsunami") G.shake = Math.max(G.shake, 12);
+    else {
+      // the whirlpool opens: a flat ring of foam thrown out from its middle
+      G.shake = Math.max(G.shake, 6);
+      if (G.parts.length < 480) G.parts.push({ type: "pfx", name: "fxw_ring", x: w.x, y: w.y, w: WHIRL_CORE * 2.4, h: WHIRL_CORE * 2.4, grow: 2.2, life: 0.6, max: 0.6 });
+    }
   }
   // droplets and spray (the look only)
   function waterSpray(w) {
     if (G.parts.length > 360 || w.t < w.w || d2(w.x, w.y, G.camX + VW / 2, G.camY + VH / 2) > 2600 * 2600) return;
     if (SNOWK.includes(w.k)) return snowSpray(w);
-    const A = G.arena, drop = (x, y, vx, vy, r) => G.parts.push({ type: "dot", x, y, vx, vy, life: rnd(0.35, 0.7), max: 0.7, r, col: WATER_COLS[Math.floor(Math.random() * WATER_COLS.length)], g: 1300 });
+    // (painted droplets, spray and foam: waterDrop)
+    const A = G.arena, drop = (x, y, vx, vy, r) => waterDrop(x, y, vx, vy, r * rnd(3, 4.2));
     if (w.k === "tsunami") {
       const f = tsuFront(w); if (Math.abs(f) > A.r) return;
-      for (let i = 0; i < 3; i++) {
+      for (let i = 0; i < 2; i++) {
         const c = rnd(-w.r, w.r), x = w.ax ? w.x + c : A.x + f, y = w.ax ? A.y + f : w.y + c;
         if (d2(x, y, A.x, A.y) < (A.r - 20) ** 2) drop(x, y - rnd(TSU_H * 0.6, TSU_H * 1.1), (w.ax ? rnd(-80, 80) : w.dir * rnd(250, 600)), -rnd(150, 450) + (w.ax ? w.dir * 200 : 0), rnd(4, 9));
       }
+      // now and then a splash where its front breaks on the deck
+      if (Math.random() < 0.06) { const c = rnd(-w.r, w.r) * 0.8, x = w.ax ? w.x + c : A.x + f + w.dir * 40, y = w.ax ? A.y + f + w.dir * 40 : w.y + c; if (d2(x, y, A.x, A.y) < (A.r - 60) ** 2) waterSplash(x, y, rnd(150, 220), 2); }
     } else if (w.k === "geyser") {
-      if (w.t - w.w < 0.6) for (let i = 0; i < 2; i++) drop(w.x + rnd(-40, 40), w.y - rnd(380, 520), rnd(-260, 260), -rnd(100, 380), rnd(4, 8));
-    } else if (w.t < w.w + WHIRL_T && Math.random() < 0.5) {
-      const a = Math.random() * TAU, r = rnd(WHIRL_CORE, w.r * 0.8);
+      if (w.t - w.w < 0.6 && Math.random() < 0.7) drop(w.x + rnd(-40, 40), w.y - rnd(380, 520), rnd(-260, 260), -rnd(100, 380), rnd(4, 8));
+    } else if (w.t < w.w + WHIRL_T && Math.random() < 0.35) {
+      // spray flung off its rim the way it turns
+      const a = Math.random() * TAU, r = rnd(w.r * 0.55, w.r * 0.9);
       drop(w.x + Math.cos(a) * r, w.y + Math.sin(a) * r - 10, -Math.sin(a) * 160, Math.cos(a) * 160 - 120, rnd(3, 6));
     }
   }
@@ -3466,56 +3497,57 @@
       if (w.k === "tsunami") {
         // in the lane's own frame: x along the sweep (the way it goes), y across
         ctx.translate(w.ax ? w.x : A.x, w.ax ? A.y : w.y); ctx.rotate(w.ax ? w.dir * Math.PI / 2 : w.dir > 0 ? 0 : Math.PI);
-        const f = w.dir * tsuFront(w), L = A.r + 40, hw = w.r;
-        ctx.globalAlpha = fade * (warn ? (0.2 + 0.14 * pulse) * Math.min(1, k * 3 + 0.3) : 0.12);
-        ctx.fillStyle = "#3aa0ff"; ctx.fillRect(warn ? -L : f, -hw, warn ? 2 * L : Math.max(0, L - f), 2 * hw);
-        ctx.globalAlpha = fade * (warn ? 0.9 : 0.4); ctx.strokeStyle = "#e9fbff"; ctx.lineWidth = 10; ctx.setLineDash([40, 22]); ctx.lineDashOffset = -G.t * 160;
-        ctx.beginPath(); ctx.moveTo(-L, -hw); ctx.lineTo(L, -hw); ctx.moveTo(-L, hw); ctx.lineTo(L, hw); ctx.stroke(); ctx.setLineDash([]);
+        const f = w.dir * tsuFront(w), L = A.r + 40, hw = w.r, TW = 2 * hw * 1.25;
         if (warn) {
-          // arrows running along the lane the way the wave will come
-          ctx.globalAlpha = 0.55 * Math.min(1, k * 3 + 0.2); ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 22; ctx.lineCap = "round"; ctx.lineJoin = "round";
+          // the lane: painted sea foam and shallow water rushing along it the way the wave will come (it fills in as the warning
+          // runs), a soft cyan light, its edges dashed and arrows running along it
+          const ka = Math.min(1, k * 3 + 0.3);
+          ctx.globalAlpha = (0.14 + 0.08 * pulse) * ka; ctx.fillStyle = "#2fb8d8"; ctx.fillRect(-L, -hw, 2 * L, 2 * hw); ctx.globalAlpha = 1;
+          for (let i = -1; i <= Math.ceil(2 * L / TW); i++) {
+            const x = -L + i * TW + ((G.t * 420) % TW) + TW / 2;
+            fitFrame("fxw_trail", x, (i % 2) * hw * 0.12, TW * 1.05, 2 * hw * 0.95, (0.28 + 0.22 * k) * fade, 0, i % 2 === 1);
+          }
+          ctx.globalAlpha = fade * 0.9; ctx.strokeStyle = "#e9fbff"; ctx.lineWidth = 10; ctx.setLineDash([40, 22]); ctx.lineDashOffset = -G.t * 160;
+          ctx.beginPath(); ctx.moveTo(-L, -hw); ctx.lineTo(L, -hw); ctx.moveTo(-L, hw); ctx.lineTo(L, hw); ctx.stroke(); ctx.setLineDash([]);
+          ctx.globalAlpha = 0.6 * Math.min(1, k * 3 + 0.2); ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 22; ctx.lineCap = "round"; ctx.lineJoin = "round";
           for (let i = 0; i < 8; i++) { const x = -L + ((G.t * 520 + i * 260) % (2 * L)); ctx.beginPath(); ctx.moveTo(x - 50, -hw * 0.45); ctx.lineTo(x + 20, 0); ctx.lineTo(x - 50, hw * 0.45); ctx.stroke(); }
-        } else if (f > -L - 700) {
-          // the water it leaves behind, fading back to sand; foam along its front
-          const fl = f + TSU_WALL, g = ctx.createLinearGradient(fl - 750, 0, fl, 0); g.addColorStop(0, "rgba(70,180,255,0)"); g.addColorStop(1, "rgba(50,150,240,.6)");
-          ctx.globalAlpha = fade; ctx.fillStyle = g; ctx.fillRect(fl - 750, -hw, 750, 2 * hw);
-          ctx.fillStyle = "#ffffff"; ctx.globalAlpha = 0.85 * fade;
-          for (let i = 0; i <= 8; i++) { const y = -hw + i * hw / 4; ctx.beginPath(); ctx.arc(fl - 18 + Math.sin(G.t * 9 + i * 1.7) * 10, y, 22 + 8 * Math.sin(G.t * 7 + i), 0, TAU); ctx.fill(); }
+        } else if (f > -L - 900) {
+          // the sea it leaves behind on the deck: painted foam trails and puddles, fading back to dry wood further behind its front
+          const fl = f - TSU_WALL * 0.6;
+          for (let i = 0; i < 4; i++) {
+            const x = fl - TW * (i + 0.5); if (x < -L - TW) break;
+            fitFrame(i % 2 ? "fxw_puddle" : "fxw_trail", x, (i % 2 ? -1 : 1) * hw * 0.08, TW * 1.05, 2 * hw * 0.92, fade * 0.8 * (1 - i * 0.22), 0, i % 2 === 1);
+          }
+          // its light under the wall
+          glow(fl, 0, hw * 1.2, WATER_RGB, 0.35 * fade);
         }
       } else {
-        const on = !warn && w.t < w.w + WHIRL_T, a0 = G.t * 2.6, ka = warn ? k : fade;
-        if (!warn) {
-          const g = ctx.createRadialGradient(w.x, w.y, 0, w.x, w.y, w.r);
-          g.addColorStop(0, "rgba(5,25,90,.95)"); g.addColorStop(0.25, "rgba(25,95,200,.8)"); g.addColorStop(0.75, "rgba(60,170,255,.5)"); g.addColorStop(1, "rgba(120,210,255,.08)");
-          ctx.globalAlpha = fade; ctx.fillStyle = g; ctx.beginPath(); ctx.arc(w.x, w.y, w.r, 0, TAU); ctx.fill();
-        }
-        // spiral arms turning in toward the middle
-        ctx.strokeStyle = "#ffffff"; ctx.lineCap = "round";
-        for (let arm = 0; arm < 5; arm++) {
-          ctx.globalAlpha = (on ? 0.6 : 0.35) * ka; ctx.lineWidth = on ? 15 : 11; ctx.beginPath();
-          for (let i = 0; i <= 16; i++) { const p = i / 16, rr = WHIRL_CORE + (w.r * 0.95 - WHIRL_CORE) * p, a = a0 + arm * TAU / 5 + (1 - p) * 3.2; const x = w.x + Math.cos(a) * rr, y = w.y + Math.sin(a) * rr; if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y); }
-          ctx.stroke();
-        }
-        // its edge (how far it pulls) and its middle (do not touch)
-        ctx.globalAlpha = (warn ? 0.6 + 0.3 * pulse : 0.45) * ka; ctx.strokeStyle = "#e9fbff"; ctx.lineWidth = 10; ctx.setLineDash([42, 24]); ctx.lineDashOffset = G.t * 120;
+        // the whirlpool, painted from above, turning: it forms (fading and growing in) while it warns, spins at its fullest while it
+        // pulls, then breaks up; its edge (how far it pulls) dashed, its middle (do not touch) ringed in light
+        const on = !warn && w.t < w.w + WHIRL_T, e = w.t - w.w, rot = G.t * (warn ? 0.7 : 1.5) + w.id;
+        const p = warn ? 0.5 * k : 0.5 + 0.5 * clamp((e - (WHIRL_T - 0.8)) / 1.2, 0, 1), D = 2 * w.r * (warn ? 0.55 + 0.45 * k : 1) * 1.04;
+        fitSeq(WFX.whirl, p, w.x, w.y, D, D, (warn ? 0.35 + 0.5 * k : 0.92) * fade, rot);
+        // (the dark funnel catches the light: a cyan glow in the middle while it spins)
+        if (!warn) glow(w.x, w.y, WHIRL_CORE * 2.6, WATER_RGB, 0.45 * fade * (on ? 1 : 0.4));
+        ctx.globalAlpha = (warn ? 0.6 + 0.3 * pulse : 0.35) * (warn ? k : fade); ctx.strokeStyle = "#e9fbff"; ctx.lineWidth = 9; ctx.setLineDash([42, 24]); ctx.lineDashOffset = G.t * 120;
         ctx.beginPath(); ctx.arc(w.x, w.y, w.r, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
-        ctx.globalAlpha = (0.5 + 0.4 * pulse) * ka; ctx.strokeStyle = "#7fd8ff"; ctx.lineWidth = 16; ctx.beginPath(); ctx.arc(w.x, w.y, Math.max(4, WHIRL_CORE * (warn ? k : 1)), 0, TAU); ctx.stroke();
+        if (warn || on) { ctx.globalAlpha = (0.55 + 0.35 * pulse) * (warn ? k : 1); ctx.strokeStyle = "#bff6ff"; ctx.lineWidth = 10; ctx.beginPath(); ctx.arc(w.x, w.y, Math.max(4, WHIRL_CORE * (warn ? k : 1)), 0, TAU); ctx.stroke(); }
       }
       ctx.restore();
-      if (w.k === "whirl" && !warn) glow(w.x, w.y, WHIRL_CORE * 2.2, "120,200,255", 0.5 * fade);
     }
   }
-  // a geyser on the ground: a circle with a ring closing in (it bursts when the ring reaches the middle), then a wet splash
+  // a geyser on the ground: the painted warning (a wet patch, water seeping up through cracks, then churning about to burst) growing
+  // over its circle, its edge dashed and a ring closing in (it bursts when the ring reaches the middle); then a puddle left behind
   function drawGeyserGround(w, warn, k, pulse, fade) {
+    const D = 2 * w.r;
     if (warn) {
-      ctx.globalAlpha = (0.16 + 0.14 * pulse) * Math.min(1, k * 3 + 0.3); ctx.fillStyle = "#3aa0ff"; ctx.beginPath(); ctx.arc(w.x, w.y, w.r, 0, TAU); ctx.fill();
-      ctx.globalAlpha = 0.9; ctx.strokeStyle = "#e9fbff"; ctx.lineWidth = 9; ctx.setLineDash([28, 16]); ctx.lineDashOffset = -G.t * 90; ctx.stroke(); ctx.setLineDash([]);
-      ctx.globalAlpha = 0.8; ctx.strokeStyle = "#9fe3ff"; ctx.lineWidth = 13; ctx.beginPath(); ctx.arc(w.x, w.y, Math.max(4, w.r * (1 - k)), 0, TAU); ctx.stroke();
-      ctx.fillStyle = "#ffffff";
-      for (let i = 0; i < 6; i++) { const a = i * TAU / 6 + G.t * 1.5, r = w.r * (0.25 + 0.5 * ((G.t * 0.9 + i * 0.37) % 1)); ctx.globalAlpha = 0.7 * k; ctx.beginPath(); ctx.arc(w.x + Math.cos(a) * r, w.y + Math.sin(a) * r, 6 + 6 * k, 0, TAU); ctx.fill(); }
+      glow(w.x, w.y, w.r * (0.9 + 0.4 * k), WATER_RGB, (0.25 + 0.3 * k) * (0.7 + 0.3 * pulse));
+      fitSeq(WFX.warn, k, w.x, w.y, D * (0.8 + 0.25 * k), D * (0.8 + 0.25 * k), Math.min(1, k * 3 + 0.35), 0, w.id % 2 === 1);
+      ctx.globalAlpha = 0.9; ctx.strokeStyle = "#e9fbff"; ctx.lineWidth = 8; ctx.setLineDash([28, 16]); ctx.lineDashOffset = -G.t * 90; ctx.beginPath(); ctx.arc(w.x, w.y, w.r, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
+      ctx.globalAlpha = 0.85; ctx.strokeStyle = "#bff6ff"; ctx.lineWidth = 11; ctx.beginPath(); ctx.arc(w.x, w.y, Math.max(4, w.r * (1 - k)), 0, TAU); ctx.stroke();
     } else {
-      const e = w.t - w.w; ctx.globalAlpha = 0.5 * fade; ctx.fillStyle = "#3a9cf0"; ctx.beginPath(); ctx.arc(w.x, w.y, w.r * (0.9 + 0.5 * Math.min(1, e * 2)), 0, TAU); ctx.fill();
-      ctx.globalAlpha = 0.7 * fade; ctx.strokeStyle = "#e9fbff"; ctx.lineWidth = 8; ctx.stroke();
+      const e = w.t - w.w, s = 0.95 + 0.4 * Math.min(1, e * 2.5);
+      fitFrame("fxw_puddle", w.x, w.y, D * s * 1.15, D * s, 0.85 * fade, 0, w.id % 2 === 1);
     }
     ctx.globalAlpha = 1;
   }
@@ -3554,41 +3586,38 @@
     if (o.k === "geyser") return drawGeyserColumn(w);
     if (o.k === "ball" || o.k === "spike") return drawSnowPiece(o);
     if (API.drawn) API.drawn.push(["wall", w.id, o.y, o.top, o.gx0, o.gx1, o.gy0, o.gy1]);
+    // the painted wave over its whole lane (the slices of one wave each show their own part of the same picture), clipped to where
+    // this piece stands: it never rises over a girl outside its lane. How far it has swept picks the frame: rising as it comes in
+    // over the fence, cresting across the middle, crashing as it leaves
+    const A = G.arena, f = tsuFront(w), p = clamp((w.dir * f + A.r) / (2 * A.r), 0, 1), bob = Math.sin(G.t * 9 + w.id) * 0.03;
     ctx.save(); ctx.globalAlpha = fade;
     const mx = w.ax ? 0 : 30; ctx.beginPath(); ctx.rect(o.gx0 - mx, o.top, o.gx1 - o.gx0 + 2 * mx, o.gy1 - o.top); ctx.clip();
     if (w.ax) {
-      // a wall facing the camera: deep blue at its foot, white foam along its crest
-      const g = ctx.createLinearGradient(0, o.top, 0, o.gy1);
-      g.addColorStop(0, "rgba(230,250,255,.95)"); g.addColorStop(0.4, "rgba(90,190,255,.85)"); g.addColorStop(1, "rgba(30,110,210,.75)");
-      ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(o.gx0, o.gy1);
-      for (let i = 0; i <= 12; i++) { const x = o.gx0 + (o.gx1 - o.gx0) * i / 12; ctx.lineTo(x, o.top + 18 + Math.sin(G.t * 8 + i * 1.3) * 14); }
-      ctx.lineTo(o.gx1, o.gy1); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = "#ffffff";
-      for (let i = 0; i <= 12; i++) { const x = o.gx0 + (o.gx1 - o.gx0) * i / 12; ctx.beginPath(); ctx.arc(x, o.top + 18 + Math.sin(G.t * 8 + i * 1.3) * 14, 16 + 6 * Math.sin(G.t * 11 + i), 0, TAU); ctx.fill(); }
+      // sweeping down the screen: its face toward the camera; up the screen: its back. Across the lane, from its crest (TSU_H above
+      // the band where it hurts) down to the band's near edge
+      // (as wide as the lane, stretched up a little so its crest stands about TSU_H over the band; its foot on the band's near edge)
+      const seq = w.dir > 0 ? WFX.front : WFX.back;
+      natSeq(seq, p, w.x, A.y + f + TSU_WALL + 12, fitW(seq[1], 2 * w.r * 1.06), 1, w.id % 2 === 1, 1.3 + bob);
     } else {
-      // a slice of the wall seen edge-on: clear water behind, white foam at its leading edge and along its crest
-      const lead = w.dir > 0 ? o.gx1 : o.gx0, back = w.dir > 0 ? o.gx0 : o.gx1, g = ctx.createLinearGradient(back, 0, lead, 0);
-      g.addColorStop(0, "rgba(40,130,230,.25)"); g.addColorStop(0.6, "rgba(80,180,255,.8)"); g.addColorStop(1, "rgba(235,250,255,.95)");
-      ctx.fillStyle = g; ctx.fillRect(Math.min(back, lead), o.top, Math.abs(lead - back), o.gy1 - o.top);
-      ctx.fillStyle = "#ffffff";
-      const n = 3; for (let i = 0; i < n; i++) { const y = o.top + (o.gy1 - o.top) * (i + 0.5) / n; ctx.beginPath(); ctx.arc(lead - w.dir * (12 + Math.sin(G.t * 9 + y * 0.03) * 8), y, 18 + 6 * Math.sin(G.t * 12 + y), 0, TAU); ctx.fill(); }
-      ctx.globalAlpha = 0.8 * fade; ctx.beginPath(); ctx.arc((lead + back) / 2, o.top + 10, 22, 0, TAU); ctx.fill();
+      // sweeping across the screen: the long ridge seen side-on, its foaming lip leading (the picture goes right: mirrored to go left),
+      // standing over the whole lane, from the lane's far edge to its near one; about as wide as the band where it hurts
+      natSeq(WFX.side, p, A.x + f + w.dir * 10, w.y + w.r + 6, fitHk(WFX.side[1], 2 * w.r + 12) * (1 + bob), 1, w.dir < 0);
     }
     ctx.restore();
-    glow((o.gx0 + o.gx1) / 2, (o.top + o.gy1) / 2, Math.max(o.gx1 - o.gx0, o.gy1 - o.top) * 0.6, "120,200,255", 0.25 * fade);
+    // its light: cyan through the water and a brighter glint along the breaking crest
+    glow((o.gx0 + o.gx1) / 2, (o.top + o.gy1) / 2, Math.max(o.gx1 - o.gx0, o.gy1 - o.top) * 0.6, WATER_RGB, 0.22 * fade);
   }
-  // a geyser's column of water standing on its circle
+  // a geyser's column of water standing on its circle: the painted burst, full column and collapse; it shoots up out of the ground
+  // (grows from its foot) and falls back
   function drawGeyserColumn(w) {
-    const e = w.t - w.w;
-    const up = Math.min(1, e / 0.12), down = clamp((e - 0.45) / 0.3, 0, 1), h = 520 * up * (1 - down * 0.85), hw = w.r * 0.55 * (1 - down * 0.5);
-    const g = ctx.createLinearGradient(w.x - hw, 0, w.x + hw, 0);
-    g.addColorStop(0, "rgba(50,150,240,.75)"); g.addColorStop(0.5, "rgba(225,248,255,.95)"); g.addColorStop(1, "rgba(50,150,240,.75)");
-    ctx.save(); ctx.globalAlpha = 1 - down * 0.6; ctx.fillStyle = g;
-    ctx.beginPath(); ctx.moveTo(w.x - hw * 1.2, w.y); ctx.lineTo(w.x - hw * 0.8, w.y - h); ctx.lineTo(w.x + hw * 0.8, w.y - h); ctx.lineTo(w.x + hw * 1.2, w.y); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = "#ffffff";
-    for (let i = 0; i < 6; i++) { const a = i * TAU / 6 + G.t * 5; ctx.beginPath(); ctx.arc(w.x + Math.cos(a) * hw * 0.8, w.y - h + Math.sin(a) * 18, hw * 0.45, 0, TAU); ctx.fill(); }
-    ctx.restore();
-    glow(w.x, w.y - h * 0.6, 240, "120,200,255", 0.55 * (1 - down));
+    const e = w.t - w.w, up = Math.min(1, 0.25 + e / 0.12), down = clamp((e - 0.45) / 0.3, 0, 1);
+    const p = e < 0.1 ? 0 : e < 0.45 ? 0.5 * clamp((e - 0.1) / 0.12, 0, 1) : 0.5 + 0.5 * down;
+    // (the full column's splash crown as wide as its circle and a little more; its shaft about 600 tall)
+    const m = fitW("fxw_gey1", w.r * 2.5), H = 600 * up, foot = w.y + w.r * 0.25;
+    glow(w.x, foot - H * 0.45, w.r * 2, WATER_RGB, 0.5 * (1 - down));
+    natSeq(WFX.gey, p, w.x, foot, m, 1 - down * 0.7, w.id % 2 === 1, up * (1 - down * 0.2));
+    // (the white water at its top flashes as it bursts)
+    if (e < 0.25) glow(w.x, foot - H * 0.85, w.r * 1.3, "235,255,255", 0.6 * (1 - e / 0.25));
   }
   // ---------------------------------------------------------------- Quỷ Dung Nham's fire (style "lava"), one move after another:
   // meteors: 3 (his second form 5) circles under and near the girls glow, then burning rocks fall into them;
@@ -4100,6 +4129,31 @@
   }
   // draw a sprite scaled to a width (px in the world)
   function sprW(name, x, y, w, a = 1, rot = 0, sy = 1) { const f = FR[name]; if (f) spr(f, x, y, false, w / (f.w * f.s), a, rot, sy); return !!f; }
+  // draw a whole frame fitted into a w x h box whose middle is (cx, cy), turned by rot, mirrored by flip, added as light by add
+  // (the painted water of Map 2: each picture is stretched over exactly the ground it stands for)
+  function fitFrame(name, cx, cy, w, h, a = 1, rot = 0, flip = false, add = false) {
+    const f = FR[name]; if (!f) return false;
+    if (a <= 0.01 || w <= 0 || h <= 0) return true;
+    ctx.save(); if (add) ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha *= Math.min(1, a); ctx.translate(cx, cy); if (rot) ctx.rotate(rot); if (flip) ctx.scale(-1, 1);
+    ctx.drawImage(f.img, f.sx, f.sy, f.w, f.h, -w / 2, -h / 2, w, h); ctx.restore(); return true;
+  }
+  // an animation as painted frames, at p (0..1) through it: the frame there with the next one fading in over it
+  function fitSeq(names, p, cx, cy, w, h, a = 1, rot = 0, flip = false) {
+    const i = clamp(p, 0, 1) * (names.length - 1), i0 = Math.min(names.length - 1, Math.floor(i)), k = i - i0;
+    fitFrame(names[i0], cx, cy, w, h, a, rot, flip);
+    if (k > 0.02 && i0 + 1 < names.length) fitFrame(names[i0 + 1], cx, cy, w, h, a * k, rot, flip);
+  }
+  // an animation drawn at its frames' own painted sizes (they keep their proportions to each other), m times as big, its foot
+  // (the frames' bottom middle) at (x, footY); sy stretches it up
+  function natSeq(names, p, x, footY, m, a = 1, flip = false, sy = 1) {
+    const i = clamp(p, 0, 1) * (names.length - 1), i0 = Math.min(names.length - 1, Math.floor(i)), k = i - i0;
+    const one = (nm, al) => { const f = FR[nm]; if (!f) return; const w = f.w * f.s * m, h = f.h * f.s * m * sy; fitFrame(nm, x, footY - h / 2, w, h, al, 0, flip); };
+    one(names[i0], a);
+    if (k > 0.02 && i0 + 1 < names.length) one(names[i0 + 1], a * k);
+  }
+  // the scale that makes a frame w world px wide / h tall (1 without the frame)
+  const fitW = (name, w) => { const f = FR[name]; return f ? w / (f.w * f.s) : 1; };
+  const fitHk = (name, h) => { const f = FR[name]; return f ? h / (f.h * f.s) : 1; };
   // ground layer: the cracks opening, the warning glow, the crater left behind
   function drawQuakes() {
     for (const q of G.quakes) {
@@ -5841,6 +5895,16 @@
         else { fx("fx_flame", p.x, p.y - p.r * (0.5 + k * 0.6), p.r / 45 * (0.7 + k), a); fx("fx_rays", p.x, p.y - p.r * 0.4, p.r / 110 * (0.6 + k), a * 0.8, k); }
       }
       else if (p.type === "dust") { ctx.globalAlpha = 1; spr("fx_smoke", p.x, p.y, p.x % 2 > 1, p.r / 34, a * 0.55); }
+      else if (p.type === "pfx") {
+        // a painted piece of the captain's sea: a splash running through its frames (standing on its foot), a flat ring growing
+        // along the ground, or a droplet / foam / spray flying (a droplet points its tail back the way it came)
+        ctx.globalAlpha = 1; const k = 1 - a, nm = p.seq ? p.seq[Math.min(p.seq.length - 1, Math.floor(k * p.seq.length))] : p.name, f = FR[nm];
+        if (f) {
+          const s = 1 + (p.grow || 0) * k, w = p.w * s, h = (p.h ? p.h * s : w * f.h / f.w);
+          const rot = p.spin ? Math.atan2(-p.vy, -p.vx) + Math.PI / 2 : p.rot || 0;
+          fitFrame(nm, p.x, p.foot ? p.y - h / 2 : p.y, w, h, Math.min(1, a * (p.seq ? 3 : 2.2)), rot, !!p.flip);
+        }
+      }
       else if (p.type === "fx") { ctx.globalAlpha = 1; fx(p.name, p.x, p.y, p.sc * (1 + (1 - a) * (p.grow || 0.6)), a, p.rot || 0, !!p.flip); }
       else if (p.type === "ring") { ctx.globalAlpha = a; ctx.strokeStyle = `rgba(${p.col},1)`; ctx.lineWidth = 26 * a + 4; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, TAU); ctx.stroke(); }
       else if (p.type === "bite") {
