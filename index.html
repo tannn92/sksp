@@ -410,7 +410,7 @@
   let META = null, ready = false;
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261028.1758", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261028.1813", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -10514,6 +10514,7 @@
     for (const id of ["hud", "controls", "bossbar", "quiz"]) $(id).hidden = true;
     const so = OUTFITS4.find((o) => o.char === "simmy" && o.theme === SH.theme);
     if (so) SIMMY.outfit = outKey(so);   // (Task 8: her ally sprite draws with SIMMY.outfit)
+    G.petTheme = LV_ART[nextLevelAfter(G.level)] || G.petTheme;
     G.mode = "runway"; RW.t = 0;
     play("portal");
   }
@@ -10621,7 +10622,6 @@
     if (RW.t >= RW_END) takePhoto();
   }
   function takePhoto() {
-    G.petTheme = LV_ART[nextLevelAfter(G.level)] || G.petTheme;
     G.mode = "photo"; PH.t = 0;
     try {
       const c = document.createElement("canvas"); c.width = 1280; c.height = 720;
