@@ -369,7 +369,7 @@
   let META = null, ready = false;
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261028.1155", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261028.1337", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -742,7 +742,8 @@
     // (next: Màn 3, Núi Tuyết (id "snow"); see nextLevelAfter)
     { name: "Màn 2: Đảo Cướp Biển", seed: 2207, path: "river", arena: true, next: "snow", hazard: "tide",
       intro: "Phù thủy Hắc Ám đã đưa cả nhóm tới Đảo Cướp Biển! Mặc đồ cướp biển, đi theo lối cát vàng, đánh bại <b>Thuyền Trưởng Ma</b> và cứu anh Kairon nhé.",
-      end: "Thuyền Trưởng Ma đã bị đánh bại và Kairon đã được cứu! Sắp tới: cứu Sammy Đào ở Núi Tuyết!",
+      end: "Thuyền Trưởng Ma đã bị đánh bại và Kairon đã được cứu! Kairon kể: Sammy Đào bị nhốt ở Núi Tuyết!",
+      handoff: "handoffSnow",   // (the hand-off talk after the boss: SAYS[handoff], before the gate opens)
       boss: { art: "pirate_boss", name: "Thuyền Trưởng Ma", hp: 60, tip: "Thuyền trưởng gọi sóng thần, cột nước và xoáy nước!", summon: "pirate_bat", style: "captain", fence: "pr_rope_fence",
         quiz: { op: "-", lim: 10, T: 3, n: [2, 2], hz: "qk_bomb" },
         laugh: "laugh0", ha: "Ha ha! Đoán đi!", say: ["Ha ha! Thuyền Trưởng Ma đây!", "Hòn đảo này là của ta!", "Sóng ơi, cuốn chúng đi!"], morph: ["Dám chọc giận ta à?", "Biển cả ơi, nổi sóng lên!"], bye: ["Ối... thuyền ta thủng rồi!", "Phù thủy Hắc Ám sẽ không", "tha cho các ngươi đâu!"] },
@@ -755,8 +756,9 @@
     // calls up ice spikes and a blizzard (style "yeti"); Sammy waits in a standing ice cage (`cage`). The snow props are cut at the
     // island props' world size, so they take the island's scales.
     { id: "snow", name: "Màn 3: Núi Tuyết", seed: 3301, path: "river", arena: true, hazard: "ice",
-      intro: "Phù thủy Hắc Ám đã đưa Sammy Đào lên Núi Tuyết! Đi theo lối tuyết, đánh bại <b>Người Tuyết Yeti</b> và cứu chị Sammy Đào nhé.",
-      end: "Yeti đã bị đánh bại và Sammy Đào đã được cứu! Sắp tới: cứu Phong Cận ở Núi Dung Nham!",
+      intro: "Kairon nói đúng: Sammy Đào bị nhốt trong lồng băng trên Núi Tuyết! Đi theo lối tuyết, đánh bại <b>Người Tuyết Yeti</b> và cứu chị Sammy Đào nhé.",
+      end: "Yeti đã bị đánh bại và Sammy Đào đã được cứu! Sammy kể: Phong Cận bị nhốt ở Núi Dung Nham!",
+      handoff: "handoffLava",
       boss: { art: "snow_boss", name: "Người Tuyết Yeti", hp: 70, tip: "Yeti lăn cầu tuyết, gọi gai băng và bão tuyết!", summon: "snow_bat", style: "yeti", fence: "sn_fence",
         quiz: { op: "+", lim: 20, T: [5, 8], n: [2, 2], hz: "qk_bomb" },
         laugh: "laugh0", ha: "Grào! Đố nè!", say: ["Grào! Yeti đây!", "Ai dám lên núi của ta?", "Ta đóng băng hết bây giờ!"], morph: ["Grào grào! Lạnh hơn nữa nào!", "Bão tuyết ơi, thổi lên!"], bye: ["Ối... ta tan chảy mất rồi...", "Phù thủy Hắc Ám", "sẽ trả thù cho ta!"] },
@@ -770,8 +772,9 @@
     // iron (lava_cage). Dark rock ground with glowing seams (gr.seam), lava pools and a lava sea at the edge of the world (the pond / sea
     // colours). After Màn 3 (Núi Tuyết, id "snow"); his gate leads into Màn 5 (Lâu Đài Phù Thủy Hắc Ám, id "castle").
     { id: "lava", name: "Màn 4: Núi Dung Nham", seed: 4409, path: "river", arena: true,
-      intro: "Phong Cận đang bị nhốt ở Núi Dung Nham! Cẩn thận đá nóng, đánh bại <b>Quỷ Dung Nham</b> và cứu anh Phong nhé.",
+      intro: "Sammy nói đúng: Phong Cận bị treo trong lồng sắt ở Núi Dung Nham! Cẩn thận đá nóng, đánh bại <b>Quỷ Dung Nham</b> và cứu anh Phong nhé.",
       end: "Quỷ Dung Nham đã bị đánh bại và Phong Cận đã được cứu! Cả nhóm SKSP đã đoàn tụ. Sắp tới: Lâu Đài Phù Thủy Hắc Ám!",
+      handoff: "handoffCastle",
       boss: { art: "lava_boss", name: "Quỷ Dung Nham", hp: 70, tip: "Quỷ Dung Nham gọi mưa đá nóng, hồ dung nham và cột lửa!", summon: "lava_bat", style: "lava", fence: "lv_chain_fence",
         quiz: { op: "-", lim: 20, T: [5, 8], n: [2, 2], hz: "qk_rock2" },
         laugh: "laugh0", ha: "Hừ hừ! Giải đi!", say: ["Hừ hừ! Quỷ Dung Nham đây!", "Núi lửa này nóng lắm đấy,", "chạy đi kẻo bỏng!"], morph: ["Grừừ! Ta nổi điên rồi!", "Núi lửa ơi, phun trào đi!"], bye: ["Xèo xèo... ta nguội mất rồi...", "Nhưng các ngươi không thắng", "nổi Phù thủy Hắc Ám đâu!"] },
@@ -793,7 +796,7 @@
     // form adds shadow clones and a ring of circles (the hexes, G.hexes: see hexMove). After her: the finale film and the end screen
     // (`finale`). Ground: dusky purple flagstones, lighter than Map 4's rock so the girls stand out (its own calm prop fill, as Map 4's).
     { id: "castle", name: "Màn 5: Lâu Đài Phù Thủy Hắc Ám", seed: 5507, path: "river", arena: true, last: true, finale: true, hazard: "spike",
-      intro: "Đây là lâu đài của Phù thủy Hắc Ám! Cả nhóm SKSP đã đoàn tụ. Cùng nhau đánh bại <b>Phù thủy Hắc Ám</b> nhé!",
+      intro: "Anh Phong đã dẫn cả nhóm tới lâu đài của Phù thủy Hắc Ám! Cả nhóm SKSP đã đoàn tụ. Cùng nhau đánh bại <b>Phù thủy Hắc Ám</b> nhé!",
       end: "Cảm ơn {girls} đã cứu cả nhóm SKSP!",   // ({girls}: the girls who played, finLine)
       boss: { art: "castle_boss", name: "Phù thủy Hắc Ám", hp: 80, tip: "Phù thủy gọi hồn ma, bắn cầu phép, biến mất và vẽ vòng phép!", summon: "castle_bat", style: "hex", fence: "cs_fence",
         // (the last boss asks no sums (Dad, 2026-10-28): the final battle, FB below: her lieutenants first, then her three forms)
@@ -1211,6 +1214,9 @@
       G.items = G.items.filter((it) => !G.hz.some((o) => o.k !== "goo" && inEll(o, it.x, it.y, 40)));
     }
     G.steer = [...G.lpools.map((o) => ({ x: o.x, y: o.y, ...lpEll(o, 1) })), ...G.hz.map((o) => ({ x: o.x, y: o.y, rx: o.rx, ry: o.ry }))];
+    // the escort's stash (placeStash: the same spot on every page, no random numbers drawn); no prop on it or on her way up to it
+    G.esc = null; G.stash = placeStash(i, L, path, endI, cageSpots); G.stashCut = 0;
+    if (G.stash) { const S = G.stash, keep = G.deco.filter((d) => d2(d.x, d.y, S.x, S.y) > 260 * 260 && d2(d.x, d.y, S.sx, S.sy) > 200 * 200); if (keep.length < G.deco.length) { G.stashCut = G.deco.length - keep.length; G.decoGrid = new Map(); G.deco = []; for (const d of keep) addDeco(d); } }   // (G.stashCut: the props taken off it)
     // reset the play state
     G.nextId = 1; G.mons = []; G.shots = []; G.pshots = []; G.foes = []; G.afx = []; clearCps(); G.hexes = []; G.parts = []; G.drops = []; G.gems = []; G.rings = []; G.quakes = []; G.waters = []; G.lavas = [];
     G.shopDone = false; G.shopPhase = 0; G.m2 = false;   // (a new level has no shop phase left over from the last one)
@@ -1487,7 +1493,7 @@
   // over the group instead of all piling on one). A monster keeps its target AGGRO_T s (then looks again) and changes only for one clearly
   // nearer (AGGRO_SW of the distance), so it does not flip between two. Without a monster (mon): the nearest girl.
   const AGGRO = { kairon: 1.4, phong: 1.4, sammy: 1.0, simmy: 0.7 }, AGGRO_T = [0.8, 1.3], AGGRO_SW = 0.85, AGGRO_CROWD = 0.25;
-  const aggroOf = (o, mon) => ((o && o.kind && AGGRO[o.kind]) || 1) / (1 + AGGRO_CROWD * Math.max(0, (o.aggN || 0) - (mon && mon.tg === o ? 1 : 0)));
+  const aggroOf = (o, mon) => ((o && o.kind && (escOf(o) ? ESC.AGGRO : AGGRO[o.kind])) || 1) / (1 + AGGRO_CROWD * Math.max(0, (o.aggN || 0) - (mon && mon.tg === o ? 1 : 0)));
   // (each frame on the host: how many monsters are on each girl / friend now)
   function aggroCount() {
     for (const g of girls()) g.aggN = 0;
@@ -1552,7 +1558,7 @@
   const rescuing = () => !!(Q && NET.role && !Q.dead && d2(Q.x, Q.y, P.x, P.y) < RESCUE_R * RESCUE_R);
   // get back up on the spot with full hearts, and shoo the monsters away
   function reviveHero() {
-    for (const e of PETE) { if (!isCls(e)) e.faintT = 0; else if (e.faintT > 0) allyRevive(e); }
+    for (const e of PETE) { if (!isCls(e)) e.faintT = 0; else if (e.faintT > 0 && !escOf(e)) allyRevive(e); }   // (a friend fainted in her escort waits for a girl beside her)
     P.dead = false; P.hurtT = 0; P.inv = 2.5; G.hearts = 5; renderHearts(); SFX.heal();
     burst(P.x, P.y - 110, 30, ["#fff4c2", "#ffd34d", ...HD().cols], 380, 0.8);
     G.parts.push({ type: "ring", x: P.x, y: P.y - 40, r: 40, vr: 1400, life: 0.6, max: 0.6, col: "255,236,170" });
@@ -3042,6 +3048,9 @@
     }
     showBanner(HD().name + " đã cứu " + PETS[kind].name + "!", PETS[kind].tip);
     if (isAlly(kind)) { SFX.unlock(); burst(P.x, P.y - 160, 40, [PETS[kind].col, "#fff", "#ffd34d"], 520, 1); }
+    // (her own map: in her everyday clothes she leads the team to her battle gear: the escort; also when the host's word that she is this
+    // girl's came before her film here)
+    if (escFor(kind) && !(G.esc && G.esc.k === kind)) startEscort(kind);
   }
 
   // ---------------------------------------------------------------- the letters S K S P (Simmy, Kairon, Sammy, Phong Cận)
@@ -3088,6 +3097,30 @@
     cookDone: [["simmy", ["Ngon quá! Ơ, nhìn kìa,", "Đảo Cướp Biển kìa!"]], ["simmy", ["Sắp cập bến rồi!", "Hai em đi thay đồ", "cướp biển nhé!"]]],
     cookDoneSolo: [["simmy", ["Ngon quá! Ơ, nhìn kìa,", "Đảo Cướp Biển kìa!"]], ["simmy", ["Sắp cập bến rồi!", "Em đi thay đồ", "cướp biển nhé!"]]],
     level2Start: [["simmy", ["Kairon đang ở đâu đó", "trên đảo này. Đi tìm thôi!"]]],
+    // the hand-off after each boss of Màn 2-4 (Dad: the friend freed on the map tells everyone where the next one is held, as Simmy does on
+    // Màn 1): Kairon -> Sammy on Núi Tuyết, Sammy -> Phong on Núi Dung Nham, Phong -> the witch's castle. A line whose speaker is not with
+    // the team is left out (handoffSeq); "mochi" / "matcha": the girl by that name, else the girl who plays
+    handoffSnow: [
+      ["kairon", ["Hoan hô! Thắng rồi!"]],
+      ["mochi", ["Anh Kairon ơi,", "chị Sammy đâu ạ?"]],
+      ["kairon", ["Sammy bị nhốt trong lồng băng", "trên Núi Tuyết!"]],
+      ["simmy", ["Chị sinh đôi của chị đó!", "Đi cứu chị ấy nào!"]],
+      ["kairon", ["Qua cổng phép thôi!"]],
+    ],
+    handoffLava: [
+      ["sammy", ["Yeti tan chảy rồi!"]],
+      ["matcha", ["Chị Sammy ơi,", "anh Phong đâu ạ?"]],
+      ["sammy", ["Phong bị treo trong lồng sắt", "ở Núi Dung Nham!"]],
+      ["kairon", ["Ở đó nóng lắm,", "tránh xa dung nham nhé!"]],
+      ["sammy", ["Đi cứu Phong thôi!"]],
+    ],
+    handoffCastle: [
+      ["phong", ["Cảm ơn cả đội nhé!"]],
+      ["mochi", ["Anh Phong ơi,", "giờ mình đi đâu ạ?"]],
+      ["phong", ["Phù thủy Hắc Ám trốn trong", "lâu đài xám sau núi lửa!"]],
+      ["simmy", ["Cả nhóm SKSP đủ rồi!", "Cùng hạ phù thủy nào!"]],
+      ["phong", ["Theo anh tới lâu đài!"]],
+    ],
     // Simmy calls a sister who is needed off her screen (Mochi's page: "chị" Matcha; Matcha's page: "em" Mochi): to the bow, back to the stove
     callBowG: [["simmy", ["Chạy ra mũi tàu", "giúp chị!"]]],
     callBowS: [["simmy", ["Chạy ra mũi tàu", "giúp em!"]]],
@@ -3166,15 +3199,16 @@
       if (r.mine) rescuePet(r.kind);
       // she steps into the team right where she stood
       for (const e of [...PETE, ...QPETE]) if (e.kind === r.kind) { e.x = r.x + 40; e.y = r.y + 30; }
-      showBanner(D.name + " đi cùng các bé!", D.tip);
+      showBanner(D.name + " đi cùng các bé!", escFor(r.kind) ? "Bảo vệ " + D.name + " tới chỗ cất đồ chiến đấu!" : D.tip);
     }
   }
   // what is said in a girl's rescue film: Simmy's story lines; Sammy's thanks and Simmy's answer; another ally's thanks (Kairon's)
   function rsSeq(kind) {
     // (her thanks name the girls who are playing: alone, only her; Dad saw Matcha in Mochi's solo films)
-    if (kind === "simmy") return girlsIn().length > 1 ? SAYS.simmyRescue : SAYS.simmyRescue.map(([k, l]) => [k, l.map((x) => x.replace(HEROES.g.name + " và " + HEROES.s.name, girlsName()))]);
+    const go = escFor(kind) ? [[kind, ESC_SAY.go[kind]]] : [];   // (her own map: her gear is hidden close by, follow and protect her)
+    if (kind === "simmy") return (girlsIn().length > 1 ? SAYS.simmyRescue : SAYS.simmyRescue.map(([k, l]) => [k, l.map((x) => x.replace(HEROES.g.name + " và " + HEROES.s.name, girlsName()))])).concat(go);
     const D = PETS[kind], th = D.thanks || ["Cảm ơn " + girlsName() + "!", "Từ giờ mình đi cùng các bé!"];
-    return D.reply ? [[kind, th], ["simmy", D.reply]] : [[kind, th]];
+    return (D.reply ? [[kind, th], ["simmy", D.reply]] : [[kind, th]]).concat(go);
   }
   const rsEnd = (r) => Math.max(RS_END, RS_THANK + seqTime(r.seq || rsSeq(r.kind), r.mul) + 0.4);
   const rescueZoom = () => { const r = G.rescue; if (!r) return 1; const k = Math.min(rsEase(clamp(r.t / 0.7, 0, 1)), 1 - rsEase(clamp((r.t - (rsEnd(r) - 0.6)) / 0.6, 0, 1))); return 1 + 0.55 * k; };
@@ -3220,14 +3254,20 @@
     const cg = hangs(r.kind) && FR[cageOf(r.kind)], x = r.x, y = r.y + lerp(cg ? -(HANG_Z + cg.h * cg.s * hangFloor(r.kind)) : 0, 70, rsEase(out));
     // the girl inside: dimmed in the cage, then bright as she steps out
     glow(x, y - 150, 260, D.rgb, 0.35 + 0.4 * out);
-    const ult = t >= RS_ULT && t < RS_THANK, k = clamp((t - RS_ULT) / (RS_THANK - RS_ULT), 0, 1);
+    const esc = escFor(r.kind), ult = !esc && t >= RS_ULT && t < RS_THANK, k = clamp((t - RS_ULT) / (RS_THANK - RS_ULT), 0, 1);
     let lift = 0;
     if (ult) lift = Math.sin(Math.min(1, k * 1.6) * Math.PI) * 60;
     shadow(x, y, 40 * CHAR_K, 12);
     // (her own ult / cheer frames while she frees herself and thanks; from her ult on in her battle-class outfit, with a flash as she changes)
-    drawAllyStandIn(r.kind, x, y - lift, ult ? { face: 0, ult: true } : t >= RS_THANK ? { face: 0, winT: 1 } : null, t >= RS_ULT ? allyOutfit(r.kind) : "base");
-    if (t >= RS_ULT && t < RS_ULT + 0.5) { const fl = 1 - (t - RS_ULT) / 0.5; glow(x, y - 160, 420, "255,255,255", fl); glow(x, y - 160, 260, (CLS[r.kind] || D).rgb, fl); }
-    if (t >= RS_ULT && t < RS_HIT + 0.6) {
+    drawAllyStandIn(r.kind, x, y - lift, ult ? { face: 0, ult: true } : t >= RS_THANK ? { face: 0, winT: 1 } : null, t >= RS_ULT && !esc ? allyOutfit(r.kind) : "base");
+    if (esc && t >= RS_ULT && t < RS_HIT + 0.6) {
+      // (no powers yet: the cage's own magic bursts out as sparkles and clears the monsters round it)
+      const a = clamp(1 - (t - RS_HIT) / 0.6, 0, 1) * clamp((t - RS_ULT) / 0.3, 0, 1), e = t - RS_ULT;
+      glow(x, y - 120, 420, D.rgb, 0.35 * a);
+      for (let i = 0; i < 14; i++) { const an = i / 14 * TAU + e * 1.4, rr = 120 + (e * 800 + i * 70) % 1100; fx("fx_twinkle", x + Math.cos(an) * rr, y - 80 + Math.sin(an) * rr * 0.62, 1.1, a, e * 6 + i); }
+    }
+    if (!esc && t >= RS_ULT && t < RS_ULT + 0.5) { const fl = 1 - (t - RS_ULT) / 0.5; glow(x, y - 160, 420, "255,255,255", fl); glow(x, y - 160, 260, (CLS[r.kind] || D).rgb, fl); }
+    if (!esc && t >= RS_ULT && t < RS_HIT + 0.6) {
       // her class's power bursts out round the cage (painted pieces, added as light): Simmy's ice ring and lightning, Sammy's javelins,
       // Kairon's golden hammers, Phong's ring of fire and flying rocks
       const a = clamp(1 - (t - RS_HIT) / 0.6, 0, 1) * clamp((t - RS_ULT) / 0.3, 0, 1), e = t - RS_ULT, C = CLS[r.kind];
@@ -3536,7 +3576,12 @@
       const fc = num(a[2]); p.faintT = fc & 16 ? 1 : 0;
       if (isCls(p)) {
         // her friend's health and getting-up ring ([3], [4]: per cent); her walk and facing when not busy (an action keeps its own)
-        p.max = CLS[p.kind].hp; if (a.length > 3) p.hp = clamp(num(a[3]), 0, 100) / 100 * p.max; p.fk = p.faintT > 0 ? clamp(num(a[4]), 0, 100) / 100 : undefined;
+        // (her escort: [5] its phase (1 lead, 2 at the stash, 3 the gear-up, 4 done), [6] its clock x10, [7] / [8] her line and its count)
+        p.escPh = a.length > 5 ? clamp(Math.floor(num(a[5])), 0, 4) : 0; p.escT = a.length > 6 ? num(a[6]) / 10 : 0;
+        if (p.escPh >= 3 && G.stash && G.stash.st < 3 && G.stash.k === p.kind) { G.stash.st = Math.max(G.stash.st, 3); stashOpenFx(G.stash); }
+        if (p.escPh === 3 && p.escT >= ESC.SWAP && !p.geared) { p.geared = true; gearFx(p); }
+        if (a.length > 8 && num(a[8]) !== (p.sayN || 0)) { p.sayN = num(a[8]); const sk = ESC_SAYK[clamp(Math.floor(num(a[7])), 0, 4)]; if (sk) { p.sayL = escLines(p.kind, sk); p.sayT = G.t; } }
+        p.max = escOf(p) && p.escT < ESC.SWAP + (p.escPh === 3 ? 0 : 99) ? ESC.HP : CLS[p.kind].hp; if (a.length > 3) p.hp = clamp(num(a[3]), 0, 100) / 100 * p.max; p.fk = p.faintT > 0 ? clamp(num(a[4]), 0, 100) / 100 : undefined;
         p.moving = !p.act && !(p.faintT > 0) && d * k > 30 * dt;
         if (!p.act) { p.face = clamp(fc & 7, 0, 4); p.flip = !!(fc & 8); }
         return;
@@ -3604,6 +3649,7 @@
   function allyInit(p) {
     const C = CLS[p.kind]; if (!C) return p;
     p.max = C.hp; p.hp = C.hp; p.inv = 0; p.hurtT = 0; p.calm = 99; p.faintT = 0; p.rev = 0; p.act = null; p.chase = null;
+    if (!p.q && escOf(p)) p.max = p.hp = ESC.HP;   // (in her escort: weak)
     p.cd = 0.6 + p.i * 0.25; p.skCd = 1.5 + p.i * 0.7; p.skI = 0; p.auraCd = 0; p.bTok = 1; p.z = 0;
     return p;
   }
@@ -3631,7 +3677,8 @@
   function allyDamage(p, n, fx, fy) {
     const C = CLS[p.kind];
     if (!C || p.faintT > 0 || p.inv > 0) return;
-    const cost = (n >= 2 ? n / 5 * C.hp * ALLY_BOSS_K : n * ALLY_MON_K[clamp(G.level || 0, 0, 4)]) * (bossFight() ? ALLY_BOSSFIGHT_K : 1);
+    const esc = escOf(p), cost = esc ? (n >= 2 ? 2 : 1) : (n >= 2 ? n / 5 * C.hp * ALLY_BOSS_K : n * ALLY_MON_K[clamp(G.level || 0, 0, 4)]) * (bossFight() ? ALLY_BOSSFIGHT_K : 1);
+    if (esc && G.esc && G.t - G.esc.hurtT > ESC.HURT_SAY && p.hp - cost > 0) { G.esc.hurtT = G.t; escSay(p.kind, "hurt"); }
     p.hp = Math.max(0, p.hp - cost); p.inv = ALLY_INV; p.hurtT = 0.3; p.calm = 0;
     const [nx, ny] = norm(p.x - (fx ?? p.x - 1), p.y - (fy ?? p.y)); p.x += nx * 30; p.y += ny * 20;
     if (G.parts.length < 430) burst(p.x, p.y - 150 * CHAR_K, 8, ["#ff9ab8", "#fff"], 220, 0.4);
@@ -3639,7 +3686,7 @@
     if (p.hp <= 0.001) allyFaint(p);
   }
   function allyFaint(p) {
-    p.hp = 0; p.faintT = p.fmax = allyFaintT(); p.rev = 0; p.act = null; p.chase = null; p.z = 0; p.moving = false;
+    p.hp = 0; p.faintT = p.fmax = escOf(p) ? 1e9 : allyFaintT(); p.rev = 0; p.act = null; p.chase = null; p.z = 0; p.moving = false;   // (in her escort she gets up only with a girl beside her)
     play("hurt"); if (G.parts.length < 420) burst(p.x, p.y - 80, 14, ["#fff4c2", "#ffd34d", "#b9a4ff"], 260, 0.6);
     allyLog(p.kind, "faint"); TALLY.allyFaint[p.kind] = (TALLY.allyFaint[p.kind] || 0) + 1;
   }
@@ -3661,6 +3708,7 @@
       if (p.rev >= ALLY_REVIVE_T || p.faintT <= 0) allyRevive(p);
       return;
     }
+    if (escOf(p)) return escortStep(p, dt);   // (no gear yet: she leads the team to it, she does not fight)
     if (p.calm > ALLY_REGEN_WAIT && p.hp < p.max) p.hp = Math.min(p.max, p.hp + p.max * ALLY_REGEN * dt);
     if ((G.quiz || fbShelter(p)) && (p.act || p.chase)) { p.act = null; p.chase = null; p.chaseK = null; p.z = 0; }
     if (p.act) { stepAct(p, dt, true, owner); return; }
@@ -3695,6 +3743,183 @@
     const sp = Math.min(d * 3.2, qz ? 900 : 560) * dt;
     if (d > 4) { p.x += dx / d * sp; p.y += dy / d * sp; p.dist += sp; if (sp > 1) setFace(p, dx, dy); }
     p.moving = sp > 40 * dt;
+  }
+  // ---------------------------------------------------------------- the escort (Dad, "bảo kê": the friend in everyday clothes leads the team to her battle gear)
+  // Each SKSP friend comes out of her cage on her own map (Simmy Màn 1, Kairon Màn 2, Sammy Màn 3, Phong Màn 4) in her everyday clothes
+  // (base art), with no powers: in the film she says her gear is hidden close by and asks the girls to follow and protect her. Then she
+  // walks ahead along the path to her stash (G.stash: the map's painted chest and rack, ESC.AT along the path, before the boss arena) at
+  // ESC.SPD while a girl is within ESC.WAIT of her; further off she stops, turns and calls them (never off the screen); with a girl ahead of
+  // her on the path she runs (ESC.RUN) to catch up. She has ESC.HP health (a monster's hit 1, a big one 2), the monsters go for her first
+  // (ESC.AGGRO), and fainted she stays down until a girl stands by her ALLY_REVIVE_T s (no getting up alone). The map's own hazards never
+  // touch her (only the girls'), so nothing on the path can hold her. At the stash she calls for help and the host sends an ambush (ESC.AMB
+  // a ring, ESC.RINGS rings ESC.GAP s apart, more together and with the party); once it is beaten (all but ESC.LEFT, or after ESC.AMB_MAX s) she opens the
+  // chest: a burst of light, she changes into her battle class (ESC.SWAP into the moment), says her line, and from ESC.GEAR s on fights as
+  // before with her class's full health. The boss's arena waits for her (escPending). Friends from earlier maps come already in their gear.
+  // Co-op: the girl who freed her runs her (G.esc on that page); her phase, the gear-up clock and her lines go in that page's report (gl[14]
+  // [5..8]); the host runs the ambush and the stash's state (world `ss`).
+  const ESC = { AT: 0.6, HP: 3, SPD: 270, RUN: 620, WAIT: 640, NEAR: 430, AGGRO: 2.2, AMB: [5, 6, 7, 8], RINGS: 2, GAP: 5, AMB_MAX: 22, AMB_R: 980,
+    TRIG: 760, GEAR: 3.4, SWAP: 1.4, CALL: 6.5, HURT_SAY: 5, LEFT: 1 };
+  const ESC_ART = ["cd_stash", "pr_stash", "sn_stash", "lv_stash"];   // (each map's painted stash, `<name>` shut and `<name>_open`)
+  const PRON = { simmy: "chị", sammy: "chị", kairon: "anh", phong: "anh" };
+  const ESC_SAY = {
+    go: { simmy: ["Gậy phép của chị bị giấu rồi.", "Theo chị đi lấy, bảo vệ chị nhé!"], kairon: ["Búa của anh bị giấu rồi.", "Theo anh đi lấy, bảo vệ anh nhé!"],
+      sammy: ["Giáo của chị bị giấu rồi.", "Theo chị đi lấy, bảo vệ chị nhé!"], phong: ["Rìu của anh bị giấu rồi.", "Theo anh đi lấy, bảo vệ anh nhé!"] },
+    wait: (k) => ["Đợi đã! Các em", "đi sát " + PRON[k] + " nhé!"],
+    hurt: (k) => ["Ối! Cứu " + PRON[k] + " với!"],
+    stash: (k) => ["Đây rồi! Giữ chân bọn", "quái giúp " + PRON[k] + " nhé!"],
+    gear: { simmy: ["Gậy phép đây rồi!", "Giờ chị đánh được rồi!"], kairon: ["Búa thánh đây rồi!", "Hiệp Sĩ Thánh tới đây!"],
+      sammy: ["Giáo của chị đây rồi!", "Nữ Chiến Binh sẵn sàng!"], phong: ["Rìu của anh đây rồi!", "Đánh thôi nào!"] },
+  };
+  const ESC_SAYK = ["", "wait", "hurt", "stash", "gear"];
+  const escLines = (k, s) => { const v = ESC_SAY[s]; return typeof v === "function" ? v(k) : (v && v[k]) || [""]; };
+  // is this friend in her escort (no gear yet)? her own page: G.esc; the partner's friend: from her page's report
+  const escOf = (p) => !!p && (p.q ? (p.escPh || 0) > 0 && p.escPh < 4 : !!(G.esc && G.esc.k === p.kind && G.esc.ph < 4));
+  // still in her everyday clothes (the gear-up's change comes ESC.SWAP into it)
+  const escBase = (p) => escOf(p) && !((p.q ? p.escPh : G.esc.ph) === 3 && (p.q ? p.escT || 0 : G.esc.t) >= ESC.SWAP);
+  // the map's own friend comes out of her cage for an escort (both pages know it: the stash is the same on both)
+  const escFor = (k) => !!(G.stash && G.stash.k === k && G.stash.st < 3);
+  // the escort friend wherever she is (this page's or the partner's)
+  const escEnt = () => (G.stash ? PETE.find((p) => p.kind === G.stash.k) || QPETE.find((p) => p.kind === G.stash.k) || null : null);
+  // the boss waits for her: she is with the team and her stash is not open yet
+  const escPending = () => !!(G.stash && G.stash.st < 3 && escEnt());
+  // the stash's spot: beside the path ESC.AT along it (moved a little to keep clear of the arena, the lava, the map's hazards, the ambush
+  // spots and the cages, a camp when it can be); none on a map with no friend of its own (Màn 5) or none that fits
+  function placeStash(i, L, path, endI, cages) {
+    const k = (L.pets || []).find((x) => isAlly(x) && PETS[x].lv === i); if (!k || !ESC_ART[i]) return null;
+    const A = G.arena, ok = (x, y, strict) => {
+      if (x < 300 || y < 300 || x > WORLD - 300 || y > WORLD - 300) return false;
+      if (A && d2(x, y, A.x, A.y) < (A.r + 700) ** 2) return false;
+      if ((G.lpools || []).some((o) => lpNear(o, x, y, 260))) return false;
+      if ((G.hz || []).some((o) => inEll(o, x, y, 260))) return false;
+      if ((G.waves || []).some((w) => d2(x, y, w.x, w.y) < (WAVE.R + 500) ** 2)) return false;
+      if (cages.some((c) => d2(x, y, c.x, c.y) < 1100 * 1100)) return false;
+      if (strict && G.camps.some((c) => d2(x, y, c.x, c.y) < (CAMP_R + 380) ** 2)) return false;
+      if (G.chests.some((c) => d2(x, y, c.x, c.y) < 260 * 260)) return false;
+      return true;
+    };
+    for (const strict of [true, false]) for (let n = 0; n <= 24; n++) {
+      const f = ESC.AT + (n % 2 ? 1 : -1) * Math.ceil(n / 2) * 0.01, si = clamp(Math.round(f * path.len / STEP), 5, endI - 4), [dx, dy] = pathDir(si);
+      for (const side of [1, -1]) {
+        const x = path.x[si] - dy * side * (PATH_W / 2 + 95), y = path.y[si] + dx * side * (PATH_W / 2 + 95);
+        if (ok(x, y, strict) && ok(path.x[si], path.y[si], strict)) return { k, art: ESC_ART[i], x, y, si, sx: path.x[si] - dy * side * 40, sy: path.y[si] + dx * side * 40 + 30, st: 0, t: 0, ring: 0, rings: ESC.RINGS };
+      }
+    }
+    return null;
+  }
+  // the escort starts (this page's girl freed her): she stands where the film left her, her everyday clothes, ESC.HP health
+  function startEscort(k) {
+    const p = PETE.find((e) => e.kind === k); if (!p || !G.stash) return;
+    const ns = nearestSample(p.x, p.y, 900);
+    G.esc = { k, ph: 1, t: 0, si: ns.i >= 0 ? Math.min(ns.i, G.stash.si) : G.stash.si, say: 0, sayN: 0, sayT: -99, callT: 0, hurtT: -99 };
+    p.max = p.hp = ESC.HP; p.faintT = 0; p.act = null; p.chase = null; p.inv = 1.5;
+    allyLog(k, "escort");
+  }
+  // a line over her (both pages: her page sends its number)
+  function escSay(k, s) { const E = G.esc; if (!E) return; E.say = ESC_SAYK.indexOf(s); E.sayN++; E.sayT = G.t; const p = PETE.find((e) => e.kind === k); if (p) { p.sayL = escLines(k, s); p.sayT = G.t; } }
+  // the path point a share `si` along it (a fraction of a step between two points)
+  function pathAt(si) { const p = G.path, i = clamp(Math.floor(si), 0, p.n - 1), j = Math.min(p.n - 1, i + 1), f = clamp(si - i, 0, 1); return [lerp(p.x[i], p.x[j], f), lerp(p.y[i], p.y[j], f)]; }
+  // how far along the path a girl is, looked for round the escort's own place (the path doubles back in places)
+  function idxNear(x, y, i0, span) { const p = G.path; let bi = i0, bd = Infinity; for (let i = Math.max(0, Math.floor(i0 - span)); i <= Math.min(p.n - 1, i0 + span); i++) { const d = d2(x, y, p.x[i], p.y[i]); if (d < bd) { bd = d; bi = i; } } return [bi, Math.sqrt(bd)]; }
+  // ---- her turn on her page (instead of fighting): lead, wait, the stash, the gear-up
+  function escortStep(p, dt) {
+    const E = G.esc, S = G.stash, C = CLS[p.kind]; E.t += dt;
+    const gs = (Q && NET.role ? [P, Q] : [P]).filter((g) => !g.dead);
+    let near = Infinity, front = -1;
+    for (const g of gs) { near = Math.min(near, Math.hypot(g.x - p.x, g.y - p.y)); const ns = nearestSample(g.x, g.y, 1600); if (ns.i >= 0) front = Math.max(front, ns.i); }   // (how far along the path the girl furthest on is: the arena's middle is its last point)
+    p.act = null; p.chase = null; p.z = 0;
+    if (E.ph === 1) {
+      // (the girls far ahead / gone off somewhere: she is with them again at once, as a follower is)
+      E.farT = near > 1800 && front > E.si ? (E.farT || 0) + dt : 0;
+      if (E.farT > 3) { E.farT = 0; E.si = Math.min(S.si, front - 3); [p.x, p.y] = pathAt(E.si); }
+      let sp = 0;
+      if (front > E.si + 6) sp = ESC.RUN;   // (a girl ahead of her: she hurries after)
+      else if (near < ESC.WAIT) sp = near < ESC.NEAR ? ESC.SPD : ESC.SPD * 0.6;
+      const [tx, ty] = pathAt(E.si), off = Math.hypot(tx - p.x, ty - p.y);
+      if (sp > 0 && off < 120) E.si = Math.min(S.si, E.si + sp * dt / STEP);
+      const [ax, ay] = E.si >= S.si - 0.01 ? [S.sx, S.sy] : pathAt(E.si), dx = ax - p.x, dy = ay - p.y, d = Math.hypot(dx, dy);
+      const mv = Math.min(d, Math.max(sp, off > 40 && near < ESC.WAIT ? ESC.SPD : 0) * dt);
+      if (d > 2 && mv > 0) { p.x += dx / d * mv; p.y += dy / d * mv; p.dist += mv; setFace(p, dx, dy); p.moving = mv > 30 * dt; }
+      else p.moving = false;
+      if (!p.moving && gs.length) { const g = gs.reduce((a, b) => (d2(a.x, a.y, p.x, p.y) < d2(b.x, b.y, p.x, p.y) ? a : b)); setFace(p, g.x - p.x, g.y - p.y); }   // (waiting: she looks back at the girls)
+      if (sp === 0 && near > ESC.WAIT && G.t - E.sayT > ESC.CALL) escSay(p.kind, "wait");
+      if (E.si >= S.si - 0.01 && d < 30) { E.ph = 2; E.t = 0; escSay(p.kind, "stash"); allyLog(p.kind, "stash"); }
+      return;
+    }
+    p.moving = false; setFace(p, S.x - p.x, S.y - p.y);
+    if (Math.hypot(S.sx - p.x, S.sy - p.y) > 60) { const [nx, ny] = norm(S.sx - p.x, S.sy - p.y); p.x += nx * Math.min(ESC.SPD * dt, 60); p.y += ny * Math.min(ESC.SPD * dt, 60); p.moving = true; }
+    if (E.ph === 2) {
+      if (S.st >= 2) { E.ph = 3; E.t = 0; S.st = 3; S.t = 0; stashOpenFx(S); allyLog(p.kind, "gear"); }
+      return;
+    }
+    // the gear-up: the chest opens (S.st 3), a column of light, the change ESC.SWAP into it, her line; then she fights
+    p.inv = Math.max(p.inv, 0.5);
+    if (E.t - dt < ESC.SWAP && E.t >= ESC.SWAP) { gearFx(p); p.max = C.hp; p.hp = C.hp; escSay(p.kind, "gear"); }
+    if (E.t >= ESC.GEAR) {
+      E.ph = 4; p.max = C.hp; p.hp = C.hp; p.cd = 0.3; p.skCd = 0.5;
+      showBanner(PETS[p.kind].name + " đã mặc đồ chiến đấu!", PETS[p.kind].tip);
+      allyLog(p.kind, "fight");
+    }
+  }
+  // the stash bursts open (both pages)
+  function stashOpenFx(S) {
+    if (S.fxd) return; S.fxd = true; S.openT = G.t;
+    SFX.chest(); SFX.unlock(); G.shake = Math.max(G.shake, 8);
+    burst(S.x, S.y - 90, 46, ["#ffd34d", "#fff4c2", "#ffffff", "#ffe08a"], 560, 1);
+    G.parts.push({ type: "fx", name: "fx_rays", x: S.x, y: S.y - 110, sc: 0.9, life: 1.2, max: 1.2, grow: 0.8 });
+  }
+  // she changes into her battle class (both pages): a flash of light round her, painted sparkles flying out, rays behind her
+  function gearFx(p) {
+    const C = CLS[p.kind]; SFX.charge && SFX.charge(); SFX.level && SFX.level(); G.shake = Math.max(G.shake, 10);
+    burst(p.x, p.y - 160, 60, ["#ffffff", "#fff4c2", "#ffd34d", "rgb(" + C.rgb + ")"], 640, 1.1);
+    G.parts.push({ type: "fx", name: "fx_rays", x: p.x, y: p.y - 170, sc: 1.1, life: 1.3, max: 1.3, grow: 1 });
+    for (let i = 0; i < 16; i++) G.parts.push({ type: "fx", name: "fx_twinkle", x: p.x + rnd(-170, 170), y: p.y - rnd(40, 360), sc: rnd(0.5, 1), life: rnd(0.7, 1.2), max: 1.2, grow: 0.6 });
+    G.parts.push({ type: "ring", x: p.x, y: p.y - 30, r: 40, vr: 1500, life: 0.7, max: 0.7, col: C.rgb });
+  }
+  // ---- the ambush at the stash (the host): the escort friend there and a girl close by
+  function updateStash(dt) {
+    const S = G.stash; if (!S || S.st >= 2) return;
+    const e = escEnt(); if (!e) return;
+    const at = e.q ? e.escPh === 2 : !!(G.esc && G.esc.k === e.kind && G.esc.ph === 2);
+    if (S.st === 0) {
+      if (!at || !girls().some((g) => !g.dead && d2(g.x, g.y, S.x, S.y) < ESC.TRIG ** 2)) return;
+      S.st = 1; S.t = 0; S.ring = 0; S.mons = []; ambushFx(S);
+    }
+    S.t += dt;
+    while (S.ring < S.rings && S.t >= S.ring * ESC.GAP) stashRing(S, S.ring++);
+    if ((S.ring >= S.rings && S.mons.filter((m) => m.alive).length <= ESC.LEFT) || S.t > ESC.AMB_MAX) { TALLY.stash = (TALLY.stash || []).concat(+S.t.toFixed(1)); S.st = 2; S.t = 0; }
+  }
+  function stashRing(S, k) {
+    const n = Math.round(ESC.AMB[clamp(G.level, 0, 3)] * (girls().length > 1 ? WAVE.COOP : 1) * partyNum());
+    for (let j = 0; j < n; j++) {
+      if (aliveCount() >= MAX_MONS) break;
+      const a = (j + (k % 2) * 0.5) / n * TAU + rnd(-0.15, 0.15), rr = ESC.AMB_R + rnd(0, 140);
+      const m = spawnMon(pickKind(), clamp(S.x + Math.cos(a) * rr, 120, WORLD - 120), clamp(S.y + Math.sin(a) * rr, 120, WORLD - 120), k === S.rings - 1 && j === 0 && G.level > 0, true);
+      setFace(m, -Math.cos(a), -Math.sin(a)); S.mons.push(m);
+    }
+    if (d2(P.x, P.y, S.x, S.y) < 2200 * 2200) { SFX.roar(); G.shake = Math.max(G.shake, 6); }
+  }
+  function ambushFx(S) {
+    const D = PETS[S.k];
+    showBanner("Quái phục kích!", "Giữ chân quái để " + D.name + " lấy đồ chiến đấu!");
+    SFX.horn && SFX.horn(); G.waveFlash = 1; G.shake = Math.max(G.shake, 8);
+  }
+  // her line over her head (this page's or the partner's friend), up for its lineTime
+  function drawEscSay() {
+    for (const p of [...PETE, ...QPETE]) {
+      if (!p.sayL || G.t - p.sayT > lineTime(p.sayL.join(" ")) || !(p.q ? p.escPh : 1)) continue;
+      const t = G.t - p.sayT, L = lineTime(p.sayL.join(" ")), k = Math.min(clamp(t / SAY_FADE, 0, 1), clamp((L - t) / SAY_FADE, 0, 1));
+      const [bx, by] = bubbleInView(p.sayL, p.x, p.y - CHAR_H[p.kind] - 60, 44 * WT);
+      talkBubble(p.sayL, bx, by, k, 44 * WT);
+    }
+  }
+  // the stash: shut (its rack full) until it opens, then open and glowing; a light over it and the hint while the escort is on
+  function drawStash(S) {
+    const f = FR[S.st >= 3 ? S.art + "_open" : S.art] || FR[S.art];
+    if (API.drawn) API.drawn.push(["stash", S.art + (S.st >= 3 ? "_open" : ""), S.st]);
+    const p = 0.5 + 0.5 * Math.sin(G.t * 3);
+    if (S.st < 3 && escEnt()) { glow(S.x, S.y - 80, 260, "255,220,120", 0.25 + 0.15 * p); }
+    if (S.st >= 3 && S.openT !== undefined) glow(S.x, S.y - 120, 320, "255,230,150", 0.5 * clamp(1 - (G.t - S.openT) / 6, 0, 1));
+    if (f) spr(S.st >= 3 ? S.art + "_open" : S.art, S.x, S.y);
   }
   // somebody hurt near Kairon (a girl short of hearts, a friend under 70 %, one fainted)
   function auraNeeded(p) {
@@ -3891,6 +4116,7 @@
   // the aura reaching this page's friends
   function auraOn(x, y) {
     for (const e of PETE) if (isCls(e) && d2(e.x, e.y, x, y) < AURA_R * AURA_R) {
+      if (e.faintT > 0 && escOf(e)) continue; // Escort revival requires a girl beside the friend.
       if (e.faintT > 0) allyRevive(e, 0.5);
       else e.hp = Math.min(e.max, e.hp + e.max * 0.35);
       if (G.parts.length < 420) burst(e.x, e.y - 140, 8, ["#fff4c2", "#7cf2c6", "#ffd34d"], 200, 0.5);
@@ -3967,7 +4193,7 @@
   }
   // ---- drawing a friend in battle: the class frame for what she is doing, a small health bar over her head
   function allyFrame(p) {
-    const k = p.kind, of = allyOutfit(k), a = p.act, side = p.flip ? "l" : "r";
+    const k = p.kind, of = escBase(p) ? "base" : allyOutfit(k), a = p.act, side = p.flip ? "l" : "r";
     const pick = (pose) => outfitFrame(k, of, /^atk\d$/.test(pose) ? "atk" + side + pose.slice(3) : pose);
     if (p.faintT > 0) return pick("faint");
     if (a) {
@@ -3976,7 +4202,8 @@
       const sp = SKP[a.k];
       if (sp) { for (const [u, f] of sp) if (a.t < u) return pick(f); return pick(sp[sp.length - 1][1]); }
     }
-    return heroFrame4({ char: k, outfit: of, face: p.face, flip: !!p.flip, moving: !!p.moving, dist: p.dist });
+    const gear = escOf(p) && (p.q ? p.escPh : G.esc.ph) === 3;   // (the gear-up: cheering in front of her stash)
+    return heroFrame4({ char: k, outfit: of, face: gear ? 0 : p.face, flip: !!p.flip, moving: !gear && !!p.moving, dist: p.dist, winT: gear ? 1 : 0 });
   }
   function drawClassAlly(p) {
     if (G.rescue && G.rescue.kind === p.kind) return;   // (the rescue film draws her)
@@ -4127,7 +4354,16 @@
     const BD = G.lvl.boss || {};
     if (c.ph === "intro" && BD.final) { if (G.boss && G.boss.st === "enter" && NET.role !== "guest") fbAfterIntro(G.boss); }
     else if (c.ph === "intro") { if (G.boss && G.boss.st === "enter" && NET.role !== "guest") { G.boss.st = "walk"; G.boss.t = 0; } showBanner(BD.name + "!", BD.tip || ""); }
+    else if (c.ph === "die") { const W = handoffSeq(); if (W) G.say = { seq: W, t: -0.4, hand: true }; }
   }
+  // the hand-off talk of this map (G.lvl.handoff), its lines whose speakers are with the team (the girls always); none without the friend
+  // freed here (her cage left shut)
+  function handoffSeq() {
+    const W = G.lvl && G.lvl.handoff && SAYS[G.lvl.handoff]; if (!W) return null;
+    const here = new Set(["mochi", "matcha", ...PETE.map((p) => p.kind), ...QPETE.map((p) => p.kind)]);
+    return here.has(W[0][0]) ? W.filter(([k]) => here.has(k)) : null;
+  }
+  const handOn = () => !!(G.say && G.say.hand);
   function updateBossCut(dt) {
     const c = G.bcut, B = G.boss; if (!c) return;
     if (!B) { G.bcut = null; return; }
@@ -4273,7 +4509,7 @@
   function updateBoss(dt) {
     const B = G.boss; if (!B) return;
     B.t += dt; B.flash -= dt; B.hurtPose -= dt; B.iT -= dt; B.morphFlash = (B.morphFlash || 0) - dt;
-    if (!B.alive) { B.die += dt; if (!G.bcut && B.die > BD_END && G.mode === "play" && !G.won && !G.portal) endLevel(); return; }
+    if (!B.alive) { B.die += dt; if (!G.bcut && B.die > BD_END && G.mode === "play" && !G.won && !G.portal && !handOn()) endLevel(); return; }   // (after the hand-off talk)
     // (fast: his second form's bigger moves; k: how much faster than before his moves come)
     const T = targetFor(B.x, B.y), dx = T.x - B.x, dy = T.y - B.y, d = Math.hypot(dx, dy) || 1, fast = B.phase === 2, k = bossTempo(B), A = G.arena;
     if (B.st === "quiz") return updateQuiz(B, dt);
@@ -7481,6 +7717,8 @@
   function guideTarget() {
     const B = G.boss, p = G.path;
     if (B && B.alive) return { x: B.x, y: B.y, boss: true };
+    // the escort: to her when she has fainted (stand by her) or walks ahead, to her stash once she is there
+    { const e = escPending() && escEnt(); if (e) { const ph = e.q ? e.escPh : G.esc && G.esc.k === e.kind ? G.esc.ph : 1; return e.faintT > 0 || ph === 1 ? { x: e.x, y: e.y + 20, esc: true } : { x: G.stash.sx, y: G.stash.sy + 70, esc: true }; } }
     // a friend still locked in her big cage close by: the arrow leads the girl there first
     for (const c of G.cages) if (c.big && !c.open && !c.botSkip && d2(P.x, P.y, c.x, c.y) < CAGE_GUIDE_R * CAGE_GUIDE_R) return { x: c.x, y: c.y, cage: true };
     const goal = G.portal || G.arena, i = P.prog + 16;
@@ -7573,7 +7811,7 @@
   }
   function hostWorld(dt) {
     updateSpawns(dt);
-    updateGuards(dt); updateWaves(dt);
+    updateGuards(dt); updateWaves(dt); updateStash(dt);
     const qzHold = G.quiz && G.arena;
     aggroCount();
     for (const m of G.mons) {
@@ -7611,7 +7849,10 @@
       if (G.portal.open && !P.winT && girls().some((g) => !g.dead && d2(g.x, g.y, G.portal.x, G.portal.y - 30) < 95 * 95)) enterPortal();
     }
     const A = G.arena;
-    if (A && A.open && !G.boss && girls().some((g) => !g.dead && d2(g.x, g.y, A.x, A.y) < (A.r - 200) ** 2)) startBoss();
+    if (A && A.open && !G.boss && girls().some((g) => !g.dead && d2(g.x, g.y, A.x, A.y) < (A.r - 200) ** 2)) {
+      if (!escPending()) startBoss();
+      else if (G.t - (G.escGateT ?? -99) > 6) { G.escGateT = G.t; const e = escEnt(); showBanner("Khoan đã!", "Bảo vệ " + PETS[e.kind].name + " lấy đồ chiến đấu trước nhé"); }   // (the boss waits for her)
+    }
   }
   // the boss's film is over: a level with a `shop` (Màn 1) has Simmy lead the team off to the clothes shop for the next land (Màn 2 starts
   // there; the ship that used to come first is parked), the others open a magic gate
@@ -8485,9 +8726,9 @@
     const ux = dx / d, uy = dy / d, r = 150 + Math.sin(G.t * 5) * 10, x = P.x + ux * r, y = P.y - 20 + uy * r * 0.75;
     const goal = T.goal && (G.portal || G.arena).open;
     ctx.save(); ctx.translate(x, y); ctx.rotate(Math.atan2(uy * 0.75, ux));
-    glow(0, 0, 70, goal ? "192,139,255" : T.cage ? "255,140,210" : "255,220,120", 0.55);
+    glow(0, 0, 70, goal ? "192,139,255" : T.cage || T.esc ? "255,140,210" : "255,220,120", 0.55);
     ctx.beginPath(); ctx.moveTo(38, 0); ctx.lineTo(-14, -30); ctx.lineTo(-2, 0); ctx.lineTo(-14, 30); ctx.closePath();
-    ctx.fillStyle = goal ? "#e0b8ff" : T.cage ? "#ff9ad5" : "#ffd34d"; ctx.fill(); ctx.lineWidth = 5; ctx.strokeStyle = "rgba(60,30,0,.55)"; ctx.stroke();
+    ctx.fillStyle = goal ? "#e0b8ff" : T.cage || T.esc ? "#ff9ad5" : "#ffd34d"; ctx.fill(); ctx.lineWidth = 5; ctx.strokeStyle = "rgba(60,30,0,.55)"; ctx.stroke();
     ctx.restore();
   }
   // markers at the screen edge for things out of view: the open gate, the partner
@@ -9231,6 +9472,7 @@
     for (const c of G.chests) if (c.x > L - 150 && c.x < R + 150 && c.y > T - 50 && c.y < B + 200) add(c.y, 5, c);
     for (const c of waveBoxes(true)) if (c.x > L - 150 && c.x < R + 150 && c.y > T - 50 && c.y < B + 200) add(c.y, 5, c);
     for (const c of G.cages) if (c.x > L - 150 && c.x < R + 150 && c.y > T - 50 && c.y < B + 300) add(c.y, 6, c);
+    if (G.stash && G.stash.x > L - 300 && G.stash.x < R + 300 && G.stash.y > T - 50 && G.stash.y < B + 400) add(G.stash.y, 14, G.stash);
     if (G.portal && G.portal.x > L - 250 && G.portal.x < R + 250 && G.portal.y > T - 50 && G.portal.y < B + 400) add(G.portal.y, 7, G.portal);
     if (G.mode !== "title") for (const p of PETE) add(p.y, 8, p);
     if (Q && NET.role) for (const p of QPETE) add(p.y, 8, p);
@@ -9256,6 +9498,7 @@
         case 11: drawWaterPiece(o); break;
         case 12: drawLavaPiece(o); break;
         case 13: drawHexPiece(o); break;
+        case 14: drawStash(o); break;
       }
       if (wa < 1) ctx.restore();
     }
@@ -9277,7 +9520,7 @@
     drawBlizzard(L, R, T, B);
     drawQuizNums(); drawQuizRain();
     drawBossTalk(L, T, R, B);
-    drawWalkTalk(); drawSay();
+    drawWalkTalk(); drawSay(); drawEscSay();
     drawRescue();
     drawParts(L, R, T, B);
     drawCombo(L, T);
@@ -9359,7 +9602,9 @@
   function updateQuest() {
     const el = $("quest"), goal = G.portal || G.arena;
     let html = "", open = false;
+    const e = !G.boss && escPending() && escEnt(), en = e && PETS[e.kind].name;
     if (G.boss) html = "";
+    else if (e) html = e.faintT > 0 ? `<b>${en}</b> ngất rồi! Đứng cạnh để đỡ dậy` : (e.q ? e.escPh : G.esc && G.esc.ph) >= 2 ? `Giữ chân quái để <b>${en}</b> lấy đồ!` : `Bảo vệ <b>${en}</b> tới chỗ cất đồ chiến đấu`;
     else if (goal && !goal.open) html = `${G.portal ? "Mở cổng phép" : "Mở đấu trường"}: hạ thêm <b>${quotaLeft()}</b> quái`;
     else if (goal) { open = true; html = G.portal ? "Cổng phép đã mở! Đi theo mũi tên" : "Vào đấu trường gặp " + ((G.lvl.boss && G.lvl.boss.name) || "trùm") + "!"; }
     if (html === questTxt) return;
@@ -9430,7 +9675,9 @@
     if (i === 0) P.outfit = "base";
     // her pet: rescued on the way in Màn 1, already with her when she starts further on
     // (the friends of everyone are with her once their level is behind her: Simmy from Màn 2 on, Kairon from Màn 3, Sammy from Màn 4)
-    P.pets = i > 0 ? Object.keys(PETS).filter((k) => PETS[k].owner === hero || (isAlly(k) && PETS[k].lv < i)) : [];
+    // (together each friend is there once for the team (Dad: two Simmys, two Kairons when they started at a later map): the host's girl
+    // takes Simmy and Sammy, the guest's Kairon and Phong (pickerAlly); each girl's own pet is hers alone)
+    P.pets = i > 0 ? Object.keys(PETS).filter((k) => PETS[k].owner === hero || (isAlly(k) && PETS[k].lv < i && pickerAlly(k))) : [];
     G.sksp = ["", "", "", ""]; G.cine = null; G.rescue = null; G.shopPhase = 0; G.say = null; G.pmode = null;
     if ($("hud").dataset.ship) shipUiOff();   // (a new game from the ship)
     for (const k of Object.keys(PETS)) if (isAlly(k) && PETS[k].lv < i) G.sksp[ALLY_LETTER[k]] = SKSP_L[ALLY_LETTER[k]];
@@ -9466,6 +9713,9 @@
   // button (or anything else unknown) starts at Màn 1
   // ("Màn 3: Núi Tuyết" / "Màn 4: Núi Dung Nham" / "Màn 5: Lâu Đài" start straight on that map with what the maps before it gave: their friends and letters,
   // LATER_STARS a map, her level)
+  // a friend from the maps before a later start: with this page's girl? (alone: all of them; together: Simmy and Sammy with the host's,
+  // Kairon and Phong with the guest's, so the team has each once and both girls have friends beside them)
+  const pickerAlly = (k) => !NET.role || (ALLY_LETTER[k] % 2 === 0) === (NET.role === "host");
   const STARTS = { man1: "selMan1", man2: "selMan2", man3: "selMan3", man4: "selMan4", man5: "selMan5" }, START_LV = { man3: 2, man4: levelIdx("lava"), man5: levelIdx("castle") }, LATER_STARS = 100;
   let startAt = "man1";
   function readStart() {
@@ -11908,10 +12158,11 @@
   function drawSay() {
     if (!G.say || G.cine || G.rescue || G.bcut) return;
     const say = sayAt(G.say.seq, G.say.t); if (!say) return;
-    const [spk, lines] = G.say.seq[say.i], sm = PETE.find((e) => e.kind === "simmy");
-    const at = spk === "simmy" ? (sm ? [sm.x, sm.y - CHAR_H.simmy - 50] : [P.x, P.y - CHAR_H[hero] - 40]) : girlSpot(spk);
+    const [spk, lines] = G.say.seq[say.i], sm = PETE.find((e) => e.kind === spk) || QPETE.find((e) => e.kind === spk);
+    const at = PETS[spk] ? (sm ? [sm.x, sm.y - (CHAR_H[spk] || 300) - 50] : [P.x, P.y - CHAR_H[hero] - 40]) : girlSpot(spk);
     const [bx, by] = bubbleInView(lines, at[0], at[1], 44 * WT);   // (kept in view and under the HUD's map name and quest pill)
     talkBubble(lines, bx, by, say.k, 44 * WT);
+    if (API.saidAt) API.saidAt.push([lines.join(" "), bx, by, G.camX, G.camY, VW, VH, spk]);
   }
 
   // ---------------------------------------------------------------- Simmy leads the team off to the clothes shop (after the candy boss)
@@ -12387,7 +12638,11 @@
   }
   function partnerLeft(lost) {
     const wasGuest = NET.role === "guest", msg = lost ? "Mất kết nối với bạn kia" : "Bạn kia đã rời phòng", ship = onShip();
+    // (the girl who goes on alone takes her sister's friends: each friend is there once for the team, and none is lost with the link)
+    const adopt = !wasGuest && Q && G.mode === "play" ? (Q.pets || []).filter((k) => isAlly(k) && !P.pets.includes(k)) : [];
+    const qpos = new Map(QPETE.map((e) => [e.kind, [e.x, e.y]]));
     leaveCoop();
+    if (adopt.length) { P.pets.push(...adopt); makePetEnts(); for (const e of PETE) { const at = qpos.get(e.kind); if (at) { e.x = at[0]; e.y = at[1]; } } if (G.stash && adopt.includes(G.stash.k) && G.stash.st < 3) startEscort(G.stash.k); }
     if (ship) shipSolo();   // (on the ship either page goes on alone: its SHIP is the whole level)
     if (wasGuest && G.mode !== "title" && !ship && G.mode !== "finale" && !(G.mode === "win" && !$("endHomeBtn").hidden)) { toTitle(); showBanner(msg, "Vào phòng lại nhé"); }   // (the end of the game stays on its own end screen)
     else showBanner(msg, "Bé chơi tiếp một mình");
@@ -12506,7 +12761,7 @@
   function girlState() {
     const bits = (P.dead ? 1 : 0) | (P.inv > 0 ? 2 : 0) | (P.slowT > 0 ? 4 : 0) | (P.castT > 0.1 ? 8 : 0) | (P.winT ? 16 : 0) | (P.flip ? 32 : 0) | (G.mode === "pause" ? 64 : 0) | (G.story ? 128 : 0) | (SH.open ? 256 : 0) | (SH.open && SH.done ? 512 : 0);   // (64: this page is paused; 128: it shows a story card; 256: its shop is open, 512: its girl is ready there)
     return [P.x | 0, P.y | 0, P.face, (G.mode === "play" && P.fn) || "", bits, ELS.indexOf(P.elem), G.ult ? Math.round(G.ult.t * 10) : 0, hero, G.hearts, 0, P.vx | 0, P.vy | 0, P.pets.join(","), P.lv,
-      PETE.map((p) => [p.x | 0, p.y | 0, p.face + (p.flip ? 8 : 0) + (p.faintT > 0 ? 16 : 0), ...(isCls(p) ? [Math.round(100 * p.hp / p.max), p.faintT > 0 ? Math.round(100 * clamp(Math.max(p.rev / ALLY_REVIVE_T, 1 - p.faintT / (p.fmax || ALLY_FAINT_T)), 0, 1)) : 0] : [])]), P.dead ? Math.round((1 - clamp(G.reviveT / FAINT_T, 0, 1)) * 100) : 0, P.helped ? 1 : 0, P.elem ? Math.ceil(P.elemT * 10) : 0, P.outfit || "base", onShip() && SHIP.ph !== "dock" ? 1 : 0, rodSlot(), onShip() && NET.role === "guest" && SHIPX.mine.length ? SHIPX.mine : 0];   // [18] = outfit id (`of`); older copies send 18 slots; [19] = on the ship's deck (x, y are deck px then); [20] = her fishing rod (rodSlot) or 0; [21] = a guest's last landed fish on the ship ([[id, kind], ...]) or 0
+      PETE.map((p) => [p.x | 0, p.y | 0, p.face + (p.flip ? 8 : 0) + (p.faintT > 0 ? 16 : 0), ...(isCls(p) ? [Math.round(100 * p.hp / p.max), p.faintT > 0 ? Math.round(100 * clamp(Math.max(p.rev / ALLY_REVIVE_T, 1 - p.faintT / (p.fmax || ALLY_FAINT_T)), 0, 1)) : 0, ...(G.esc && G.esc.k === p.kind ? [G.esc.ph, Math.round(G.esc.t * 10), G.esc.say, G.esc.sayN] : [])] : [])]), P.dead ? Math.round((1 - clamp(G.reviveT / FAINT_T, 0, 1)) * 100) : 0, P.helped ? 1 : 0, P.elem ? Math.ceil(P.elemT * 10) : 0, P.outfit || "base", onShip() && SHIP.ph !== "dock" ? 1 : 0, rodSlot(), onShip() && NET.role === "guest" && SHIPX.mine.length ? SHIPX.mine : 0];   // [18] = outfit id (`of`); older copies send 18 slots; [19] = on the ship's deck (x, y are deck px then); [20] = her fishing rod (rodSlot) or 0; [21] = a guest's last landed fish on the ship ([[id, kind], ...]) or 0
   }
   function worldState() {
     const B = G.boss, near = Q ? (o) => d2(o.x, o.y, Q.x, Q.y) < 1900 * 1900 : () => true;
@@ -12535,6 +12790,7 @@
       it: bitsOf(G.items), ch: bitsOf(G.chests), cg: bitsOf(G.cages),
       gd: G.cages.map((c) => (c.gd === undefined ? "-" : c.gd)).join(""),   // each cage's guardian (- none, 0 not yet, 1 waiting, 2 awake, 3 beaten)
       wv: (G.waves || []).map((w) => [w.st, Math.round(w.t * 20), w.box && w.box.open ? 1 : 0, w.off ? 1 : 0]),   // the ambushes: state, clock, its chest
+      ss: G.stash ? G.stash.st : -1,   // the escort's stash: 0 waiting, 1 its ambush, 2 beaten, 3 open
       sp: onShip() ? shipState() : 0,   // the ship (host-owned), compact: see shipState
       sc: G.story ? 1 : 0,   // (the host's page shows a story card: the guest's world waits too)
       sh: G.shopPhase || 0, po: G.portal && G.portal.open ? 1 : 0, ao: G.arena && G.arena.open ? 1 : 0, al: G.arenaLock ? 1 : 0, st: G.stars, k: G.kills, lk: G.lvKills, won: G.won ? 1 : 0, cp: G.camps.map((c) => c.st * 1000 + Math.max(0, c.left)),
@@ -12787,6 +13043,7 @@
     flags(w.cg, G.cages, (c) => openCageFx(c));
     if (typeof w.gd === "string") G.cages.forEach((c, i) => { const v = w.gd[i]; if (v === undefined || v === "-" || c.gd === undefined) return; const n = clamp(num(+v), 0, 3); if (n === c.gd) return;
       if (n === 2 && c.gd < 2) guardWakeFx(c); if (n === 3) guardBeatenFx(c, null); c.gd = n; });
+    if (G.stash && typeof w.ss === "number" && w.ss > G.stash.st) { const st = clamp(Math.floor(w.ss), 0, 3); if (st === 1) ambushFx(G.stash); if (st >= 3) stashOpenFx(G.stash); G.stash.st = st; }   // (never back: her page opens it first)
     if (Array.isArray(w.wv)) w.wv.forEach((a, i) => { const o = G.waves[i]; if (!o || !Array.isArray(a)) return; const st = clamp(num(a[0]), 0, 3), t = num(a[1]) / 20;
       o.off = !!a[3];
       if (st !== o.st) { if (st >= 1 && o.st === 0) waveStartFx(o); if (st === 3) waveEndLocal(o); o.st = st; o.t = t; }
@@ -12937,7 +13194,7 @@
   }
   // test hooks for automated checks. __sksp.autopilot = true makes this girl walk the path on her own.
   const API = window.__sksp = {
-    G, P, IN, joy, keys, NET, FR, LEVELS, MON, HEROES, PETS, TIERS, startGame, buildLevel, toTitle, snowSlow, nextLevelAfter, levelIdx,
+    G, P, IN, joy, keys, NET, FR, LEVELS, MON, HEROES, PETS, TIERS, startGame, sendStart, buildLevel, toTitle, snowSlow, nextLevelAfter, levelIdx,
     autopilot: false,
     trial: false,   // the game has its real end now (Màn 5's finale and the end screen); sim.js / coop.js print WIN (tests read this)
     FB, FB_SAY, FB_MOVES, FB_GEO, LTS, fbIn, fbHurts, fbDodge, fbTalk, fbLts, fbThrone, fbMove, fbDark, bossOpen: (B) => bossOpen(B || G.boss), bossR: (B) => bossR(B || G.boss), updateBossBar,
@@ -12964,6 +13221,9 @@
     damageBoss: (n) => damageBoss(n, 0, 0, false, true), makeSum, carryShare, ULT_SELF_T, WT, hudMidY, nextQuestion,
     // (party scaling, champions, who the monsters go for: Dad's "Game khó hơn" 1, 2, 5)
     PARTY, partyN, partyHp, CHAMP, AFFIX, AGGRO, champShare, setPets: (list) => { P.pets = list.slice(); makePetEnts(); },
+    ESC, ESC_SAY, targetFor, escOf, escFor, escEnt, escPending, startEscort, stash: () => G.stash, esc: () => G.esc, handoffSeq,
+    // (a test hook: the escort over at once, in her gear: the older tests' friends fight as soon as they are out)
+    escSkip: () => { const S = G.stash; if (S) S.st = 3; if (G.esc) { G.esc.ph = 4; const p = PETE.find((e) => e.kind === G.esc.k); if (p) { p.max = p.hp = CLS[p.kind].hp; if (p.faintT > 0) { p.faintT = 0; p.rev = 0; } } } },
     spawnChamp: (kind, x, y, k) => { const m = spawnMon(kind, x, y); makeChamp(m, k); return m; },
     rollMon: (kind, x, y, pre) => spawnMon(kind, x, y, false, true, pre), hitMon: (m, n, by = "p") => damageMon(m, n, m.x - 50, m.y, false, by),
     tally: TALLY, GUARDS, GUARD, WAVES, WAVE, waves: () => G.waves || [], waveOk, beatGuards, lpNear, SFX, guardLocked,   // (the cage guardians and the ambushes)
