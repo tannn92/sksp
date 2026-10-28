@@ -394,9 +394,13 @@
   if (window.visualViewport) window.visualViewport.addEventListener("resize", fit);
   document.addEventListener("fullscreenchange", fit);
   document.addEventListener("webkitfullscreenchange", fit);
-  // Called synchronously from Play taps: iPad fullscreen requires user activation.
-  // Unsupported/denied requests leave the already playable viewport in place.
+  // Only iPad enters fullscreen on Play. Android immersive mode hides system
+  // navigation and consumes an edge swipe to reveal it; its canvas already fills
+  // the available viewport. Unsupported/denied requests keep that viewport too.
   function requestGameFullscreen() {
+    const nav = window.navigator || {};
+    const iPad = /iPad/.test(nav.userAgent || "") || (nav.platform === "MacIntel" && nav.maxTouchPoints > 1);
+    if (!iPad) return;
     if (!window.matchMedia || !window.matchMedia("(pointer: coarse)").matches || document.fullscreenElement || document.webkitFullscreenElement) return;
     const root = document.documentElement;
     if (!root) return;
@@ -410,7 +414,7 @@
   let META = null, ready = false;
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261028.1813", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261028.1821", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -12732,15 +12736,20 @@
   }
 
   // ---------------------------------------------------------------- the opening film (Màn 1)
-  // SKSP have found the route to the witch's castle to recover the stolen portal crystal. She ambushes and separates them; the girls follow.
-  // It is a stage of its own (drawn straight to the canvas like the runway), ~17 s, skippable; the world waits and the game starts where it ends.
+  // Establish the crystal, the theft and the rescue party before the ambush.
+  // It is a stage of its own (drawn straight to the canvas like the runway), ~29 s, skippable; the world waits and the game starts where it ends.
   // G.cine = { ph: "opening", t, lock: true }; null when there is no film.
-  const OP_END = 17.0, OP_FEET = 0.72;
+  const OP_CONTEXT = 12, OP_END = 17.0, OP_FEET = 0.72;
+  const OP_INTRO = [
+    ["Mochi, Matcha và nhóm SKSP đang", "khám phá năm vùng đất phép thuật.", "Viên pha lê của nhóm mở các cổng phép", "để mọi người đi chơi rồi trở về nhà."],
+    ["Nhưng đêm ấy, Phù thủy Hắc Ám", "đánh cắp viên pha lê.", "Bà ta muốn khóa các cổng phép,", "giữ mọi người trong vương quốc của mình."],
+    ["SKSP lần theo dấu phép tới lâu đài", "để lấy lại pha lê và mở đường về.", "Mochi và Matcha cùng hai thú cưng", "đang chờ tin ở phía sau…"],
+  ];
   // who says what, when: [speaker, from, to, lines, who says it while the speaker has no art yet]
   const OP_SAY = [
     ["simmy", 0.9, 3.5, ["Tìm ra đường tới", "lâu đài rồi cả nhà ơi!"]],
-    ["kairon", 3.5, 6.0, ["Đi lấy lại pha lê thôi!", "Cô ta đã cướp nó!"], "sammy"],
-    ["witch", 6.9, 9.4, ["Dám tới lấy pha lê của ta?", "Đừng hòng!"]],
+    ["kairon", 3.5, 6.0, ["Lấy lại pha lê rồi", "đưa mọi người về nhà nhé!"], "sammy"],
+    ["witch", 6.9, 9.4, ["Pha lê giờ là của ta!", "Các ngươi không được trở về!"]],
     ["sammy", 9.5, 10.9, ["Cẩn thận! Cổng bẫy!"], "simmy"],
     ["phong", 10.4, 11.9, ["Nắm tay nhau!", "Đừng để bị tách ra!"], "simmy"],
     ["witch", 11.9, 14.0, ["Mỗi đứa một nơi!", "Xem còn ai cản được ta!"]],
@@ -12774,6 +12783,8 @@
   const opSpeaker = (l, cast) => (l[0] in OP_CAST && !cast.some((c) => c[0] === l[0]) ? l[4] || "" : l[0]);
   // is a bubble up in the opening at t? (the lines drawOpening shows: a speaker who is in the film, or a friend standing in for her)
   function opTalking(t) {
+    if (t < OP_CONTEXT) return true;
+    t -= OP_CONTEXT;
     const cast = opCast();
     return OP_SAY.some((l) => { const w = opSpeaker(l, cast); return t >= l[1] && t < l[2] && !!w && (!(w in OP_CAST) || cast.some((c) => c[0] === w)); });
   }
@@ -12801,7 +12812,7 @@
   function updateCine(dt) {
     if (G.cine.ph === "walkin") return updateWalkIn(dt);
     const c = G.cine, t0 = c.t; c.t += opTalking(c.t) ? dt / talkMul() : dt;   // (the film waits while a bubble is up, for Mochi; its sounds keep to the picture)
-    const at = (x) => t0 < x && c.t >= x;
+    const at = (x) => t0 < x + OP_CONTEXT && c.t >= x + OP_CONTEXT;
     P.inv = Math.max(P.inv, 1.5); P.vx = P.vy = 0; P.moving = false;
     if (API.autopilot) return endCine();
     if (at(5.8)) SFX.charge();
@@ -12814,7 +12825,7 @@
     G.shake = Math.max(0, G.shake - 40 * dt);
     for (const m of G.mons) if (!m.alive) m.die += dt;
     updateParts(dt);
-    if (c.t >= OP_END) endCine();
+    if (c.t >= OP_CONTEXT + OP_END) endCine();
   }
   // a cast member of the films, drawn from her own frames `<key>_a` / `_b` / `_stand` (the witch: `witch_gray_<pose>`).
   // All the art is painted (ChatGPT): a member with no frames packed is simply not drawn. Returns whether she was drawn.
@@ -12831,6 +12842,19 @@
     return true;
   }
   function drawOpening(g, W, H, t) {
+    if (t < OP_CONTEXT) {
+      // Use the painted meadow and cast as the setting; only narration is UI.
+      drawOpening(g, W, H, OP_CONTEXT + 0.7);
+      const lines = OP_INTRO[Math.min(2, Math.floor(t / 4))];
+      const fs = Math.round(Math.min(H * 0.038, W * 0.033)), lh = fs * 1.55;
+      g.save(); g.fillStyle = "rgba(18,14,38,.86)";
+      g.fillRect(W * 0.04, H * 0.055, W * 0.92, lh * 5.1);
+      g.fillStyle = "#fff6e5"; g.font = `700 ${fs}px Grandstander, system-ui, sans-serif`;
+      g.textAlign = "center"; g.textBaseline = "middle";
+      lines.forEach((line, i) => g.fillText(line, W / 2, H * 0.055 + lh * (i + 1)));
+      g.restore(); return;
+    }
+    t -= OP_CONTEXT;
     g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1; g.globalCompositeOperation = "source-over";
     let gy = H * 0.82; const th = H * 0.4, px = W * 0.74, py = H * 0.4;
     const grey = ss(5.6, 8.0, t) * (1 - ss(15.4, 16.6, t));      // the colours drain while she is there
