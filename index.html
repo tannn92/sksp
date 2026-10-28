@@ -415,7 +415,7 @@
   let META = null, ready = false;
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261028.1858", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261028.1933", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -10393,7 +10393,10 @@
 
   // A journey is host-owned. Its complete state also rides in presence, so a lost
   // event, a slow photo, or a resumed iPad joins the current shot immediately.
-  const TRAVEL_END = 9, TRAVEL_BOARD = 3, TRAVEL_ARRIVE = 6.5;
+  const TRAVEL_END = 18, TRAVEL_BOARD = 3, TRAVEL_DEPART = 6, TRAVEL_APPROACH = 12, TRAVEL_ARRIVE = 15;
+  const TRAVEL_FROM = ["meadow", "travel_candy_dock", "travel_dock", "travel_snow", "travel_lava"];
+  const TRAVEL_TO = ["travel_candy", "travel_dock", "travel_snow", "travel_lava", "travel_castle"];
+  const TRAVEL_ROUTE = ["travel_candy", "travel_pirate", "travel_pirate", "travel_snow", "travel_lava"];
   // Coordinates are fractions of the trimmed painted vehicle frame. Adjust here
   // after cutting a new painting; image aspect ratio is always preserved.
   const TRAVEL_LAYOUT = {
@@ -10418,8 +10421,8 @@
     G.cine = null; G.mode = "travel"; G.pmode = null; SH.open = false; closeStory(); P.vx = P.vy = 0; IN.ultPressed = false;
     for (const id of ["shop", "photo", "pauseScreen", "hud", "controls", "bossbar", "quiz"]) $(id).hidden = true;
     $("skipFilm").hidden = false;
-    scene("travel_" + LV_ART[to]); atlasLoad([LV_ART[to], "common"]);
-    if (to === 1) scene("travel_dock");
+    for (const key of new Set([TRAVEL_FROM[to], TRAVEL_TO[to], TRAVEL_ROUTE[to], "travel_" + LV_ART[to]])) scene(key);
+    atlasLoad([LV_ART[to], "common"]);
     $("banner").classList.remove("show");
     NET.sendT = 0;
   }
@@ -10464,27 +10467,46 @@
   }
   function drawTravel(g, W, H) {
     const tr = G.travel; if (!tr) return;
-    const t = tr.t, theme = LV_ART[tr.to], bg = scene("travel_" + theme) || scene(tr.to === 1 ? "island" : "meadow");
-    // The new painted dock has a full-width pier below y=.78, feet at y=.86.
-    // It contains no ship: the same painted vehicle is used at dock and at sea.
-    const atDock = tr.to === 1 && (t < TRAVEL_BOARD || t >= TRAVEL_ARRIVE), dock = atDock && scene("travel_dock");
+    const t = tr.t, theme = LV_ART[tr.to];
+    const shot = t < TRAVEL_BOARD ? "boarding" : t < TRAVEL_DEPART ? "departure" : t < TRAVEL_APPROACH ? "crossing" : t < TRAVEL_ARRIVE ? "approach" : "arrival";
+    const wide = shot === "crossing", destination = t >= 9;
+    const key = t < TRAVEL_DEPART ? TRAVEL_FROM[tr.to] : wide
+      ? (destination ? (tr.to === 1 ? "travel_pirate" : TRAVEL_TO[tr.to]) : TRAVEL_ROUTE[tr.to])
+      : TRAVEL_TO[tr.to];
+    const bg = scene(key), dock = !wide && (key === "travel_dock" || key === "travel_candy_dock");
     g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1;
     g.fillStyle = "#182239"; g.fillRect(0,0,W,H);
-    const ride = clamp((t - TRAVEL_BOARD) / (TRAVEL_ARRIVE - TRAVEL_BOARD),0,1);
-    const dockMap = dock ? cover(g,dock,W,H,.5,.6) : null;
-    if (!dock && bg) { g.save(); g.translate(-W*.25*ride,0); cover(g,bg,W * 1.25,H,.5,.6); g.restore(); }
-    if (API.drawn) API.drawn.push(["travelBackdrop", dock ? "travel_dock" : "travel_" + theme, travelPhase()]);
+    let dockMap = null;
+    if (bg) {
+      if (wide) {
+        const pan = clamp((t - (destination ? 9 : TRAVEL_DEPART)) / 3, 0, 1);
+        g.save(); g.translate(-W*.35*pan,0); cover(g,bg,W*1.35,H,.5,.6); g.restore();
+      } else {
+        const map = cover(g,bg,W,H,.5,.6); if (dock) dockMap = map;
+      }
+    }
+    if (API.drawn) {
+      API.drawn.push(["travelBackdrop", key, travelPhase()]);
+      API.drawn.push(["travelShot", shot]);
+    }
     const vehicle = FR["travel_"+theme], layout = TRAVEL_LAYOUT[theme];
-    const vw = Math.min(W * .94, H * 1.3), vh = vw * (vehicle ? vehicle.h / vehicle.w : .6), vx = (W-vw)/2;
-    const bob = t >= TRAVEL_BOARD && t < TRAVEL_ARRIVE ? Math.sin(t*6)*H*.004 : 0;
-    const vy = H*(dock ? .68 : .75)-vh*layout.seatY+bob, seatY = vy+vh*layout.seatY, groundY = dockMap ? dockMap(.5,.86)[1] : H*.82;
+    const vw = Math.min(W * .94, H * 1.3) * (wide ? .62 : 1), vh = vw * (vehicle ? vehicle.h / vehicle.w : .6);
+    const offscreen = (W+vw)/2 + W*.12;
+    let vx = (W-vw)/2;
+    if (shot === "departure") vx += offscreen * Math.pow(clamp((t-TRAVEL_BOARD)/3,0,1),2);
+    else if (wide) vx += W * (-.12 + .24 * (t-TRAVEL_DEPART)/6);
+    else if (shot === "approach") vx -= offscreen * Math.pow(1-clamp((t-TRAVEL_APPROACH)/3,0,1),2);
+    const moving = t >= TRAVEL_BOARD && t < TRAVEL_ARRIVE;
+    const bob = moving ? Math.sin(t*6)*H*.004 : 0;
+    const vy = H*(dock ? .68 : wide ? .69 : .75)-vh*layout.seatY+bob, seatY = vy+vh*layout.seatY, groundY = dockMap ? dockMap(.5,.86)[1] : H*.82;
+    if (API.drawn) API.drawn.push(["travelVehicleBox",vx,vy,vw,vh]);
     const paintVehicle = () => { if(vehicle) g.drawImage(vehicle.img,vehicle.sx,vehicle.sy,vehicle.w,vehicle.h,vx,vy,vw,vh); };
     paintVehicle();
     if(API.drawn) API.drawn.push(["travelVehicleBack"]);
     const people = tr.members, n = people.length;
     people.forEach((m,i) => {
       const seatX = vx+vw*(layout.left+(layout.right-layout.left)*(i+.5)/Math.max(1,n));
-      const board = clamp((t-i*.16)/1.8,0,1), leave = clamp((t-TRAVEL_ARRIVE-i*.1)/1.7,0,1);
+      const board = clamp((t-i*.16)/1.8,0,1), leave = clamp((t-TRAVEL_ARRIVE-i*.1)/2.2,0,1);
       let x = leave > 0 ? lerp(seatX,W*.12+W*.76*(i+.5)/n,leave) : lerp(-vw*.12-i*20,seatX,board);
       const th = Math.min(H*.28,vw*.23,vw*(layout.right-layout.left)/Math.max(1,n)*2.3);
       const pet = m.char === "dog" || m.char === "cat";
@@ -10503,15 +10525,26 @@
       paintVehicle(); g.restore();
       if(API.drawn) API.drawn.push(["travelVehicleFront",vy+vh*layout.frontY]);
     }
-    if (tr.to === 1) {
-      const fade = Math.max(0,1-Math.abs(t-TRAVEL_BOARD)/.3,1-Math.abs(t-TRAVEL_ARRIVE)/.3);
-      if (fade) { g.fillStyle=`rgba(12,18,35,${fade})`; g.fillRect(0,0,W,H); }
-    }
+    // Cuts hide the change of camera/location: departure -> distant route ->
+    // destination landscape -> arrival. Everyone remains aboard until parked.
+    const fade = Math.max(...[TRAVEL_DEPART,9,TRAVEL_APPROACH].map(cut=>Math.max(0,1-Math.abs(t-cut)/.35)));
+    if (fade) { g.fillStyle=`rgba(12,18,35,${fade})`; g.fillRect(0,0,W,H); }
+    const from = tr.to ? LEVELS[tr.to-1].name.split(": ")[1] : "Điểm cắm trại", to = LEVELS[tr.to].name.split(": ")[1];
+    const heading = t < TRAVEL_DEPART ? from : wide ? from + " → " + to : to;
+    const line = shot === "boarding" ? (tr.to===1?"Cả đội lên tàu nào!":"Cả đội lên xe nào!")
+      : shot === "departure" ? "Tạm biệt! Cả đội lên đường!"
+      : wide ? (destination ? "Vùng đất mới ở phía trước!" : "Chuyến phiêu lưu còn ở phía trước…")
+      : shot === "approach" ? "Đến nơi rồi! Chờ xe dừng nhé!"
+      : (tr.to===1?"Cập bến rồi! Cả đội lên đảo thôi!":"Xe dừng rồi! Cả đội xuống thôi!");
     g.fillStyle="rgba(12,18,35,.72)";g.fillRect(0,0,W,H*.16);
-    g.fillStyle="#fff5df";g.textAlign="center";g.font=`800 ${Math.round(Math.min(W*.045,H*.046))}px Grandstander, system-ui`;
-    g.fillText(LEVELS[tr.to].name,W/2,H*.065);
+    g.fillStyle="#fff5df";g.textAlign="center";
+    const titleFs=Math.round(Math.min(W*.045,H*.046));
+    g.font=`800 ${titleFs}px Grandstander, system-ui`;
+    const titleFit=Math.min(1,W*.92/Math.max(1,g.measureText(heading).width));
+    g.font=`800 ${Math.floor(titleFs*titleFit)}px Grandstander, system-ui`;
+    g.fillText(heading,W/2,H*.065);
     g.font=`600 ${Math.round(Math.min(W*.035,H*.032))}px system-ui`;
-    g.fillText(travelPhase()==="boarding"?(tr.to===1?"Cả đội lên tàu nào!":"Cả đội lên xe nào!"):travelPhase()==="journey"?"Cùng nhau lên đường!":(tr.to===1?"Cập bến rồi! Cả đội lên đảo thôi!":"Đến nơi rồi! Cả đội xuống thôi!"),W/2,H*.12);
+    g.fillText(line,W/2,H*.12);
   }
 
   // ---- closing: Simmy changes, the team walks the runway, a photo is taken, then the island
