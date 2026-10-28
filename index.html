@@ -360,7 +360,7 @@
   let META = null, ready = false;
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261028.0138", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261028.1119", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -383,6 +383,81 @@
     document.addEventListener("visibilitychange", () => { if (!document.hidden && G.mode === "title") check(false); });
   }
   initVersion();
+  // ---- the atlas sheets (perf, Dad's "văng trên iPad"): the packed art is ~60 sheets of 2048 px, ~790 MB once decoded. Drawn straight
+  // from <img> sheets, Chrome kept re-decoding them (its decode cache is far smaller than that): a Màn 4/5 ambush, drawing from ~50
+  // sheets a frame, fell to 2-8 fps. So each sheet is decoded once into an ImageBitmap (createImageBitmap, off the main thread) and
+  // only while it is wanted: tools/g4_pack.py packs the frames of one load group onto sheets of their own (atlas4.json "groups": a
+  // map's monsters / boss / props / effects, one outfit of one girl or friend, the common art), atlasPins() names the groups in play
+  // (kept decoded) and any other sheet is decoded when one of its frames is first drawn and freed again ATLAS_IDLE s after its last draw.
+  // A frame's `img` is a getter: it marks the sheet as used and, while the sheet is not decoded yet, starts that and gives NOIMG (a
+  // 1 px blank canvas: the draw shows nothing for those few frames). Pages without createImageBitmap use <img> sheets the same way.
+  const NOIMG = document.createElement("canvas"); NOIMG.width = NOIMG.height = 1;
+  const ATLAS_IDLE = 12;   // s a sheet outside the pinned groups stays decoded after its last draw
+  // (AT.off = new Set(): a test log of the frames drawn from outside the pinned groups, to see what belongs in tools/g4_pack.py SHARED)
+  const AT = { sheets: [], groups: {}, pins: new Set(), t: 0, sweepT: 0, loads: 0, frees: 0, off: null };
+  const canBitmap = typeof createImageBitmap === "function" && typeof fetch === "function";
+  function sheetLoad(S) {
+    if (S.img || S.p || AT.t - S.fail < 3) return S.p || null;
+    AT.loads++;
+    S.p = (async () => {
+      try {
+        let im;
+        if (canBitmap) { const r = await fetch(S.url); if (!r.ok) throw new Error(r.status + " " + S.url); im = await createImageBitmap(await r.blob()); }
+        else im = await loadImg(S.url);
+        S.img = im; S.w = im.width; S.h = im.height; S.used = AT.t;
+      } catch (e) { S.fail = AT.t; if (S.need) throw e; }
+      finally { S.p = null; }
+    })();
+    return S.p;
+  }
+  function sheetFree(S) {
+    if (!S.img || S.keep) return;
+    if (S.img.close) S.img.close();
+    S.img = null; AT.frees++;
+  }
+  class AFrame {
+    constructor(S, f, n) { this.S = S; this.n = n; this.sx = f[1]; this.sy = f[2]; this.w = f[3]; this.h = f[4]; this.s = f[5]; this.ax = f[6]; this.ay = f[7]; }
+    get img() { const S = this.S; S.used = AT.t; if (AT.off && !AT.pins.has(S.g)) AT.off.add(this.n); if (S.img) return S.img; sheetLoad(S); return NOIMG; }
+    set img(v) { Object.defineProperty(this, "img", { value: v, writable: true, configurable: true, enumerable: true }); }
+  }
+  // is this frame's sheet decoded (else its decoding is started)? Pictures made once from a frame (a tinted copy...) wait for it
+  const frameReady = (f) => !f || !f.S || !!f.S.img || (sheetLoad(f.S), false);
+  const groupSheets = (g) => (AT.groups[g] || []).map((i) => AT.sheets[i]);
+  // decode these groups' sheets now (a promise for when they are in)
+  const atlasLoad = (groups) => Promise.all(groups.flatMap(groupSheets).map((S) => sheetLoad(S))).catch(() => {});
+  // the groups in play, kept decoded: the common art, this map's (tools/g4_pack.py MAP_GROUPS), the outfits the girls and the
+  // friends with them wear, the girls' school uniforms (the stand-in for a missing pose; both sisters' on the home screen)
+  const LV_ART = ["candy", "pirate", "snow", "lava", "castle"];
+  const ATLAS_MB = 220;   // over this many MB decoded, a sheet outside the pinned groups is freed 2 s after its last draw
+  function atlasPins() {
+    const p = new Set(["common", hero + ".base"]);
+    if (G.mode === "title") { p.add("g.base"); p.add("s.base"); }
+    if (onShip()) for (const g of ["ship", hero + ".sailor", "simmy.sailor", Q && Q.hero ? Q.hero + ".sailor" : "ship"]) p.add(g); else if (G.lvl && G.mode !== "title") p.add(LV_ART[G.level]);
+    p.add(hero + "." + (P.outfit || "base"));
+    if (Q && Q.hero) { p.add(Q.hero + ".base"); p.add(Q.hero + "." + (Q.of || "base")); }
+    if (G.mode !== "title") for (const k of P.pets || []) if (isAlly(k)) p.add(k + "." + allyOutfit(k));
+    if (SH.open && SH.cards) for (const c of SH.cards) p.add(hero + "." + cardOutfit(c));   // (the shop's cards are drawn again on a pick)
+    return p;
+  }
+  // once a second: decode what is pinned, free what has not been drawn for ATLAS_IDLE s
+  function atlasSweep(now) {
+    AT.t = now;
+    if (now - AT.sweepT < 1) return;
+    AT.sweepT = now;
+    AT.pins = atlasPins();
+    const idle = atlasMem().mb > ATLAS_MB ? 2 : ATLAS_IDLE;
+    for (const S of AT.sheets) {
+      if (AT.pins.has(S.g)) { if (!S.img) sheetLoad(S); else S.used = now; }
+      // (another map's art goes as soon as it is not drawn for a second: a new map does not keep the last one's in memory)
+      else if (S.img && now - S.used > (LV_ART.includes(S.g) ? 1 : idle)) sheetFree(S);
+    }
+  }
+  // decoded sheets now: { mb, sheets, of, loads, frees } (the old atlas included)
+  function atlasMem() {
+    let b = 0, n = 0;
+    for (const S of AT.sheets) if (S.img) { b += S.w * S.h * 4; n++; }
+    return { mb: Math.round(b / 1048576), sheets: n, of: AT.sheets.length, loads: AT.loads, frees: AT.frees };
+  }
   async function loadAssets() {
     // the atlas is checked with the server every time; its sheets carry a hash of it so a new pack is never mixed with old pictures
     // two atlases: atlas.json = the old shared art still used (effects, pets, pickups; tools/g4_assets.py), then
@@ -392,19 +467,29 @@
       try { txt = await (await fetch("assets/" + name, { cache: "no-cache" })).text(); } catch (e) { if (need) throw e; return null; }
       const M = JSON.parse(txt);
       let hv = 0; for (let i = 0; i < txt.length; i += 7) hv = (hv * 31 + txt.charCodeAt(i)) | 0;
-      const sheets = await Promise.all(M.sheets.map((s) => loadImg("assets/" + s + "?v=" + (hv >>> 0).toString(36))));
+      const base = AT.sheets.length, sheets = M.sheets.map((s, i) => ({ i: base + i, url: "assets/" + s + "?v=" + (hv >>> 0).toString(36), g: "common", img: null, p: null, used: 0, fail: -99, w: 0, h: 0, keep: false, need: false }));
+      // (the old atlas has no groups: all of it is common art, decoded for good, as is an atlas4 packed before the groups)
+      const groups = !need && M.groups ? M.groups : null;
+      if (groups) { for (const [g, ix] of Object.entries(groups)) for (const i of ix) sheets[i].g = g; }
+      else for (const S of sheets) S.keep = true;
+      AT.sheets.push(...sheets);
+      for (const S of sheets) (AT.groups[S.g] = AT.groups[S.g] || []).push(S.i);
       return { M, sheets };
     };
     const [old, art] = await Promise.all([one("atlas.json", true), one("atlas4.json", false)]);
     META = old.M;
-    for (const A of [old, art]) if (A) for (const [n, f] of Object.entries(A.M.frames)) FR[n] = { img: A.sheets[f[0]], sx: f[1], sy: f[2], w: f[3], h: f[4], s: f[5], ax: f[6], ay: f[7] };
+    for (const A of [old, art]) if (A) for (const [n, f] of Object.entries(A.M.frames)) FR[n] = new AFrame(A.sheets[f[0]], f, n);
+    // what the home screen and the first moments need, decoded before the game shows (the old atlas must all be in)
+    for (const S of old.sheets) S.need = true;
+    await Promise.all(old.sheets.map((S) => sheetLoad(S)));
+    await Promise.all(AT.sheets.filter((S) => S.keep || atlasPins().has(S.g)).map((S) => sheetLoad(S)));
     FR.potion_energy = recolor("potion", "#ffc21a");
     placeholderWorldFrames();
     for (const k of ["meadow", "stage", "shop_room", "dock", "island"]) scene(k);
   }
   // ==== PLACEHOLDER world art (only what the real pack does not have yet) =================================================
   // The real art is packed into atlas4 (tools/g4_pack.py): Mochi / Matcha / Simmy / Sammy / Kairon / Phong Cận (`<char>.<outfit>.<pose><i>`),
-  // the candy and pirate monsters, both bosses, props, cages and Phù thủy Xám Xịt. What is still missing is stood in for here,
+  // the candy and pirate monsters, both bosses, props, cages and Phù thủy Hắc Ám. What is still missing is stood in for here,
   // by name, so a later pack replaces it on its own:
   //   Simmy's / Sammy's missing poses  -> her standing frame (outfitFrame); no frames at all -> drawAllyAt's glowing stand-in
   //   Kairon, Phong Cận (films)        -> packed (`kairon.base.*`, `phong.base.*`); without them they are left out of the opening (opHasArt)
@@ -634,11 +719,11 @@
     // its lava pools, lavaPools)
     { name: "Màn 1: Rừng Kẹo Ngọt", seed: 1101, path: "river", arena: true, shop: "pirate", hazard: "goo",
       // the title card (intro, trusted markup) and the end screen (end) of this level
-      intro: "Phù thủy Xám Xịt đã bắt cả nhóm SKSP vào Rừng Kẹo Ngọt! Chọn Mochi hoặc chị Matcha, đi theo con đường để đánh bại <b>Bánh Kem Khổng Lồ</b> và cứu bạn nhé.",
-      end: "Bánh Kem Khổng Lồ đã bị đánh bại và Mèo Simmy đã được cứu! Phù thủy Xám Xịt vẫn giữ các bạn còn lại. Cuộc phiêu lưu vẫn còn tiếp!",
+      intro: "Phù thủy Hắc Ám đã bắt cả nhóm SKSP vào Rừng Kẹo Ngọt! Chọn Mochi hoặc chị Matcha, đi theo con đường để đánh bại <b>Bánh Kem Khổng Lồ</b> và cứu bạn nhé.",
+      end: "Bánh Kem Khổng Lồ đã bị đánh bại và Mèo Simmy đã được cứu! Nhưng Phù thủy Hắc Ám vẫn nhốt Kairon, Sammy và Phong Cận. Đi cứu các bạn thôi!",
       // the boss leaps twice (at 2/3 and 1/3 of his health), each leap asks quiz.n[i] questions in a row
       boss: { art: "candy_boss", name: "Bánh Kem Khổng Lồ", hp: 45, tip: "Bánh kem đập đất nứt, đàn kẹo mút bay tới!", summon: "candy_lolli", style: "furrow", fence: "cd_wafer_fence", quiz: { op: "+", lim: 10, T: 3, n: [2, 2], hz: "qk_bomb" },
-      laugh: "laugh0", ha: "Hô hô hô!", say: ["Ta là Bánh Kem Khổng Lồ,", "chủ nhân Rừng Kẹo Ngọt!", "Không ai qua được đâu!"], morph: ["Grừừ! Ta nổi giận rồi!"], bye:["Ôi... kem của ta...", "chảy hết rồi...", "Phù thủy Xám Xịt sẽ trả thù!"] }, quota: 120, spawn: [0.7, 1.6], camps: 9, pets: ["cat", "dog", "simmy"],
+      laugh: "laugh0", ha: "Hô hô! Đố đấy!", say: ["Hô hô! Bánh Kem Khổng Lồ đây!", "Vào rừng kẹo của ta à?", "Ta đè cho bẹp dí bây giờ!"], morph: ["Á à! Dám làm sứt kem của ta!", "Giờ ta giận thật rồi nhé!"], bye: ["Ối ối... kem chảy hết rồi...", "Phù thủy Hắc Ám ơi,", "cứu ta với!"] }, quota: 120, spawn: [0.7, 1.6], camps: 9, pets: ["cat", "dog", "simmy"],
       kinds: [["candy_gummy", 3, 0], ["candy_lolli", 2, 0], ["candy_corn", 2, 0.1], ["candy_cupcake", 2, 0.2]],
       deco: [["cd_lolly_tree", 3], ["cd_gumdrop_bush", 3], ["cd_marsh_bush", 2], ["cd_candy_cane", 2], ["cd_cupcake_shroom", 2], ["cd_cookie_rock", 1], ["cd_choc_rock", 1]], arenaFloor: "arena_candy",
       gr: { base: "#f7d3e2", patch: ["#fde7d0", "#c9efdd", "#f2b9d2", "#fff1b8"], blade: ["#ffffff", "#ff9fc4", "#a8e6cf"], dot: ["#ff6fa8", "#7cf2c6", "#ffe066", "#ffffff", "#b9a4ff", "#ff9a5c"], nDot: 110,
@@ -647,11 +732,11 @@
     // Props are drawn about 12% smaller than the candy ones, so each deco entry carries a scale: [sprite, weight, scale].
     // (next: Màn 3, Núi Tuyết (id "snow"); see nextLevelAfter)
     { name: "Màn 2: Đảo Cướp Biển", seed: 2207, path: "river", arena: true, next: "snow", hazard: "tide",
-      intro: "Phù thủy Xám Xịt đã đưa cả nhóm tới Đảo Cướp Biển! Mặc đồ cướp biển, đi theo lối cát vàng, đánh bại <b>Thuyền Trưởng Ma</b> và cứu anh Kairon nhé.",
+      intro: "Phù thủy Hắc Ám đã đưa cả nhóm tới Đảo Cướp Biển! Mặc đồ cướp biển, đi theo lối cát vàng, đánh bại <b>Thuyền Trưởng Ma</b> và cứu anh Kairon nhé.",
       end: "Thuyền Trưởng Ma đã bị đánh bại và Kairon đã được cứu! Sắp tới: cứu Sammy Đào ở Núi Tuyết!",
       boss: { art: "pirate_boss", name: "Thuyền Trưởng Ma", hp: 60, tip: "Thuyền trưởng gọi sóng thần, cột nước và xoáy nước!", summon: "pirate_bat", style: "captain", fence: "pr_rope_fence",
         quiz: { op: "-", lim: 10, T: 3, n: [2, 2], hz: "qk_bomb" },
-        laugh: "laugh0", ha: "Ha ha ha!", say: ["Ta là Thuyền Trưởng Ma!", "Biển cả nghe lệnh ta!"], morph: ["Grừừ! Biển cả, nổi giận đi!"], bye:["Ôi... mỏ neo của ta...", "Nhưng Phù thủy Xám Xịt vẫn", "giữ các bạn còn lại đấy!"] },
+        laugh: "laugh0", ha: "Ha ha! Đoán đi!", say: ["Ha ha! Thuyền Trưởng Ma đây!", "Hòn đảo này là của ta!", "Sóng ơi, cuốn chúng đi!"], morph: ["Dám chọc giận ta à?", "Biển cả ơi, nổi sóng lên!"], bye: ["Ối... thuyền ta thủng rồi!", "Phù thủy Hắc Ám sẽ không", "tha cho các ngươi đâu!"] },
       quota: 130, spawn: [0.8, 1.7], camps: 10, pets: ["kairon"], chest: "pr_chest", arenaFloor: "arena_pirate",
       kinds: [["pirate_zombie", 3, 0], ["pirate_skeleton", 2, 0], ["pirate_mummy", 2, 0.05], ["pirate_bat", 2, 0.12]],
       deco: [["pr_palm", 4, 1.15], ["pr_barrels", 2, 1.12], ["pr_boat", 1, 1.12], ["pr_anchor", 1, 1.12], ["pr_rope_fence", 1, 1.12], ["pr_shell_rock", 2, 1.12], ["pr_skull_flag", 1, 1.12]],
@@ -661,11 +746,11 @@
     // calls up ice spikes and a blizzard (style "yeti"); Sammy waits in a standing ice cage (`cage`). The snow props are cut at the
     // island props' world size, so they take the island's scales.
     { id: "snow", name: "Màn 3: Núi Tuyết", seed: 3301, path: "river", arena: true, hazard: "ice",
-      intro: "Phù thủy Xám Xịt đã đưa Sammy Đào lên Núi Tuyết! Đi theo lối tuyết, đánh bại <b>Người Tuyết Yeti</b> và cứu chị Sammy Đào nhé.",
+      intro: "Phù thủy Hắc Ám đã đưa Sammy Đào lên Núi Tuyết! Đi theo lối tuyết, đánh bại <b>Người Tuyết Yeti</b> và cứu chị Sammy Đào nhé.",
       end: "Yeti đã bị đánh bại và Sammy Đào đã được cứu! Sắp tới: cứu Phong Cận ở Núi Dung Nham!",
       boss: { art: "snow_boss", name: "Người Tuyết Yeti", hp: 70, tip: "Yeti lăn cầu tuyết, gọi gai băng và bão tuyết!", summon: "snow_bat", style: "yeti", fence: "sn_fence",
         quiz: { op: "+", lim: 20, T: [5, 8], n: [2, 2], hz: "qk_bomb" },
-        laugh: "laugh0", ha: "Grào grào!", say: ["Grào! Ta là Yeti!", "Núi Tuyết là của ta!"], morph: ["Grào! Bão tuyết, nổi lên đi!"], bye: ["Ôi... ta tan chảy mất...", "Nhưng Phù thủy Xám Xịt vẫn", "giữ các bạn còn lại đấy!"] },
+        laugh: "laugh0", ha: "Grào! Đố nè!", say: ["Grào! Yeti đây!", "Ai dám lên núi của ta?", "Ta đóng băng hết bây giờ!"], morph: ["Grào grào! Lạnh hơn nữa nào!", "Bão tuyết ơi, thổi lên!"], bye: ["Ối... ta tan chảy mất rồi...", "Phù thủy Hắc Ám", "sẽ trả thù cho ta!"] },
       quota: 140, spawn: [0.85, 1.8], camps: 10, pets: ["sammy"], cage: "snow_cage", arenaFloor: "arena_snow",
       kinds: [["snow_zombie", 3, 0], ["snow_skeleton", 2, 0], ["snow_mummy", 2, 0.05], ["snow_bat", 2, 0.12]],
       deco: [["sn_pine", 4, 1.15], ["sn_ice_rock", 2, 1.12], ["sn_snowman", 1, 1.12], ["sn_sign", 1, 1.12], ["sn_crystal", 2, 1.12], ["sn_fence", 1, 1.12], ["sn_berry_bush", 2, 1.12], ["sn_sled", 1, 1.12]],
@@ -674,13 +759,13 @@
     // Màn 4: a volcano. The boss is a lava demon who rains burning rocks, spreads a lava pool from where he stands and sends lanes of fire
     // columns at the girls (the lava hazards, G.lavas: see lavaMove); his second form adds the eruption. Phong Cận hangs in a cage of black
     // iron (lava_cage). Dark rock ground with glowing seams (gr.seam), lava pools and a lava sea at the edge of the world (the pond / sea
-    // colours). After Màn 3 (Núi Tuyết, id "snow"); his gate leads into Màn 5 (Lâu Đài Phù Thủy Xám, id "castle").
+    // colours). After Màn 3 (Núi Tuyết, id "snow"); his gate leads into Màn 5 (Lâu Đài Phù Thủy Hắc Ám, id "castle").
     { id: "lava", name: "Màn 4: Núi Dung Nham", seed: 4409, path: "river", arena: true,
       intro: "Phong Cận đang bị nhốt ở Núi Dung Nham! Cẩn thận đá nóng, đánh bại <b>Quỷ Dung Nham</b> và cứu anh Phong nhé.",
-      end: "Quỷ Dung Nham đã bị đánh bại và Phong Cận đã được cứu! Cả nhóm SKSP đã đoàn tụ. Sắp tới: Lâu Đài Phù Thủy Xám!",
+      end: "Quỷ Dung Nham đã bị đánh bại và Phong Cận đã được cứu! Cả nhóm SKSP đã đoàn tụ. Sắp tới: Lâu Đài Phù Thủy Hắc Ám!",
       boss: { art: "lava_boss", name: "Quỷ Dung Nham", hp: 70, tip: "Quỷ Dung Nham gọi mưa đá nóng, hồ dung nham và cột lửa!", summon: "lava_bat", style: "lava", fence: "lv_chain_fence",
         quiz: { op: "-", lim: 20, T: [5, 8], n: [2, 2], hz: "qk_rock2" },
-        laugh: "laugh0", ha: "Hừ hừ hừ!", say: ["Hừ hừ! Ta là Quỷ Dung Nham!", "Lửa sẽ thiêu rụi tất cả!"], morph: ["Grừừ! Núi lửa, phun trào đi!"], bye: ["Ôi... lửa của ta...", "tắt mất rồi...", "Phù thủy Xám Xịt sẽ trả thù!"] },
+        laugh: "laugh0", ha: "Hừ hừ! Giải đi!", say: ["Hừ hừ! Quỷ Dung Nham đây!", "Núi lửa này nóng lắm đấy,", "chạy đi kẻo bỏng!"], morph: ["Grừừ! Ta nổi điên rồi!", "Núi lửa ơi, phun trào đi!"], bye: ["Xèo xèo... ta nguội mất rồi...", "Nhưng các ngươi không thắng", "nổi Phù thủy Hắc Ám đâu!"] },
       quota: 140, spawn: [0.85, 1.8], camps: 10, pets: ["phong"], arenaFloor: "arena_lava",
       kinds: [["lava_zombie", 3, 0], ["lava_skeleton", 2, 0], ["lava_mummy", 2, 0.05], ["lava_bat", 2, 0.12]],
       // (readable: the girls vanished on near-black ground among orange-cracked props, so this map has fewer, calmer props (no lava-pool
@@ -694,17 +779,18 @@
       gr: { base: "#4a3b36", patch: ["#5a4640", "#3f3330", "#6b4a3a", "#4e3d37"], blade: ["#55463f", "#7a3b1f", "#3a302c"], dot: ["#ff7a2a", "#ffb03a", "#ff4a1a", "#6b5a55", "#8a7a70", "#ffd36a"], nDot: 25,
         stone: ["#766760", "#655850", "#84736c"], gap: "#8c3a1c", edge: "#140e0c", sea: "#ffc23a", seaEdge: "#3a1a12", pond: "#ff5a1a", nPond: 0, seam: ["#ff5a1a", "#ffc23a"], nSeam: 3, seamA: [0.1, 0.45, 0.8] } },
     // Màn 5, the last map: the grey witch's castle (nobody caged: all four SKSP friends are with the girls already). The boss is Phù thủy
-    // Xám Xịt (style "hex": the old flying monster kind "witch" keeps its name), who calls ghosts and crows out of purple circles, sends slow
+    // Hắc Ám (style "hex": the old flying monster kind "witch" keeps its name), who calls ghosts and crows out of purple circles, sends slow
     // magic orbs after the girls, vanishes in smoke and comes back at a warned spot, and sets magic circles burning on the floor; her second
     // form adds shadow clones and a ring of circles (the hexes, G.hexes: see hexMove). After her: the finale film and the end screen
     // (`finale`). Ground: dusky purple flagstones, lighter than Map 4's rock so the girls stand out (its own calm prop fill, as Map 4's).
-    { id: "castle", name: "Màn 5: Lâu Đài Phù Thủy Xám", seed: 5507, path: "river", arena: true, last: true, finale: true, hazard: "spike",
-      intro: "Đây là lâu đài của Phù thủy Xám Xịt! Cả nhóm SKSP đã đoàn tụ. Cùng nhau đánh bại <b>Phù thủy Xám Xịt</b> nhé!",
-      end: "Cảm ơn Mochi và Matcha đã cứu cả nhóm SKSP!",
-      boss: { art: "castle_boss", name: "Phù thủy Xám Xịt", hp: 80, tip: "Phù thủy gọi hồn ma, bắn cầu phép, biến mất và vẽ vòng phép!", summon: "castle_bat", style: "hex", fence: "cs_fence",
-        quiz: { op: "±", lim: 20, T: [5, 8], n: [2, 2], hz: "qk_bomb" },
-        laugh: "laugh1", ha: "Hi hi hi!", say: ["Hừm! Các ngươi dám tới đây sao?", "Ta sẽ biến tất cả thành đá!"], morph: ["Hừm! Giờ thì nếm phép thật của ta!"], bye: ["Không... sức mạnh của ta...", "Thôi được, ta thua rồi..."] },
-      quota: 150, spawn: [0.9, 1.85], camps: 10, pets: [], arenaFloor: "arena_castle",
+    { id: "castle", name: "Màn 5: Lâu Đài Phù Thủy Hắc Ám", seed: 5507, path: "river", arena: true, last: true, finale: true, hazard: "spike",
+      intro: "Đây là lâu đài của Phù thủy Hắc Ám! Cả nhóm SKSP đã đoàn tụ. Cùng nhau đánh bại <b>Phù thủy Hắc Ám</b> nhé!",
+      end: "Cảm ơn {girls} đã cứu cả nhóm SKSP!",   // ({girls}: the girls who played, finLine)
+      boss: { art: "castle_boss", name: "Phù thủy Hắc Ám", hp: 80, tip: "Phù thủy gọi hồn ma, bắn cầu phép, biến mất và vẽ vòng phép!", summon: "castle_bat", style: "hex", fence: "cs_fence",
+        // (the last boss asks no sums (Dad, 2026-10-28): the final battle, FB below: her lieutenants first, then her three forms)
+        final: true,
+        laugh: "laugh1", ha: "Hi hi! Đố đấy!", say: ["Hi hi hi! Dám tới tận đây à?", "Ta sẽ biến các ngươi", "thành tượng đá hết!"], morph: ["Hừm! Giỏi lắm...", "Giờ xem phép thật của ta!"], bye: ["Không thể nào!", "Phép thuật của ta tan hết rồi...", "Ta thua rồi!"] },
+      quota: 150, spawn: [0.9, 1.85], camps: 10, pets: [], arenaFloor: "arena_castle", arenaK: 1.6,   // (arenaK: her arena 1.6x as wide as the others')
       kinds: [["castle_zombie", 3, 0], ["castle_skeleton", 2, 0], ["castle_mummy", 2, 0.05], ["castle_bat", 2, 0.12]],
       deco: [["cs_candelabra", 2, 1.12], ["cs_pillar", 2, 1.15], ["cs_cauldron", 1, 1.12], ["cs_bookshelf", 1, 1.12], ["cs_lamp", 2, 1.12], ["cs_fence", 1, 1.12], ["cs_gargoyle", 1, 1.12], ["cs_pumpkins", 2, 1.12]],
       decoN: 1100, decoSkip: 0.55, decoGap: 150,
@@ -713,7 +799,7 @@
   ];
   // what follows level i: the level its `next` names (by id; -1 while that map is not in the game yet), else the one after it in LEVELS;
   // -1: none (the last map: its finale, or the "Còn tiếp…" screen). Màn 2 -> Màn 3 (Núi Tuyết, id "snow") -> Màn 4 (Núi Dung Nham, id
-  // "lava") -> Màn 5 (Lâu Đài Phù Thủy Xám, id "castle", `last`, `finale`) -> the finale film and the end screen
+  // "lava") -> Màn 5 (Lâu Đài Phù Thủy Hắc Ám, id "castle", `last`, `finale`) -> the finale film and the end screen
   function nextLevelAfter(i) {
     const L = LEVELS[i]; if (!L || L.last) return -1;
     if (L.next) return LEVELS.findIndex((o) => o.id === L.next);
@@ -754,7 +840,7 @@
   const SNOW_LIKE = { snow_zombie: "zombie", snow_skeleton: "skeleton", snow_mummy: "mummy", snow_bat: "bat" };
   // Núi Dung Nham's four breeds (art `lava_<kind>_d<dir>_w<i>`): a magma golem, a fire imp, a salamander, a fire bat
   const LAVA_LIKE = { lava_zombie: "zombie", lava_skeleton: "skeleton", lava_mummy: "mummy", lava_bat: "bat" };
-  // Lâu Đài Phù Thủy Xám's (art `castle_<kind>_d<dir>_w<i>`): a ghost (it floats: HOVER), a rag doll, a dark knight, a crow
+  // Lâu Đài Phù Thủy Hắc Ám's (art `castle_<kind>_d<dir>_w<i>`): a ghost (it floats: HOVER), a rag doll, a dark knight, a crow
   const CASTLE_LIKE = { castle_zombie: "zombie", castle_skeleton: "skeleton", castle_mummy: "mummy", castle_bat: "bat" };
   const ART_LIKE = { ...CANDY_LIKE, ...PIRATE_LIKE, ...SNOW_LIKE, ...LAVA_LIKE, ...CASTLE_LIKE };
   for (const [k, o] of Object.entries(ART_LIKE)) MON[k] = { ...MON[o], like: o };
@@ -976,10 +1062,11 @@
     if (L.arena) {
       // the path stops at the rim of a round arena beyond its last point
       const [dx, dy] = pathDir(path.n - 1);
-      let ax = path.x[path.n - 1] + dx * (ARENA_R - 120), ay = path.y[path.n - 1] + dy * (ARENA_R - 120);
-      ax = clamp(ax, ARENA_R + 150, WORLD - ARENA_R - 150); ay = clamp(ay, ARENA_R + 150, WORLD - ARENA_R - 150);
-      G.arena = { x: ax, y: ay, r: ARENA_R, open: false };
-      let n = path.n; while (n > 20 && d2(path.x[n - 1], path.y[n - 1], ax, ay) < (ARENA_R - 60) ** 2) n--;
+      const AR = Math.round(ARENA_R * (L.arenaK || 1));   // (the final battle's arena is bigger: arenaK)
+      let ax = path.x[path.n - 1] + dx * (AR - 120), ay = path.y[path.n - 1] + dy * (AR - 120);
+      ax = clamp(ax, AR + 150, WORLD - AR - 150); ay = clamp(ay, AR + 150, WORLD - AR - 150);
+      G.arena = { x: ax, y: ay, r: AR, open: false };
+      let n = path.n; while (n > 20 && d2(path.x[n - 1], path.y[n - 1], ax, ay) < (AR - 60) ** 2) n--;
       path.n = n; path.x.length = n; path.y.length = n; path.len = (n - 1) * STEP;
       path.x.push(ax); path.y.push(ay); // one point at the centre so the stones run into the plaza
       path.n++;
@@ -1340,16 +1427,22 @@
   }
   // test bot: walk the path toward the guide target; wait near a sealed gate; circle the boss at a safe distance
   function autopilot() { const v = autopilotWay(); return G.steer && G.steer.length ? lpSteer(v) : v; }   // (round Núi Dung Nham's lava pools and each map's hazards)
+  // (its timers count game seconds: they counted frames, so on a 120 Hz screen it gave up on a cage after 2 s; BOT_*: the times the
+  // node sims had at 30 frames a second, kept)
+  const BOT_CAGE_T = 8, BOT_STUCK_T = 3, BOT_SIDE_T = 2;
   function autopilotWay() {
-    const B = G.boss;
+    const B = G.boss, bdt = clamp(G.t - (G.botAt ?? G.t), 0, 0.1); G.botAt = G.t;
     let tx, ty, dx, dy, d;
     if (G.quiz && G.arena) { const [qx, qy] = quadCentre(G.quiz.ok); dx = qx - P.x; dy = qy - P.y; d = Math.hypot(dx, dy); return d < 40 ? [0, 0] : [dx / d, dy / d]; }
+    if (G.hexes && G.hexes.some((o) => FB_GEO[o.k] === "dark" && o.t < o.w + o.fly)) { const fd = fbDodge(); return fd || [0, 0]; }   // (the final battle's dark: into the light and stay there, whatever else)
     { const cd = creepDodge(); if (cd) return cd; }   // (out of the monsters' warnings first)
     { const gw = botGuardWave(); if (gw) return gw; }   // (a cage guardian awake close by / an ambush she is in)
     if (B && B.alive && B.st !== "enter") {
-      const wet = waterDodge() || lavaDodge() || hexDodge() || quakeDodge(); if (wet) return wet;   // (out of the captain's warned water, the lava demon's warned fire, the warned cracks and landing spots first)
-      dx = B.x - P.x; dy = B.y - P.y; d = Math.hypot(dx, dy) || 1;
-      const w = d > 560 ? 1 : d < 400 ? -1 : 0;
+      const wet = fbDodge() || waterDodge() || lavaDodge() || hexDodge() || quakeDodge(); if (wet) return wet;   // (out of the captain's warned water, the lava demon's warned fire, the warned cracks and landing spots first)
+      const [fx0, fy0, k0, k1] = B.fs ? fbBotFocus(B) : [B.x, B.y, 400, 560];   // (the final battle: round her lieutenants first, further off her giant form)
+      dx = fx0 - P.x; dy = fy0 - P.y; d = Math.hypot(dx, dy);
+      if (d < 8) { dx = P.x - G.arena.x || 1; dy = P.y - G.arena.y; d = Math.hypot(dx, dy) || 1; dx = -dx; dy = -dy; }   // (right on her: step off toward the middle)
+      const w = d > k1 ? 1 : d < k0 ? -1 : 0;
       return norm(dx / d * w - dy / d * 0.8, dy / d * w + dx / d * 0.8);
     }
     const goal = G.portal || G.arena, gt = guideTarget(), pr = G.arena ? G.arena.r + 380 : 520;
@@ -1357,7 +1450,7 @@
     // detour to a treasure or a cage close by
     // (give up on one it cannot reach within a few seconds)
     for (const c of [...G.chests, ...G.cages, ...waveBoxes()]) if (!c.open && !c.botSkip && !guardLocked(c) && d2(P.x, P.y, c.x, c.y) < 650 * 650) {
-      c.botT = (c.botT || 0) + 1 / 60; if (c.botT > 4) { c.botSkip = true; continue; }
+      c.botT = (c.botT || 0) + bdt; if (c.botT > BOT_CAGE_T) { c.botSkip = true; continue; }
       tx = c.x; ty = c.y; break;
     }
     if (goal && !goal.open && d2(P.x, P.y, goal.x, goal.y) < (pr + 400) ** 2) {
@@ -1368,9 +1461,9 @@
     if (d < 30) return [0, 0];
     // pressed against something for a while: slide sideways for a moment
     const bs = G.botStuck || (G.botStuck = { x: P.x, y: P.y, t: 0, side: 0 });
-    if (bs.side > 0) { bs.side -= 1 / 60; return norm(dx / d - dy / d * 2 * bs.dir, dy / d + dx / d * 2 * bs.dir); }
+    if (bs.side > 0) { bs.side -= bdt / BOT_SIDE_T; return norm(dx / d - dy / d * 2 * bs.dir, dy / d + dx / d * 2 * bs.dir); }
     if (d2(P.x, P.y, bs.x, bs.y) > 60 * 60) { bs.x = P.x; bs.y = P.y; bs.t = 0; }
-    else if ((bs.t += 1 / 60) > 1.5) { bs.t = 0; bs.side = 1; bs.dir = Math.random() < 0.5 ? -1 : 1; }
+    else if ((bs.t += bdt) > BOT_STUCK_T) { bs.t = 0; bs.side = 1; bs.dir = Math.random() < 0.5 ? -1 : 1; }
     return [dx / d, dy / d];
   }
   const norm = (x, y) => { const l = Math.hypot(x, y) || 1; return [x / l, y / l]; };
@@ -1523,9 +1616,9 @@
   }
   // the boss can be shot only on the ground, out of his entrance and his quiz (up in the air his ground spot is empty)
   // (nor while he changes into his second form: bolts fly past him then)
-  const bossOpen = (B) => !!B && B.alive && B.st !== "enter" && B.st !== "quiz" && B.st !== "morph" && B.st !== "tele" && !(B.jz > 60);   // (nor while the grey witch is gone in smoke)
+  const bossOpen = (B) => !!B && B.alive && B.st !== "enter" && B.st !== "quiz" && B.st !== "morph" && B.st !== "tele" && B.st !== "throne" && B.st !== "fly" && B.st !== "ult" && !(B.jz > 60);   // (nor while the grey witch is gone in smoke, nor on her throne / in her descent)
   // his body's radius on the ground (the second form stands 15 % bigger)
-  const bossR = (B) => 120 * (B && B.phase === 2 ? BOSS2_K : 1);
+  const bossR = (B) => (B && B.phase === 3 ? FB.GIANT_R : 120 * (B && B.phase === 2 ? BOSS2_K : 1));   // (Rồng Hắc Ám, the final battle's giant: FB.GIANT_R)
   // where a shot flying z above the ground meets o on the ground plane: its feet, or for a flyer (drawn hgt up) the spot
   // that puts the shot on its drawn body rather than on the air under it
   const aimY = (o, z = BOLT_Z) => o.y - Math.max(0, (o.hgt || 0) - z);
@@ -1733,14 +1826,17 @@
     const lv = Q && Q.lv ? (P.lv + Q.lv) / 2 : P.lv;
     const hp = creepHp(kind, lv, !!Q, k, elite, n);
     const r = c.r ? c.r : (c.fly ? 46 : kind === "spider" ? 62 : 50) * (elite ? 1.25 : 1);
-    return { id: G.nextId++, kind, c, x, y, vx: 0, vy: 0, face: 0, flip: false, hp, max: hp, st: c.fly ? "fly" : "walk", t: 0, cd: rnd(0.4, 1.4), dist: 0, hurt: 0, flash: 0,
+    const m = { id: G.nextId++, kind, c, x, y, vx: 0, vy: 0, face: 0, flip: false, hp, max: hp, st: c.fly ? "fly" : "walk", t: 0, cd: rnd(0.4, 1.4), dist: 0, hurt: 0, flash: 0,
       alive: true, die: 0, ph: Math.random() * 10, r, hgt: c.hgt || 0, elite: !!elite, born: G.t, atkK: atk };
+    if (LTS[kind]) { m.ltD = LTS[kind]; m.r = LTS[kind].r; }   // (one of the final battle's lieutenants)
+    return m;
   }
   function updateMon(m, dt) {
     if (!m.alive) { m.die += dt; return; }
     m.t += dt; m.cd -= dt; m.hurt -= dt; m.flash -= dt;
     if (m.fastT > 0) m.fastT -= dt;   // (a wolf's howl hurries it)
     if (m.guard && guardStep(m, dt)) return;   // (a cage guardian: asleep at the cage, walking back to it, or back there at once)
+    if (m.ltD && ltStep(m, dt)) return;   // (a lieutenant of the final battle: its own ways)
     if (m.champ && m.champ.k === "summon" && !m.wait && champSummon(m, dt)) return;   // (a summoning champion stands calling)
     // a camp monster idles at its camp until a girl steps in or the camp is attacked
     if (m.wait) {
@@ -2164,6 +2260,7 @@
   function damageMon(m, dmg, fx, fy, dot, by, kb = 60) {
     if (!m.alive) return;
     if (m.guard && !dot) dmg = Math.min(dmg, Math.max(1, Math.ceil(m.max * GUARD.HIT)));   // (a cage guardian's hide: no one hit takes more than GUARD.HIT of it)
+    if (m.ltD && !dot) dmg = Math.min(dmg, Math.max(1, Math.ceil(m.max * FB.LT_HIT)));   // (the lieutenants' likewise)
     if (!dot) m.hits = (m.hits || 0) + 1;
     if (m.shd > 0 && (dmg = champShield(m, dmg)) <= 0) { if (!dot) play("hit"); return; }   // (a champion's shield takes it first)
     m.hp -= dmg; m.flash = 0.12;
@@ -2179,6 +2276,7 @@
     m.alive = false; m.die = 0; G.kills++; G.lvKills++;
     if (give) tallyHits(m);
     if (m.guard && m.guard.gd !== undefined && NET.role !== "guest") guardBeaten(m.guard, m);
+    if (m.ltD && NET.role !== "guest") ltBeaten(m);
     if (m.camp) { m.camp.left--; m.camp = null; }
     play("pop");
     const cy = m.y - (m.hgt || 90);
@@ -2250,7 +2348,7 @@
   ];
   const AFF_K = AFFIX.map((a) => a.k), affixOf = (k) => AFFIX[AFF_K.indexOf(k)] || null;
   const champShare = () => CHAMP.SHARE[clamp(G.level | 0, 0, CHAMP.SHARE.length - 1)];
-  const champOk = (m) => !m.guard && !m.elite && !m.summoned && !m.mini && !m.champ && !(SKILL[m.kind] && SKILL[m.kind].sk === "boom");
+  const champOk = (m) => !m.guard && !m.ltD && !m.elite && !m.summoned && !m.mini && !m.champ && !(SKILL[m.kind] && SKILL[m.kind].sk === "boom");
   function champRoll(m) {
     if (!champOk(m) || Math.random() >= champShare()) return m;
     return makeChamp(m, AFF_K[Math.floor(Math.random() * AFF_K.length)]);
@@ -2441,7 +2539,7 @@
     }
     // monsters left far behind come back around
     for (const m of G.mons) {
-      if (!m.alive || m.summoned || m.wait || m.guard) continue;
+      if (!m.alive || m.summoned || m.wait || m.guard || m.ltD) continue;
       let near = false; for (const g of gs) if (d2(m.x, m.y, g.x, g.y) < 2700 * 2700) { near = true; break; }
       if (!near) { const T = gs[Math.floor(Math.random() * gs.length)], [x, y] = spawnPoint(T); m.x = x; m.y = y; m.st = m.c.fly ? "fly" : "walk"; }
     }
@@ -2723,7 +2821,10 @@
   function drawWaveClock() {
     for (const w of G.waves || []) {
       if (w.off || (w.st !== 1 && w.st !== 2) || d2(P.x, P.y, w.x, w.y) > (WAVE.R + 80) ** 2) continue;
-      label(w.st === 1 ? "Chuẩn bị!" : "Trụ vững: " + Math.max(1, Math.ceil(w.dur - w.t)) + " giây", G.camX + VW / 2, G.camY + 260, 46, "#ffe9a6");
+      // (under the quest pill "Vào đấu trường…", never through it: Dad's run on Màn 4 / 5)
+      const hy = hudMidY(14), y = Math.max(G.camY + 260, hy === null ? -Infinity : hy + 46 * WT * 0.85);
+      if (API.drawn) API.drawn.push(["waveClock", y, hy]);
+      label(w.st === 1 ? "Chuẩn bị!" : "Trụ vững: " + Math.max(1, Math.ceil(w.dur - w.t)) + " giây", G.camX + VW / 2, y, 46, "#ffe9a6");
     }
   }
 
@@ -2853,6 +2954,7 @@
     }
     return o.frz > 0 ? 0 : o.slow > 0 ? 0.4 : 1;
   }
+  const ULT_SELF_T = 40;   // s: the ultimate fills by itself in this long (Dad: 30 s was too quick)
   function addEnergy(n, x, y) {
     const was = G.energy;
     G.energy = Math.min(100, G.energy + n);
@@ -2918,7 +3020,9 @@
   const quizZoom = () => 1 - 0.18 * rsEase(qzK);
   // the boss changing form: the camera leans toward him so he and his growl are in view (mzK: 0..1)
   let mzK = 0;
-  const morphZoom = () => 1 - 0.14 * rsEase(mzK);
+  const morphZoom = () => (1 - 0.14 * rsEase(mzK)) * (1 - FB.ZOOM * rsEase(fbK));
+  // Rồng Hắc Ám (the final battle's giant form): the camera pulls back a little, so she and her big moves fit (fbK: 0..1)
+  let fbK = 0;
   function rescuePet(kind) {
     // (Simmy joins when her rescue film ends)
     if (isAlly(kind) && G.rescue && G.rescue.kind === kind) { G.rescue.mine = true; return; }
@@ -3025,7 +3129,7 @@
   // generic: who = the cage's kind (a PETS entry with owner "any"); Kairon's cage on the island reuses this
   function startAllyRescue(c, who) {
     if (G.rescue || !PETS[who]) return;
-    G.rescue = { kind: who, x: c.x, y: c.y, t: 0, mine: false, mul: talkMul() };   // (mul: its lines' timing fixed at the start, as the walk-in's)
+    G.rescue = { kind: who, x: c.x, y: c.y, t: 0, mine: false, mul: talkMul(), seq: rsSeq(who) };   // (mul, seq: its lines and their timing fixed at the start, as the walk-in's)
     P.vx = P.vy = 0;
   }
   function updateRescue(dt) {
@@ -3058,11 +3162,12 @@
   }
   // what is said in a girl's rescue film: Simmy's story lines; Sammy's thanks and Simmy's answer; another ally's thanks (Kairon's)
   function rsSeq(kind) {
-    if (kind === "simmy") return SAYS.simmyRescue;
-    const D = PETS[kind], th = D.thanks || ["Cảm ơn " + HEROES.g.name + " và " + HEROES.s.name + "!", "Từ giờ mình đi cùng các bé!"];
+    // (her thanks name the girls who are playing: alone, only her; Dad saw Matcha in Mochi's solo films)
+    if (kind === "simmy") return girlsIn().length > 1 ? SAYS.simmyRescue : SAYS.simmyRescue.map(([k, l]) => [k, l.map((x) => x.replace(HEROES.g.name + " và " + HEROES.s.name, girlsName()))]);
+    const D = PETS[kind], th = D.thanks || ["Cảm ơn " + girlsName() + "!", "Từ giờ mình đi cùng các bé!"];
     return D.reply ? [[kind, th], ["simmy", D.reply]] : [[kind, th]];
   }
-  const rsEnd = (r) => Math.max(RS_END, RS_THANK + seqTime(rsSeq(r.kind), r.mul) + 0.4);
+  const rsEnd = (r) => Math.max(RS_END, RS_THANK + seqTime(r.seq || rsSeq(r.kind), r.mul) + 0.4);
   const rescueZoom = () => { const r = G.rescue; if (!r) return 1; const k = Math.min(rsEase(clamp(r.t / 0.7, 0, 1)), 1 - rsEase(clamp((r.t - (rsEnd(r) - 0.6)) / 0.6, 0, 1))); return 1 + 0.55 * k; };
   // a heart-shaped candy star (Simmy's shots and her move): a glossy pink heart with a white shine and sprinkles
   function drawCandyStar(x, y, rot, alpha, sz = 1) {
@@ -3132,7 +3237,7 @@
       if (t >= RS_HIT && t < RS_HIT + 0.35) { ctx.save(); ctx.globalAlpha = 0.5 * (1 - (t - RS_HIT) / 0.35); ctx.fillStyle = "#fff"; ctx.fillRect(G.camX - 200, G.camY - 200, VW + 400, VH + 400); ctx.restore(); }
     }
     // the film's lines, one after another, each over its speaker
-    const seq = rsSeq(r.kind), say = sayAt(seq, t - RS_THANK, r.mul), si = r.kind === "simmy" ? -1 : seq.findIndex((l) => l[0] === "simmy");
+    const seq = r.seq || rsSeq(r.kind), say = sayAt(seq, t - RS_THANK, r.mul), si = r.kind === "simmy" ? -1 : seq.findIndex((l) => l[0] === "simmy");
     let sx = x - 260, sy = y + 30;
     if (si >= 0 && t >= RS_THANK + seqTime(seq.slice(0, si), r.mul) - 0.25) {
       // Simmy answers: she is already with the girls (or stands by the cage), and the two sisters are in one shot
@@ -3457,6 +3562,11 @@
   };
   const HIT_AT = 0.4, ALLY_FAINT_T = 12, ALLY_REVIVE_T = 1.5, ALLY_INV = 1.0, ALLY_REGEN_WAIT = 6, ALLY_REGEN = 0.03, ALLY_Z = 120;
   const ALLY_MON_K = [0.6, 0.8, 1.2, 1.4, 1.5], ALLY_BOSS_K = 0.6;
+  // in a boss fight (Dad: the girls carry the boss fights) the friends take ALLY_BOSSFIGHT_K x the damage and lie fainted ALLY_BOSSFIGHT_K x
+  // as long before they get up by themselves (24 s); a girl beside them still gets them up in ALLY_REVIVE_T s, Kairon's aura at once
+  const ALLY_BOSSFIGHT_K = 2;
+  const bossFight = () => !!(G.boss && G.boss.alive);
+  const allyFaintT = () => ALLY_FAINT_T * (bossFight() ? ALLY_BOSSFIGHT_K : 1);
   const AURA_R = 520, AURA_CD = 12, LEAP_T0 = 0.15, LEAP_T1 = 0.7, LEAP_H = 280;
   const ACTS = ["combo", "bolt", "fireball", "nova", "chain", "multishot", "ljav", "pierce", "bhammer", "charge", "aura", "whirl", "leap", "warcry"];
   // each action's poses: [[until t, frame], ...] (sk0..2: the skill poses facing us; atkN: the combo frame N facing the way she faces);
@@ -3512,7 +3622,7 @@
   function allyDamage(p, n, fx, fy) {
     const C = CLS[p.kind];
     if (!C || p.faintT > 0 || p.inv > 0) return;
-    const cost = n >= 2 ? n / 5 * C.hp * ALLY_BOSS_K : n * ALLY_MON_K[clamp(G.level || 0, 0, 4)];
+    const cost = (n >= 2 ? n / 5 * C.hp * ALLY_BOSS_K : n * ALLY_MON_K[clamp(G.level || 0, 0, 4)]) * (bossFight() ? ALLY_BOSSFIGHT_K : 1);
     p.hp = Math.max(0, p.hp - cost); p.inv = ALLY_INV; p.hurtT = 0.3; p.calm = 0;
     const [nx, ny] = norm(p.x - (fx ?? p.x - 1), p.y - (fy ?? p.y)); p.x += nx * 30; p.y += ny * 20;
     if (G.parts.length < 430) burst(p.x, p.y - 150 * CHAR_K, 8, ["#ff9ab8", "#fff"], 220, 0.4);
@@ -3520,7 +3630,7 @@
     if (p.hp <= 0.001) allyFaint(p);
   }
   function allyFaint(p) {
-    p.hp = 0; p.faintT = ALLY_FAINT_T; p.rev = 0; p.act = null; p.chase = null; p.z = 0; p.moving = false;
+    p.hp = 0; p.faintT = p.fmax = allyFaintT(); p.rev = 0; p.act = null; p.chase = null; p.z = 0; p.moving = false;
     play("hurt"); if (G.parts.length < 420) burst(p.x, p.y - 80, 14, ["#fff4c2", "#ffd34d", "#b9a4ff"], 260, 0.6);
     allyLog(p.kind, "faint"); TALLY.allyFaint[p.kind] = (TALLY.allyFaint[p.kind] || 0) + 1;
   }
@@ -3543,7 +3653,7 @@
       return;
     }
     if (p.calm > ALLY_REGEN_WAIT && p.hp < p.max) p.hp = Math.min(p.max, p.hp + p.max * ALLY_REGEN * dt);
-    if (G.quiz && (p.act || p.chase)) { p.act = null; p.chase = null; p.chaseK = null; p.z = 0; }
+    if ((G.quiz || fbShelter(p)) && (p.act || p.chase)) { p.act = null; p.chase = null; p.chaseK = null; p.z = 0; }
     if (p.act) { stepAct(p, dt, true, owner); return; }
     if (p.chase) {
       const T = p.chase, B = G.boss, dead = !T || (T === B ? !bossOpen(B) : !T.alive);
@@ -3559,7 +3669,7 @@
       }
     }
     trailGirl(p, owner, dt);
-    if (!act || G.quiz || (p.cd -= dt) > 0) return;   // (no attacks in a maths quiz: the monsters wait too)
+    if (!act || G.quiz || fbShelter(p) || (p.cd -= dt) > 0) return;   // (no attacks in a maths quiz: the monsters wait too)
     const T = nearestFoes(owner.x, owner.y, C.range, 1)[0];
     if (!T) { p.cd = 0.3; return; }
     if (p.skCd <= 0) { const s = pickSkill(p, T); if (s) { if (s === "nova" || s === "warcry") { p.chase = T; p.chaseK = s; } else startAct(p, s, T); return; } }
@@ -3569,7 +3679,8 @@
   // trail behind the girl, one on each side (the pets' way)
   function trailGirl(p, owner, dt) {
     const qz = !!G.quiz, side = p.i % 2 ? 1 : -1, back = qz ? 60 + Math.floor(p.i / 2) * 30 : 120 + Math.floor(p.i / 2) * 60;
-    const fx = owner.flip ? 1 : -1, tx = owner.x + fx * back * 0.8 + side * (qz ? 20 : 30), ty = owner.y + side * (qz ? 35 : 70);
+    const fx = owner.flip ? 1 : -1, sh = fbShelter(p);   // (the final battle's dark: into a circle of light)
+    const tx = sh ? sh[0] : owner.x + fx * back * 0.8 + side * (qz ? 20 : 30), ty = sh ? sh[1] : owner.y + side * (qz ? 35 : 70);
     const dx = tx - p.x, dy = ty - p.y, d = Math.hypot(dx, dy);
     if (d > 1400) { p.x = tx; p.y = ty; return; }
     const sp = Math.min(d * 3.2, qz ? 900 : 560) * dt;
@@ -3883,7 +3994,7 @@
     spr(fn, p.x, p.y, false, m, 1);
     const f = FR[fn], hx = f ? p.x + (f.w * 0.22 - f.ax) * f.s * m : p.x - 60, hy = p.y - (f ? f.ay * f.s * m * 0.75 : 60);
     for (let i = 0; i < 3; i++) { const an = G.t * 4 + i * TAU / 3; fx("fx_twinkle", hx + Math.cos(an) * 42, hy - 24 + Math.sin(an) * 14, 0.6, 1, G.t * 6); }
-    const k = clamp(p.fk ?? Math.max((p.rev || 0) / ALLY_REVIVE_T, 1 - p.faintT / ALLY_FAINT_T), 0, 1), rx = p.x, ry = p.y - 170 * CHAR_K, R = 26, help = p.rev > 0;   // (teal while a girl helps her up: her own page knows)
+    const k = clamp(p.fk ?? Math.max((p.rev || 0) / ALLY_REVIVE_T, 1 - p.faintT / (p.fmax || ALLY_FAINT_T)), 0, 1), rx = p.x, ry = p.y - 170 * CHAR_K, R = 26, help = p.rev > 0;   // (teal while a girl helps her up: her own page knows)
     ctx.save(); ctx.fillStyle = "rgba(28,16,48,.8)"; ctx.beginPath(); ctx.arc(rx, ry, R + 7, 0, TAU); ctx.fill();
     ctx.lineWidth = 8; ctx.lineCap = "round"; ctx.strokeStyle = "rgba(255,255,255,.2)"; ctx.beginPath(); ctx.arc(rx, ry, R, 0, TAU); ctx.stroke();
     ctx.strokeStyle = help ? "#7cf2c6" : "#ffd34d"; ctx.beginPath(); ctx.arc(rx, ry, R, -Math.PI / 2, -Math.PI / 2 + TAU * k); ctx.stroke(); ctx.restore();
@@ -3979,7 +4090,7 @@
   // PH2_TEMPO faster again, warnings shorter but never under WARN_MIN, one more move (the candy boss's ring of lollipops, the captain's
   // double tsunami) and one more monster in each wave he calls.
   const BOSS_HP_K = 1.2, PH1_TEMPO = 1.1, PH2_TEMPO = 1.3, MORPH_T = 2.0, MORPH_SWAP = 1.0, WARN_MIN = 0.8, BOSS2_K = 1.15;
-  const bossTempo = (B) => PH1_TEMPO * (B && B.phase === 2 ? PH2_TEMPO : 1);
+  const bossTempo = (B) => (B && B.fs ? FB.TEMPO[B.fs] : PH1_TEMPO * (B && B.phase === 2 ? PH2_TEMPO : 1));
   function startBoss() {
     const A = G.arena; G.arenaLock = true;
     if (d2(P.x, P.y, A.x, A.y) > (A.r - 80) ** 2) fadeTo(() => { const [nx, ny] = norm(P.x - A.x, P.y - A.y); P.x = A.x + nx * (A.r - 260); P.y = A.y + ny * (A.r - 260); });
@@ -3988,7 +4099,9 @@
     const BD = G.lvl.boss;
     $("bossName").textContent = BD.name;
     const hp = Math.round(BD.hp * BOSS_HP_K * partyHp());   // (the party: his health grows with the friends, his pace does not)
-    G.boss = { x: A.x + nx * 260, y: A.y + ny * 260, dir: -1, hp, max: hp, st: "enter", t: 0, flash: 0, hurtPose: 0, cycle: 0, alive: true, die: 0, dropY: -700, iT: 0, vx: 0, vy: 0, phase: 1 };
+    // (facing the girls from the start: they come in on the other side of the arena; Dad: the cake boss talked facing away from them)
+    G.boss = { x: A.x + nx * 260, y: A.y + ny * 260, dir: nx > 0 ? -1 : 1, hp, max: hp, st: "enter", t: 0, flash: 0, hurtPose: 0, cycle: 0, alive: true, die: 0, dropY: -700, iT: 0, vx: 0, vy: 0, phase: 1 };
+    if (BD.final) { const [tx, ty] = fbThrone(), fh = Math.round(FB.HP * BOSS_HP_K * partyHp()); Object.assign(G.boss, { x: tx, y: ty, fs: 1, hp: fh, max: fh }); G.fbLtT = 2; G.fbTurn = 0; }   // (the final battle: she lands on her throne)
     // the maths quizzes: he leaps up twice, at 2/3 and 1/3 of his health (each leap asks 1 or 2 questions in a row)
     if (BD.quiz) G.boss.quizHp = [Math.round(hp * 2 / 3), Math.round(hp / 3)];
     // (the monsters chasing the girls stay and keep fighting)
@@ -4003,7 +4116,8 @@
   function endBossCut() {
     const c = G.bcut; G.bcut = null; IN.ultPressed = false; if (!c) return;
     const BD = G.lvl.boss || {};
-    if (c.ph === "intro") { if (G.boss && G.boss.st === "enter" && NET.role !== "guest") { G.boss.st = "walk"; G.boss.t = 0; } showBanner(BD.name + "!", BD.tip || ""); }
+    if (c.ph === "intro" && BD.final) { if (G.boss && G.boss.st === "enter" && NET.role !== "guest") fbAfterIntro(G.boss); }
+    else if (c.ph === "intro") { if (G.boss && G.boss.st === "enter" && NET.role !== "guest") { G.boss.st = "walk"; G.boss.t = 0; } showBanner(BD.name + "!", BD.tip || ""); }
   }
   function updateBossCut(dt) {
     const c = G.bcut, B = G.boss; if (!c) return;
@@ -4086,6 +4200,15 @@
   // the world view's top (world y), zoom and letterbox, set each frame by render: a screen y in css px is at T + (y * DPR - offY) / zs
   const VIEWT = { T: 0, zs: 0, offY: 0, L: 0, offX: 0 };
   // the bottom of the boss's name and health bar (css px; the stub page has no layout: 15 u, u = min(1vh, 1.6vw), as the css places it)
+  // the bottom of the HUD's middle column (the map's name, the SKSP letters and the quest pill) in css px, and as a world y (pad css px
+  // below it): what is drawn at the top of the view (the ambush clock, the story bubbles) stays under it (the stub page has no layout:
+  // 14 u). Before the first frame is drawn (VIEWT unset): null.
+  function hudMidBottom() {
+    const el = $("quest");
+    if (el && !el.hidden && el.getBoundingClientRect) { const r = el.getBoundingClientRect(); if (r.bottom > 0) return r.bottom; }
+    return 14 * Math.min(window.innerHeight / 100, window.innerWidth * 1.6 / 100);
+  }
+  const hudMidY = (pad = 10) => (VIEWT.zs && !$("hud").hidden ? VIEWT.T + ((hudMidBottom() + pad) * DPR - VIEWT.offY) / VIEWT.zs : null);
   function bossBarBottom() {
     const el = $("bossbar");
     if (el && !el.hidden && el.getBoundingClientRect) { const r = el.getBoundingClientRect(); if (r.bottom > 0) return r.bottom; }
@@ -4101,6 +4224,8 @@
   // drawn over the scene: what he says in his films, and his laugh during the quiz
   // (every bubble of his stays below his name and health bar at the top of the screen and inside the view: Dad saw his laugh under the bar)
   function drawBossTalk(L, T, R, Bt) {
+    // (the final battle: "Chạy vào vòng sáng!" over each circle of light while the dark is warned, over everyone, for the little ones)
+    for (const o of G.hexes || []) if (FB_GEO[o.k] === "dark" && o.t < o.w) for (const [x, y] of o.m >= 2 ? [[o.cx, o.cy], [o.vx, o.vy]] : [[o.cx, o.cy]]) label(FB_SAY.ultTip, x, y - o.r * 0.55 - 60 + Math.sin(G.t * 5) * 6, 44, "#fff2b0");
     const B = G.boss, BD = G.lvl && G.lvl.boss; if (!B || !BD) return;
     const c = G.bcut, head = B.headY === undefined ? B.y - 520 : B.headY;
     const minTop = VIEWT.zs ? VIEWT.T + ((bossBarBottom() + 10) * DPR - VIEWT.offY) / VIEWT.zs : undefined, box = { L, R, B: Bt };
@@ -4111,10 +4236,13 @@
     } else if (c && c.ph === "die" && BD.bye && c.t >= BD_SAY && c.t < BD_FALL) {
       const k = Math.min(clamp((c.t - BD_SAY) / 0.25, 0, 1), clamp((BD_FALL - c.t) / 0.2, 0, 1));
       talkBubble(BD.bye, B.x + Math.sin(c.t * 13) * 4, head - 20, k, 46 * WT, false, 0, minTop, box);
-    } else if (B.alive && B.st === "morph" && BD.morph && B.t >= 0.15 && B.t < MORPH_T - 0.1) {
-      // changing form: he growls his line, shaking with rage
-      const k = Math.min(clamp((B.t - 0.15) / 0.2, 0, 1), clamp((MORPH_T - 0.1 - B.t) / 0.2, 0, 1));
-      talkBubble(BD.morph, B.x + Math.sin(G.t * 40) * 5, head - 20, k, 54 * WT, false, 0, minTop, box);
+    } else if (B.alive && B.st === "morph" && BD.morph && B.t >= 0.15 && B.t < mT(B) - 0.1) {
+      // changing form: he growls his line, shaking with rage (the final battle: her own line for each change)
+      const k = Math.min(clamp((B.t - 0.15) / 0.2, 0, 1), clamp((mT(B) - 0.1 - B.t) / 0.2, 0, 1));
+      talkBubble(B.fs === 3 ? FB_SAY.m2 : B.fs === 4 ? FB_SAY.m3 : BD.morph, B.x + Math.sin(G.t * 40) * 5, head - 20, k, 54 * WT, false, 0, minTop, box);
+    } else if (B.alive && B.fs && fbTalk(B)) {
+      const [lines, k] = fbTalk(B);
+      talkBubble(lines, B.x + (B.st === "ult" ? Math.sin(G.t * 40) * 5 : 0), head - 20, k, 52 * WT, false, 0, minTop, box);
     } else if (B.alive && G.quiz && G.quiz.ph !== "down" && BD.ha) {
       // he laughs from beside the fence: the bubble over his head, leaning in toward the arena
       const sd = B.x < G.arena.x ? 1 : -1, k = G.quiz.ph === "up" ? clamp(G.quiz.t / 0.3, 0, 1) : 1;
@@ -4122,7 +4250,17 @@
       talkBubble([BD.ha], B.x + sd * 130 + Math.sin(G.t * 40) * 4, head + 10, k, 62 * WT * big, false, 0, minTop, box);   // (62: as big on the screen as before under the quiz's lighter zoom)
     }
   }
-  function updateBossBar() { if (G.boss) { $("bfill").style.width = (100 * Math.max(0, G.boss.hp) / G.boss.max) + "%"; $("bossbar").classList.toggle("p2", G.boss.phase === 2); } }
+  function updateBossBar() {
+    const B = G.boss; if (!B) return;
+    let k = Math.max(0, B.hp) / B.max;
+    if (B.fs) {
+      // (the final battle: her lieutenants' health together on her throne; then hers, under the name of her form)
+      const L = G.mons.filter((m) => m.ltD), nm = B.fs === 1 ? FB_SAY.bar : B.phase === 3 ? FB_SAY.giant : (G.lvl.boss || {}).name;
+      if (B.fs === 1) { const mx = L.reduce((s, m) => s + m.max, 0); k = mx ? L.reduce((s, m) => s + (m.alive ? Math.max(0, m.hp) : 0), 0) / mx : 1; }
+      if ($("bossName").textContent !== nm) $("bossName").textContent = nm;
+    }
+    $("bfill").style.width = (100 * k) + "%"; $("bossbar").classList.toggle("p2", B.phase >= 2);
+  }
   function updateBoss(dt) {
     const B = G.boss; if (!B) return;
     B.t += dt; B.flash -= dt; B.hurtPose -= dt; B.iT -= dt; B.morphFlash = (B.morphFlash || 0) - dt;
@@ -4131,12 +4269,14 @@
     const T = targetFor(B.x, B.y), dx = T.x - B.x, dy = T.y - B.y, d = Math.hypot(dx, dy) || 1, fast = B.phase === 2, k = bossTempo(B), A = G.arena;
     if (B.st === "quiz") return updateQuiz(B, dt);
     if (B.st === "enter") {
+      if (Math.abs(dx) > 30) B.dir = Math.sign(dx);   // (he lands and speaks facing the girls)
       B.dropY = Math.min(0, B.dropY + 1800 * dt);
       if (B.dropY >= 0 && B.t > 0.5) { if (!B.landed) { B.landed = true; SFX.slam(); G.shake = 20; dust(B.x, B.y, 20); } if (B.t > 1.2 && !G.bcut) { B.st = "walk"; B.t = 0; } }
       return;
     }
     // down to half: he changes once the move he was making (or his quiz) is over
-    if (B.phase !== 2 && B.st !== "morph" && B.hp <= B.max / 2 && (B.st === "walk" || B.st === "rest") && !G.quiz) startMorph(B);
+    if (B.fs && fbUpdate(B, dt)) return;   // (the final battle: her throne, her descent, her desperation move, her two changes)
+    if (!B.fs && B.phase !== 2 && B.st !== "morph" && B.hp <= B.max / 2 && (B.st === "walk" || B.st === "rest") && !G.quiz) startMorph(B);
     if (B.st === "morph") return updateMorph(B, dt);
     const style = (G.lvl.boss && G.lvl.boss.style) || "king";
     if (B.st === "walk") {
@@ -4147,7 +4287,7 @@
       // the lava demon's until his fire is out)
       if (((d < 420 && B.t > 0.6 / k) || B.t > 3.0 / k) && !(style === "captain" && G.waters.length) && !(style === "yeti" && G.waters.some((w) => w.k !== "blizzard")) && !(style === "lava" && G.lavas.length) && !(style === "hex" && G.hexes.length)) bossPrep(B, style, T, dx / d, dy / d, fast);
     } else if (B.st === "prep") {
-      if (B.t > 0.9 / k) bossAct(B, T, fast);
+      if (B.t > (B.move === "stomp" ? FB.STOMP_PREP : 0.9) / k) bossAct(B, T, fast);   // (Rồng Hắc Ám winds up her leap longer)
     } else if (B.st === "tele") {
       // the grey witch, gone in smoke: back at the spot that glows once its warning is over
       if (B.t >= (B.tw || 1) || B.t > 4) { B.x = B.ix; B.y = B.iy; B.st = "slam"; B.t = 0; }
@@ -4173,6 +4313,8 @@
     if (!(B.jz > 60) && B.st !== "tele") for (const g of hitables()) if (d2(g.x, g.y, B.x, B.y) < br * br) hurtTarget(g, B.x, B.y, false, BOSS_HIT.contact);
   }
   // ---------------------------------------------------------------- his change into the second form (the host runs it; both pages show it)
+  // (the final battle's two changes are longer films: FB.M2 / FB.M3, the painting swapped at FB.M2S / FB.M3S)
+  const mT = (B) => (B && B.fs === 3 ? FB.M2 : B && B.fs === 4 ? FB.M3 : MORPH_T), mSwap = (B) => (B && B.fs === 3 ? FB.M2S : B && B.fs === 4 ? FB.M3S : MORPH_SWAP);
   function startMorph(B) {
     B.st = "morph"; B.t = 0; B.vx = B.vy = 0; B.hurtPose = 0; B.move = null; B.mfx = {};
     // nothing of his first form can hurt any more: its warnings and shots go (the film's flash covers it)
@@ -4181,23 +4323,27 @@
   }
   function updateMorph(B, dt) {
     const T = targetFor(B.x, B.y); if (Math.abs(T.x - B.x) > 30) B.dir = Math.sign(T.x - B.x);
-    if (B.phase !== 2 && B.t >= MORPH_SWAP) { B.phase = 2; updateBossBar(); }
+    const ph = B.fs === 4 ? 3 : 2;
+    if (B.phase !== ph && B.t >= mSwap(B)) { B.phase = ph; updateBossBar(); if (B.fs === 4) showBanner(FB_SAY.giant + "!", FB_SAY.giantTip); }
     morphFx(B, B.t - dt, B.t);
-    if (B.t >= MORPH_T) { B.phase = 2; B.st = "rest"; B.t = 0; B.cycle0 = B.cycle; }
+    if (B.t >= mT(B)) { B.phase = ph; B.st = "rest"; B.t = 0; B.cycle0 = B.cycle; }
   }
   // the film's look and sound (both pages): rumbling (at most 10 px), roars, magic gathering, a flash and rings bursting as he changes
   function morphFx(B, t0, t1) {
     // (each moment once per film: a guest page's clock is set from the host's now and then and may step back a little)
     const fired = B.mfx || (B.mfx = {}), at = (x) => t1 >= x && t0 < x + 0.3 && !fired[x] && (fired[x] = true), cols = bossLook().cols;
     const rgb = bossLook().rgb;
-    G.shake = Math.min(Math.max(G.shake, 4 + 5 * Math.min(1, t1 / MORPH_SWAP)), 10);
+    const SW = mSwap(B), big = B.fs === 4;
+    G.shake = Math.min(Math.max(G.shake, 4 + 5 * Math.min(1, t1 / SW)), big ? 16 : 10);
     if (at(0.05)) SFX.roar();
-    if (at(0.3) || at(0.65)) G.parts.push({ type: "ring", x: B.x, y: B.y - 40, r: 380, vr: -520, life: 0.45, max: 0.45, col: rgb });   // magic gathering in
-    if (t1 < MORPH_SWAP && Math.floor(t1 * 12) !== Math.floor(t0 * 12) && G.parts.length < 420) {
+    if (at(0.3) || at(0.65) || (B.fs && (at(1.0) || at(1.4)))) G.parts.push({ type: "ring", x: B.x, y: B.y - 40, r: 380, vr: -520, life: 0.45, max: 0.45, col: rgb });   // magic gathering in
+    if (B.fs && t1 < SW && Math.floor(t1 * 5) !== Math.floor(t0 * 5)) for (let i = 0; i < (big ? 4 : 2); i++) hexSmoke(B.x + rnd(-160, 160), B.y - rnd(40, 420), big ? 1.6 : 1.2);   // (purple smoke swirling round her)
+    if (B.fs && at(SW)) fbMorphBurst(B, big);
+    if (t1 < SW && Math.floor(t1 * 12) !== Math.floor(t0 * 12) && G.parts.length < 420) {
       const a = Math.random() * TAU, r = rnd(260, 420);
       G.parts.push({ type: "dot", x: B.x + Math.cos(a) * r, y: B.y - 200 + Math.sin(a) * r * 0.7, vx: -Math.cos(a) * r * 1.6, vy: -Math.sin(a) * r * 1.1, life: 0.6, max: 0.6, r: rnd(6, 11), col: cols[Math.floor(Math.random() * cols.length)] });
     }
-    if (at(MORPH_SWAP)) {
+    if (at(SW)) {
       B.morphFlash = 0.45; SFX.boom(); SFX.roar();
       G.parts.push({ type: "ring", x: B.x, y: B.y - 40, r: 60, vr: 1500, life: 0.6, max: 0.6, col: rgb });
       G.parts.push({ type: "ring", x: B.x, y: B.y - 40, r: 30, vr: 950, life: 0.8, max: 0.8, col: "255,255,255" });
@@ -4266,7 +4412,9 @@
   // the next question of the same leap: he stays up in the sky, the fence stays up
   function nextQuestion(z) {
     const cfg = quizCfg(G.lvl.boss.quiz); let q = makeSum(cfg);
-    for (let i = 0; i < 6 && q.a === z.a && q.b === z.b; i++) q = makeSum(cfg);
+    // (a new answer on a new square: Dad's run had the same answer twice in one leap 4 times in 19, so she could just stay put)
+    const same = (q) => (q.a === z.a && q.b === z.b) || q.ans[q.ok] === z.ans[z.ok] || q.ok === z.ok;
+    for (let i = 0; i < 40 && same(q); i++) q = makeSum(cfg);
     Object.assign(z, q, { ph: "next", t: 0, T: quizT(cfg, q), drops: [], hit: false, lastSec: -1, n: (G.qzN = (G.qzN || 0) + 1), left: z.left - 1 });
     quizAnnounce("next");
   }
@@ -4286,6 +4434,7 @@
     const A = G.arena;
     // he leaps out of the arena and hovers beside the fence, laughing, while the girls answer; then he leaps back in
     if (z.hx === undefined) { const sd = B.x < A.x ? -1 : 1; z.hx = A.x + sd * (A.r + 330); z.hy = A.y + 150; z.x0 = B.x; z.y0 = B.y; }
+    B.dir = z.hx < A.x ? 1 : -1;   // (all through his quiz, out by the fence and back, he faces the arena and the girls in it)
     const hover = () => { B.x = z.hx; B.y = z.hy; B.jz = QZ_HOV + Math.sin(G.t * 2.4) * 22; };
     if (z.ph === "up") {
       const k = clamp(z.t / QZ_UP, 0, 1), e = rsEase(k);
@@ -4356,6 +4505,12 @@
     ctx.globalAlpha = 0.85 * k; ctx.strokeStyle = "#fff"; ctx.lineWidth = 18; ctx.shadowColor = "rgba(255,230,150,.9)"; ctx.shadowBlur = 24;
     ctx.beginPath(); ctx.moveTo(A.x - A.r, A.y); ctx.lineTo(A.x + A.r, A.y); ctx.moveTo(A.x, A.y - A.r); ctx.lineTo(A.x, A.y + A.r); ctx.stroke();
     ctx.restore();
+  }
+  // the four answers on the floor, drawn over everyone (Dad's run: the party standing on the right square hid its number)
+  function drawQuizNums() {
+    const z = G.quiz, A = G.arena; if (!z || !A || z.ph === "up" || z.ph === "down" || z.ph === "next" || z.ph === "wait") return;
+    const k = z.ph === "ask" ? clamp(z.t / 0.4, 0, 1) : 1, mine = quadOf(P.x, P.y), after = z.ph === "drop" && z.hit;
+    if (API.drawn) API.drawn.push(["quizNums", z.ans.join()]);
     for (let i = 0; i < 4; i++) {
       const [x, y] = quadCentre(i), sz = 230 * (0.6 + 0.4 * k) * (i === mine && !after ? 1 + 0.05 * Math.sin(G.t * 8) : 1);
       ctx.save(); ctx.globalAlpha = k * (after && i !== z.ok ? 0.45 : 1);
@@ -4386,7 +4541,7 @@
   const FENCE_N = 30;
   function fencePosts() {
     const A = G.arena, out = [];
-    for (let i = 0; i < FENCE_N; i++) { const a = i / FENCE_N * TAU; out.push({ x: A.x + Math.cos(a) * (A.r + 40), y: A.y + Math.sin(a) * (A.r + 40), i }); }
+    for (let i = 0, N = Math.round(FENCE_N * A.r / ARENA_R); i < N; i++) { const a = i / N * TAU; out.push({ x: A.x + Math.cos(a) * (A.r + 40), y: A.y + Math.sin(a) * (A.r + 40), i }); }
     return out;
   }
   function drawFencePost(o) {
@@ -4424,11 +4579,17 @@
     B.st = "prep"; B.t = 0; B.ax = ux; B.ay = uy; SFX.roar();
     const c = B.cycle, c2 = B.cycle - (B.cycle0 || 0);
     // (his second form adds a move: the candy boss's ring of lollipops, the captain's double tsunami, the lava demon's eruption)
-    if (B.phase === 2 && PH2_MOVES[style]) B.move = PH2_MOVES[style][c2 % PH2_MOVES[style].length];
+    if (B.fs && FB_MOVES[B.fs]) B.move = FB_MOVES[B.fs][c2 % FB_MOVES[B.fs].length];   // (the final battle: her moves of this stage, in turn)
+    else if (B.phase === 2 && PH2_MOVES[style]) B.move = PH2_MOVES[style][c2 % PH2_MOVES[style].length];
     else B.move = style === "furrow" ? (c % 3 === 2 ? "crows" : "furrow") : style === "spider" ? (c % 2 ? "spit" : "leap") : style === "knight" ? "charge" : style === "captain" ? WKINDS[c % 3] : style === "yeti" ? YMOVES[c % 3] : style === "lava" ? LAVA_MOVES[c % 3] : style === "hex" ? HEX_MOVES[c % 4] : (c % 2 ? "bombs" : "meteor");
     if (B.move === "leap") {
       const A = G.arena, [nx, ny] = norm(T.x - A.x, T.y - A.y), r = Math.min(Math.hypot(T.x - A.x, T.y - A.y), A.r - 200);
       B.ix = A.x + nx * r; B.iy = A.y + ny * r; addQuake(B.ix, B.iy, 210, (fast ? 0.6 : 0.9) + 0.9);
+    }
+    if (B.move === "stomp") {
+      // Rồng Hắc Ám's leap onto the girl: her landing circle shows from her wind-up (it lands as she does, after her wind-up and the leap)
+      const A = G.arena, [nx, ny] = norm(T.x - A.x, T.y - A.y), r = Math.min(Math.hypot(T.x - A.x, T.y - A.y), A.r - 420);
+      B.ix = A.x + nx * r; B.iy = A.y + ny * r; addFb("stomp", B.ix, B.iy, { w: FB.STOMP_PREP / bossTempo(B) + 0.9, fly: 0.35, r: 330 });
     }
   }
   function bossAct(B, T, fast) {
@@ -4446,7 +4607,8 @@
       }
     } else if (B.move === "crows") summonBats(B);
     else if (B.move === "lolli") lolliRing(B, T);
-    else if (B.move === "leap") { B.st = "leap"; B.lx0 = B.x; B.ly0 = B.y; if (Math.abs(B.ix - B.x) > 30) B.dir = Math.sign(B.ix - B.x); }
+    else if (B.move === "leap" || B.move === "stomp") { B.st = "leap"; B.lx0 = B.x; B.ly0 = B.y; if (Math.abs(B.ix - B.x) > 30) B.dir = Math.sign(B.ix - B.x); if (B.move === "stomp") SFX.roar(); }
+    else if (isFb(B.move)) fbMove(B, T);
     else if (B.move === "spit") {
       const a0 = Math.atan2(T.y - B.y, T.x - B.x), n = fast ? 5 : 3;
       for (let i = 0; i < n; i++) { const a = a0 + (i - (n - 1) / 2) * 0.28; G.foes.push({ type: "webball", x: B.x + Math.cos(a) * 120, y: B.y + Math.sin(a) * 60, vx: Math.cos(a) * 700, vy: Math.sin(a) * 700, life: 1.6 }); }
@@ -5342,7 +5504,7 @@
     else if (p.on < PIL_ON) footFrame(F[2], p.x, p.y + 12, W * (1 + 0.04 * Math.sin(G.t * 23 + p.i)), 0.85, flip, 1 + 0.05 * Math.sin(G.t * 17 + p.i * 2), true);
     else { footFrame(F[2], p.x, p.y + 12, W, 1 - down, flip, 1, true); footFrame(F[3], p.x, p.y + 12, W, Math.min(1, down * 3) * (1 - down * down), flip, 1, true); }
   }
-  // ---------------------------------------------------------------- Phù thủy Xám Xịt's magic (style "hex"), one move after another:
+  // ---------------------------------------------------------------- Phù thủy Hắc Ám's magic (style "hex"), one move after another:
   // summon: purple circles glow on the floor away from the girls, then a ghost or a crow steps out of each (a wave of her monsters);
   // orbs: 3 (her second form 4) magic orbs gather round her staff, then fly after the girls, slower than they walk and turning slowly, for a
   //   few seconds, then pop: a girl who keeps moving is never caught; one that touches a girl pops on her;
@@ -5355,7 +5517,7 @@
   // a piece of her own second-form painting (the burst of purple fire at her feet), her frames for the clones; code adds light and sparks.
   // { id, k (HKINDS), x, y, t, w, end, r, vx, vy (an orb's flight), cx, cy (an orb: what it gathered round / a ring circle: the ring's
   //   middle), v (an orb's speed), fly (its flight time), n / m (an orb: its place among m), weak (a clone's orb), mon (summon: 0 ghost, 1 crow) }
-  const HKINDS = ["sum", "orb", "tele", "circle", "clone"], HEX_MOVES = ["summon", "orbs", "teleport", "circle"];
+  const HKINDS = ["sum", "orb", "tele", "circle", "clone", "kslash", "kslam", "feather", "dive", "beam", "star", "breath", "meteor", "stomp", "dark", "ult"], HEX_MOVES = ["summon", "orbs", "teleport", "circle"];
   const isHex = (mv) => HEX_MOVES.includes(mv) || mv === "clones" || mv === "ring";
   const HEX_W1 = 1.1, HEX_W2 = WARN_MIN + 0.05, HEX_ON = 0.4, HEX_RGB = "190,110,255", HEX_COLS = ["#f6ecff", "#dcc2ff", "#b98aff", "#9a5cff", "#ffb3e6"];
   const SUM_R = 120, SUM_MAX = 8, SUM_KINDS = ["castle_zombie", "castle_bat"];
@@ -5364,7 +5526,7 @@
   Object.assign(OBST, { cs_candelabra: 26, cs_pillar: 46, cs_cauldron: 44, cs_bookshelf: 48, cs_lamp: 20, cs_gargoyle: 46, cs_pumpkins: 44 });   // (what blocks a walker)
   function addHex(k, x, y, o) { const h = { id: G.nextId++, k, x, y, t: 0, w: 1, end: 2, r: 100, vx: 0, vy: 0, cx: x, cy: y, v: 0, fly: 0, n: 0, m: 1, weak: 0, mon: 0, cost: bossHit(G.boss && G.boss.move), ...o }; G.hexes.push(h); return h; }
   // her second form floats (her painting ends in smoke): drawn this far above the ground, bobbing
-  const hexLift = (B) => (G.lvl && G.lvl.boss && G.lvl.boss.style === "hex" && B && B.phase === 2 && B.alive ? HEX_LIFT + Math.sin(G.t * 2.2) * 10 : 0);
+  const hexLift = (B) => (G.lvl && G.lvl.boss && G.lvl.boss.style === "hex" && B && B.alive && (B.phase === 2 || (B.phase === 3 && !FR.castle_boss3_w0)) ? (B.phase === 3 ? FB.LIFT3 : HEX_LIFT) + Math.sin(G.t * 2.2) * 10 : 0);
   // how much of her shows: she fades into smoke as she teleports away and out of it where she comes back
   const hexVis = (B) => (!B || !B.alive ? 1 : B.st === "tele" ? clamp(1 - B.t / TELE_OUT, 0, 1) : B.move === "teleport" && B.st === "slam" ? clamp(B.t / TELE_IN, 0, 1) : 1);
   // orbs gather round (cx, cy): n of them, the first launching after w s, the others ORB_STEP after one another
@@ -5377,12 +5539,12 @@
   // where an orb is while it gathers (both pages work it out from its clock): circling the staff, ORB_RING out
   function orbGather(o) { const a = o.n / o.m * TAU + o.t * 2.4; return [o.cx + Math.cos(a) * ORB_RING, o.cy + Math.sin(a) * ORB_RING * 0.45]; }
   function hexMove(B, T, fast) {
-    const A = G.arena, gs = girls().filter((g) => !g.dead), who = gs.length ? gs : [T], lim = A.r - 170, w = fast ? HEX_W2 : HEX_W1;
+    const A = G.arena, gs = girls().filter((g) => !g.dead), who = gs.length ? gs : [T], lim = A.r - 170, w = B.fs ? Math.max(HEX_W1, FB.W + 0.1) : fast ? HEX_W2 : HEX_W1;   // (the final battle: never under FB.W)
     const inside = (x, y) => Math.hypot(x - A.x, y - A.y) < lim;
     const into = (x, y) => { const dx = x - A.x, dy = y - A.y, d = Math.hypot(dx, dy); return d > lim ? [A.x + dx / d * lim, A.y + dy / d * lim] : [x, y]; };
     if (B.move === "summon") {
       // (at most SUM_MAX of her monsters at once: a wave tops them up)
-      const room = Math.max(0, SUM_MAX - G.mons.filter((m) => m.alive && m.summoned).length), n = Math.min(room, fast ? 4 : 3), at = [];
+      const room = Math.max(0, (B.fs ? FB.SUM_MAX : SUM_MAX) - G.mons.filter((m) => m.alive && m.summoned).length), n = Math.min(room, fast ? 4 : 3), at = [];
       for (let k = 0; at.length < n && k < 600; k++) {
         const g = who[k % who.length], a = Math.random() * TAU, r = rnd(420, 660), x = g.x + Math.cos(a) * r, y = g.y + Math.sin(a) * r;
         if (inside(x, y) && at.every(([px, py]) => Math.hypot(px - x, py - y) > 300) && who.every((q) => Math.hypot(q.x - x, q.y - y) > 380)) at.push([x, y]);
@@ -5390,7 +5552,7 @@
       at.forEach(([x, y], i) => addHex("sum", x, y, { w: w + i * 0.15, r: SUM_R, end: w + i * 0.15 + 0.7, mon: i % 2 }));
       SFX.swirl(); sample("laugh1", 0.5);
     } else if (B.move === "orbs" || B.move === "clones") {
-      hexOrbs(B.x, B.y, B.move === "clones" ? 1 : fast ? 4 : 3, w, 0, fast);   // (with her clones: one of her own, one weaker from each copy)
+      hexOrbs(B.x, B.y, B.move === "clones" ? 1 : B.fs ? (fast ? 6 : 5) : fast ? 4 : 3, w, 0, fast);   // (with her clones: one of her own, one weaker from each copy)
       if (B.move === "clones") {
         // two shadow copies of her, one each side of her round the arena (each casts its own weaker orb once it is there)
         const a0 = Math.atan2(B.y - A.y, B.x - A.x), d = clamp(Math.hypot(B.x - A.x, B.y - A.y), 320, lim - 60);
@@ -5437,6 +5599,7 @@
   // does o hurt someone standing at (x, y) now? (only inside what it shows, and only once its warning is over)
   function hexHurts(o, x, y) {
     const e = o.t - o.w; if (e < 0 || !G.arena) return false;
+    if (FB_GEO[o.k]) return fbHurts(o, x, y);   // (the final battle's pieces)
     if (o.k === "orb") return e < o.fly && d2(x, y, o.x, o.y) < o.r * o.r;
     if (o.k === "circle" || o.k === "tele") return e < HEX_ON && d2(x, y, o.x, o.y) < o.r * o.r;
     return false;
@@ -5468,7 +5631,7 @@
       if (host) for (const g of hitables()) if (!g.dead && hexHurts(o, g.x, g.y)) { hurtTarget(g, o.x, o.y, false, o.cost || BOSS_HIT.contact); if (o.k === "orb") { orbPop(o); break; } }
     }
     G.hexes = G.hexes.filter((o) => o.t < o.end);
-    for (const [x, y] of born) hexOrbs(x, y, 1, WARN_MIN, 1, true);   // (a clone's weaker orb, gathered >= WARN_MIN like every warning of her second form)
+    for (const [x, y] of born) hexOrbs(x, y, 1, G.boss && G.boss.fs ? FB.W : WARN_MIN, 1, true);   // (a clone's weaker orb, gathered >= WARN_MIN like every warning of her second form)
   }
   // an orb's end: it bursts into sparks (when it touches a girl, flies out to the fence, or its time is up: `late`)
   function orbPop(o, late) {
@@ -5481,6 +5644,7 @@
   // the moment a warning is over: the circle erupts, the monster steps out, she comes back, the clone is there
   function hexStart(o, host, born) {
     const near = d2(o.x, o.y, P.x, P.y) < 2400 * 2400;
+    if (FB_GEO[o.k]) return fbStart(o);
     if (o.k === "sum") {
       for (let i = 0; i < 5; i++) hexSmoke(o.x + rnd(-70, 70), o.y - rnd(10, 160), 1);
       if (host && G.mons.length < MAX_MONS) { const m = spawnMon(SUM_KINDS[o.mon] || "castle_bat", o.x, o.y); m.summoned = true; }
@@ -5542,6 +5706,8 @@
   // second-form painting, and her frames darkened for the clones (FR.hx_*). Pages without pixel access keep the frames' own colours.
   let hexArtDone = false;
   function hexArt() {
+    // (made once: only when the pictures it is made from are decoded, else on a later frame)
+    if (!["castle_boss2_w0", "castle_boss2_w1", "castle_boss2_w2"].map((n) => frameReady(FR[n])).every(Boolean)) return;
     hexArtDone = true;
     const make = (from, to, fn, crop) => {
       const f = FR[from]; if (!f || FR[to]) return;
@@ -5572,11 +5738,13 @@
   function drawHexes() {
     const A = G.arena; if (!A || !G.hexes || !G.hexes.length) return;
     if (!hexArtDone) hexArt();
+    if (!fbArtDone) fbArt();
     for (const o of G.hexes) {
       const warn = o.t < o.w, k = clamp(o.t / Math.max(0.01, o.w), 0, 1), e = o.t - o.w, pulse = 0.5 + 0.5 * Math.sin(G.t * 12), fade = clamp((o.end - o.t) / 0.4, 0, 1);
-      if (API.drawn) API.drawn.push(["hex", o.k, o.id, warn ? "warn" : "on"]);
+      if (API.drawn && fbShown(o)) API.drawn.push(["hex", o.k, o.id, warn ? "warn" : "on"]);
       ctx.save(); ctx.beginPath(); ctx.arc(A.x, A.y, A.r - 6, 0, TAU); ctx.clip();
-      if (o.k === "circle" || o.k === "tele") {
+      if (FB_GEO[o.k]) fbGround(o, warn, k, e, pulse, fade);
+      else if (o.k === "circle" || o.k === "tele") {
         const spin = (o.k === "tele" ? -0.9 : 0.6) * G.t;
         if (warn) {
           glow(o.x, o.y, o.r * 1.25, HEX_RGB, 0.25 + 0.2 * k);
@@ -5603,9 +5771,12 @@
   // what stands up out of the floor, for the y-sorted pass: the orbs (high up while they gather round her staff), the purple fire bursting
   // out of a circle, the clones, and her shape fading in where she will come back
   function hexPieces() {
-    const out = []; if (!G.arena || !G.hexes || !G.hexes.length) return out;
+    const out = []; if (!G.arena) return out;
+    fbThronePiece(out);
+    if (!G.hexes || !G.hexes.length) return out;
     for (const o of G.hexes) {
       const e = o.t - o.w;
+      if (FB_GEO[o.k]) { fbPieces(o, out); continue; }
       if (o.k === "orb") { if (e < o.fly) out.push({ o, k: "orb", y: o.y }); }
       else if ((o.k === "circle" || o.k === "tele") && e >= 0 && e < 0.75) out.push({ o, k: "burst", y: o.y + 1 });
       else if (o.k === "clone") out.push({ o, k: "clone", y: o.y });
@@ -5614,6 +5785,8 @@
     return out;
   }
   function drawHexPiece(p) {
+    if (p.k === "throne") return drawThrone(p);
+    if (FB_GEO[p.o.k]) return fbPiece(p);
     const o = p.o, e = o.t - o.w;
     if (API.drawn) API.drawn.push(["hexPiece", o.id, p.k, o.x, o.y]);
     if (p.k === "orb") {
@@ -5646,6 +5819,547 @@
     glow(o.x, o.y - 260, 230, HEX_RGB, 0.35 * a);
     spr(fr, o.x, o.y - lift, flip, 1, a);
     if (p.k === "clone") fx("hx_wisp", o.x + rnd(-6, 6), o.y - 40, 1.6, 0.5 * a, Math.sin(G.t * 3) * 0.2);
+  }
+  // ---------------------------------------------------------------- the final battle (Dad, 2026-10-28: "thiết kế lại phase đánh boss cuối")
+  // Màn 5's boss (`final`): a bigger arena (arenaK), no maths quiz (beaten by damage only), and four stages (B.fs), each warned move shown
+  // >= FB.W s with a clear safe spot (only one of her moves or one lieutenant's at a time):
+  //   1 "Đệ tử": she watches from her throne at the top of the arena (cannot be hurt, cannot hurt, taunts now and then) while her two
+  //     lieutenants fight together (LTS: Hiệp Sĩ Hắc Ám, the shadow knight: a slash in a cone before him, a slam round him; Quạ Đêm Khổng
+  //     Lồ, the giant shadow raven: a rain of feathers on warned circles, a dive down a warned lane), taking turns; each its own health bar
+  //     over it, their sum in the top bar. Both beaten: her descent film ("fly"), she lands in the middle;
+  //   2 her first form (castle_boss): beams of dark lightning (a gap between every two), a swarm of homing orbs, a rain of dark stars on
+  //     warned circles, her teleport, her summons;
+  //   3 at FB.AT2 of her health she changes (the morph film) into her second form (castle_boss2): quicker, two sets of beams, a bigger star
+  //     rain, her shadow clones, the ring of circles round each girl, orbs, teleport, summons;
+  //   4 at FB.AT3 her last change (a longer film) into Rồng Hắc Ám, a giant dark dragon (castle_boss3, a stand-in until it is packed): a
+  //     cone of purple dragon fire, a meteor storm in waves, a leap onto the girl, and "Bóng Tối Bao Trùm": the whole arena erupts but for a
+  //     circle of light near each girl. At FB.ULT_AT, once: her desperation move "Hắc Ám Diệt Thế" (she rises, the whole arena is warned
+  //     FB.ULT_W s but for the circles of light, it erupts, she crashes down and is worn out for FB.TIRED s).
+  // The host runs it; the guest follows the boss's state (BST "throne" / "fly" / "ult", her stage b[17], her form b[16]), the lieutenants
+  // among the monsters (their kinds) and every warned piece among her hexes (`hx`, the kinds below).
+  const FB = {
+    HP: 780, AT2: 0.65, AT3: 0.33, ULT_AT: 0.1, W: 1.0, TH_IN: 330,
+    TEMPO: [1, 1, 1.15, 1.35, 1.25],
+    TAUNT: 8.5, TAUNT_ON: 2.8, DESC: 4.2, DESC_UP: 0.7, DESC_LAND: 3.0,
+    M2: 2.6, M2S: 1.2, M3: 3.8, M3S: 1.9,
+    GIANT_K: 1.3, GIANT_R: 220, LIFT3: 60, ZOOM: 0.1,
+    ULT_RISE: 1.0, ULT_W: 3.0, ULT_ON: 0.9, ULT_FALL: 0.6, TIRED: 5.0,
+    LT_GAP: 0.9, LT_HIT: 0.012, LT_ULT: 0.25,
+    SUM_MAX: 6, STOMP_PREP: 1.3,
+  };
+  // her lines (the stage films and her taunts from the throne)
+  const FB_SAY = {
+    lts: "Hiệp Sĩ Hắc Ám và Quạ Đêm Khổng Lồ!", ltsTip: "Hạ hai đệ tử trước, Phù thủy đang xem đấy!",
+    taunt: [["Hi hi hi! Cố lên nào!"], ["Đệ tử của ta", "giỏi lắm đấy!"], ["Mới thế đã mệt rồi à?"], ["Hai đứa nhóc này", "lì thật đấy!"]],
+    desc: ["Hừ! Lũ đệ tử vô dụng!", "Để ta tự ra tay!"],
+    m2: ["Các ngươi làm ta", "nổi giận thật rồi đấy!"],
+    m3: ["Đủ rồi! Hãy xem", "hình dạng thật của ta!"],
+    ult: ["Hắc Ám...", "nuốt chửng tất cả!"], ultTip: "Chạy vào vòng sáng!",
+    tired: ["Hộc... hộc..."],
+    giant: "Rồng Hắc Ám", giantTip: "Rồng phun lửa, gọi mưa sao và bao trùm bóng tối: tìm vòng sáng!",
+    bar: "Đệ tử của Phù thủy",
+  };
+  // the two lieutenants: their own kinds among the monsters (MON: their old kind's ways; `ltD` holds the rest). Drawn from their own
+  // five-pose paintings (`<kind>_w0..4`: stand, wind-up, strike, hurt, fallen) when packed, else from their old breed's frames, bigger.
+  const LTS = {
+    fb_knight: { name: "Hiệp Sĩ Hắc Ám", base: "castle_mummy", sc: 2.1, r: 105, hp: 125, spd: 110, rgb: "160,120,255", moves: ["kslash", "kslam"], keep: [230, 420] },
+    fb_raven: { name: "Quạ Đêm Khổng Lồ", base: "castle_bat", sc: 2.5, r: 95, hp: 105, spd: 160, rgb: "120,90,210", moves: ["feather", "dive"], keep: [420, 640] },
+  };
+  MON.fb_knight = { ...MON.mummy, like: "mummy" }; MON.fb_raven = { ...MON.bat, like: "bat", hgt: 190 };
+  // her moves in each stage, in turn (the moves without an `fb` look are her old ones: hexMove)
+  const FB_MOVES = [null, null, ["beams", "orbs", "stars", "teleport", "summon"], ["beams2", "clones", "stars2", "ring", "orbs", "teleport", "summon"],
+    ["breath", "meteor", "stomp", "dark", "breath", "summon", "meteor", "stomp", "dark"]];
+  const FB_NEW = ["beams", "beams2", "stars", "stars2", "breath", "meteor", "stomp", "dark"];
+  const isFb = (mv) => FB_NEW.includes(mv);
+  // the warned pieces (among G.hexes): how each hurts. circle: within r of (x, y); lane: within r of the segment (x, y)-(cx, cy); cone:
+  // within the distance |(cx, cy) - (x, y)| of (x, y) and v / 1000 rad of its direction; dark: anywhere in the arena but within r of a
+  // circle of light ((cx, cy), and (vx, vy) when m is 2). Each hurts from its warning's end (w) for `fly` s.
+  const FB_GEO = { kslash: "cone", kslam: "circle", feather: "circle", dive: "lane", beam: "lane", star: "circle", breath: "cone", meteor: "circle", stomp: "circle", dark: "dark", ult: "dark" };
+  const FB_COST = { kslash: 2, kslam: 2, feather: 1, dive: 2, beam: 2, star: 2, breath: 3, meteor: 2, stomp: 3, dark: 3, ult: 3 };
+  const FB_RGB = { kslash: "170,130,255", kslam: "150,100,255", feather: "140,110,220", dive: "140,110,220", beam: "200,140,255", star: "210,150,255", breath: "220,110,255", meteor: "200,120,255", stomp: "170,110,255", dark: "120,60,200", ult: "120,60,200" };
+  const isFbBoss = () => !!(G.lvl && G.lvl.boss && G.lvl.boss.final);
+  const fbThrone = () => { const A = G.arena; return [A.x, A.y - A.r + FB.TH_IN]; };
+  const fbLts = () => G.mons.filter((m) => m.ltD && m.alive);
+  function addFb(k, x, y, o) { const p = { cost: FB_COST[k] || 2, fly: 0.4, w: 1.2, ...o }; if (p.end === undefined) p.end = p.w + p.fly + 0.45; return addHex(k, x, y, p); }   // (each lasts its warning, its time hurting and a moment fading)
+  // does piece o hurt (x, y) now (m: a margin, for the bot)? and would it, ignoring time (fbIn)
+  function fbIn(o, x, y, m = 0) {
+    const g = FB_GEO[o.k], A = G.arena;
+    if (g === "circle") return d2(x, y, o.x, o.y) < (o.r + m) ** 2;
+    if (g === "lane") {
+      const dx = o.cx - o.x, dy = o.cy - o.y, L2 = dx * dx + dy * dy || 1, u = clamp(((x - o.x) * dx + (y - o.y) * dy) / L2, 0, 1);
+      return d2(x, y, o.x + dx * u, o.y + dy * u) < (o.r + m) ** 2;
+    }
+    if (g === "cone") {
+      const R = Math.hypot(o.cx - o.x, o.cy - o.y), d = Math.hypot(x - o.x, y - o.y); if (d > R + m) return false;
+      if (d < 60 + m) return true;
+      const da = Math.atan2(Math.sin(Math.atan2(y - o.y, x - o.x) - Math.atan2(o.cy - o.y, o.cx - o.x)), Math.cos(Math.atan2(y - o.y, x - o.x) - Math.atan2(o.cy - o.y, o.cx - o.x)));
+      return Math.abs(da) < o.v / 1000 + m / Math.max(d, 60);
+    }
+    if (g === "dark") {
+      if (!A || d2(x, y, A.x, A.y) > (A.r + 40) ** 2) return false;
+      const sr = Math.max(0, o.r - m);
+      if (d2(x, y, o.cx, o.cy) < sr * sr) return false;
+      if (o.m >= 2 && d2(x, y, o.vx, o.vy) < sr * sr) return false;
+      return true;
+    }
+    return false;
+  }
+  // (a beam of the second set is there only from v ms on)
+  const fbShown = (o) => !(FB_GEO[o.k] === "lane" && o.v && o.t < o.v / 1000);
+  const fbHurts = (o, x, y) => { const e = o.t - o.w; return e >= 0 && e < o.fly && fbIn(o, x, y); };
+
+  // ---- stage 1: the throne, her lieutenants
+  // (after her intro film) she sits on her throne; the lieutenants step out of purple smoke
+  function fbAfterIntro(B) {
+    B.st = "throne"; B.t = 0; B.fs = 1; B.phase = 1;
+    fbSpawnLts(); updateBossBar();
+    showBanner(FB_SAY.lts, FB_SAY.ltsTip);
+  }
+  function fbSpawnLts() {
+    const A = G.arena, lv = Q && Q.lv ? (P.lv + Q.lv) / 2 : P.lv, base = creepHp(commonKind(), lv, !!Q, 0, false);
+    G.fbTurn = 0; G.fbLtT = 1.6;
+    [["fb_knight", -1], ["fb_raven", 1]].forEach(([k, s], i) => {
+      const D = LTS[k], x = A.x + s * 380, y = A.y - A.r * 0.25, m = makeMon(k, x, y, false), hp = Math.round(D.hp * base);
+      Object.assign(m, { atkK: 1, hp, max: hp, ltI: i, st: m.c.fly ? "fly" : "walk", t: 0 });
+      setFace(m, 0, 1); G.mons.push(m);
+      for (let j = 0; j < 7; j++) hexSmoke(x + rnd(-120, 120), y - rnd(20, 360), 1.3);
+    });
+    SFX.roar(); SFX.swirl(); G.shake = Math.max(G.shake, 12);
+  }
+  // a lieutenant's turn (the host; true: done for this frame). Each walks to keep its distance from the girl it is after (circling her),
+  // then, its turn come (G.fbTurn) and the last move's warning over (G.fbLtT), winds up one of its two moves ("prep": its warning shows
+  // FB.W+ s), strikes ("atk": while its piece hurts; the raven flies down its lane), rests. They take turns, one move at a time.
+  function ltStep(m, dt) {
+    const D = m.ltD, A = G.arena; if (!A) return true;
+    const T = targetFor(m.x, m.y), dx = T.x - m.x, dy = T.y - m.y, d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d;
+    if (m.st === "prep") {
+      if (Math.abs(dx) > 20) m.flip = dx < 0;
+      if (m.t >= m.ltW) { m.st = "atk"; m.t = 0; if (m.ltMv === "kslam") { SFX.slam(); G.shake = Math.max(G.shake, 14); dust(m.x, m.y, 24); } else SFX.swoosh(); }
+      return true;
+    }
+    if (m.st === "atk") {
+      if (m.ltMv === "dive" && m.dive) {
+        const k = clamp(m.t / m.dive.T, 0, 1); m.x = lerp(m.dive.x0, m.dive.x1, k); m.y = lerp(m.dive.y0, m.dive.y1, k);
+        if (Math.random() < 0.5) hexSmoke(m.x, m.y - 100, 0.8);
+      }
+      if (m.t >= m.ltOn) { m.st = "rest"; m.t = 0; m.dive = null; }
+      return true;
+    }
+    if (m.st === "rest" && m.t < 0.6) return true;
+    if (m.st === "rest") { m.st = m.c.fly ? "fly" : "walk"; m.t = 0; }
+    // walking: into its band round the girl, sideways round her, inside the fence
+    const [k0, k1] = D.moves[((m.ltN || 0) + 1) % 2] === "kslam" ? [120, 290] : D.keep, want = d > k1 ? 1 : d < k0 ? -1 : 0, side = m.ltI ? -0.7 : 0.7, sp = D.spd * (d > 700 ? 2 : 1) * dt;   // (far behind her: it hurries)
+    const [mx, my] = norm(ux * want - uy * side, uy * want + ux * side);
+    m.x += mx * sp; m.y += my * sp; m.dist += sp; setFace(m, dx, dy);
+    const ad = Math.hypot(m.x - A.x, m.y - A.y), lim = A.r - 160; if (ad > lim) { m.x = A.x + (m.x - A.x) / ad * lim; m.y = A.y + (m.y - A.y) / ad * lim; }
+    // its move, when its turn has come
+    if (G.fbLtT <= 0 && (G.fbTurn === m.ltI || fbLts().length < 2) && !T.dead && !G.hexes.some((o) => FB_GEO[o.k] && o.t < o.w + o.fly)) { ltMove(m, T, d, ux, uy); { if (m.st === "prep") m.ltWait = 0; else if ((m.ltWait = (m.ltWait || 0) + dt) > 2.5) { m.ltWait = 0; G.fbTurn = 1 - m.ltI; } } }   // (out of reach of its move for a while: the other one goes)
+    return true;
+  }
+  function ltMove(m, T, d, ux, uy) {
+    const D = m.ltD, A = G.arena, mv = D.moves[((m.ltN || 0) + 1) % 2], gs = girls().filter((g) => !g.dead), who = gs.length ? gs : [T];
+    const into = (x, y, lim = A.r - 150) => { const ex = x - A.x, ey = y - A.y, e = Math.hypot(ex, ey); return e > lim ? [A.x + ex / e * lim, A.y + ey / e * lim] : [x, y]; };
+    let w = 1.2, on = 0.45;
+    if (mv === "kslash") {
+      // a slash of shadow in a cone before him, at the girl (she steps aside or back out of it)
+      if (d > 520) return; m.ltN = (m.ltN || 0) + 1;
+      addFb("kslash", m.x, m.y, { w, fly: on, cx: m.x + ux * 560, cy: m.y + uy * 560, r: 560, v: 560 });
+    } else if (mv === "kslam") {
+      if (d > 330) return; m.ltN = (m.ltN || 0) + 1;
+      w = 1.3; addFb("kslam", m.x, m.y, { w, fly: on, r: 340 });
+    } else if (mv === "feather") { m.ltN = (m.ltN || 0) + 1;
+      // feathers rain on a circle under each girl and a few more round them
+      const at = who.map((g) => into(g.x, g.y));
+      for (let k = 0, n = at.length + 4; at.length < n && k < 400; k++) {
+        const g = who[k % who.length], a = Math.random() * TAU, r = rnd(330, 700), [x, y] = into(g.x + Math.cos(a) * r, g.y + Math.sin(a) * r);
+        if (at.every(([px, py]) => Math.hypot(px - x, py - y) > 2 * 150 + 120)) at.push([x, y]);
+      }
+      at.forEach(([x, y], i) => addFb("feather", x, y, { w: w + i * 0.08, fly: 0.35, r: 150 }));
+      on = 0.35 + at.length * 0.08;
+    } else { m.ltN = (m.ltN || 0) + 1;
+      // the dive: down a lane from where it is, through the girl, to the fence
+      const [x1, y1] = into(m.x + ux * 3000, m.y + uy * 3000, A.r - 120);
+      addFb("dive", m.x, m.y, { w, fly: 0.55, cx: x1, cy: y1, r: 130 });
+      m.dive = { x0: m.x, y0: m.y, x1, y1, T: 0.55 }; on = 0.55;
+    }
+    m.ltMv = mv; m.st = "prep"; m.t = 0; m.ltW = w; m.ltOn = on;
+    G.fbLtT = w + on + FB.LT_GAP; G.fbTurn = 1 - m.ltI;
+    SFX.roar();
+  }
+  // a lieutenant beaten: stars and a heart; both down: her descent
+  function ltBeaten(m) {
+    G.stars += 10; updateHud(); floatText(m.x, m.y - 300, "+10 sao");
+    for (let i = 0; i < 8; i++) spawnGem(m.x + rnd(-120, 120), m.y + rnd(-80, 80), 2 + G.level * 2);
+    spawnDrop(m.x, m.y, "heart");
+    ltBeatenFx(m);
+  }
+  function ltBeatenFx(m) {
+    burst(m.x, m.y - 160, 50, ["#ffd34d", "#fff4c2", "#ffffff", "rgb(" + m.ltD.rgb + ")"], 620, 1.1);
+    for (let i = 0; i < 8; i++) hexSmoke(m.x + rnd(-120, 120), m.y - rnd(20, 360), 1.2);
+    SFX.boom(); G.shake = Math.max(G.shake, 14);
+    showBanner("Đã hạ " + m.ltD.name + "!", fbLts().length ? "Còn một đệ tử nữa!" : "");
+  }
+  // ---- the boss's own steps in the final battle (true: done for this frame): her throne, her descent, her desperation move
+  function fbUpdate(B, dt) {
+    const A = G.arena;
+    G.fbLtT = (G.fbLtT || 0) - dt;
+    if (B.st === "throne") {
+      const [tx, ty] = fbThrone(); B.x = tx; B.y = ty; B.jz = 0;
+      const T = targetFor(B.x, B.y); if (Math.abs(T.x - B.x) > 40) B.dir = Math.sign(T.x - B.x);
+      if (B.t > 1 && !fbLts().length && !G.hexes.some((o) => FB_GEO[o.k])) fbStartDescend(B);
+      return true;
+    }
+    if (B.st === "fly") {
+      // her descent: up off the throne, gliding down into the middle, landing
+      const t = B.t, k = rsEase(clamp((t - FB.DESC_UP) / (FB.DESC_LAND - FB.DESC_UP), 0, 1));
+      B.x = lerp(B.fx0, A.x, k); B.y = lerp(B.fy0, A.y - 120, k);
+      B.jz = t < FB.DESC_UP ? 260 * rsEase(t / FB.DESC_UP) : t < FB.DESC_LAND ? 260 : 260 * (1 - rsEase(clamp((t - FB.DESC_LAND) / 0.4, 0, 1)));
+      if (Math.random() < 0.3) hexSmoke(B.x + rnd(-80, 80), B.y - B.jz - rnd(0, 200), 0.9);
+      if (t >= FB.DESC_LAND + 0.4 && !B.landed2) { B.landed2 = true; SFX.slam(); G.shake = Math.max(G.shake, 18); dust(B.x, B.y, 24); }
+      if (t >= FB.DESC) { B.st = "rest"; B.t = 0; B.jz = 0; B.fs = 2; B.cycle0 = B.cycle; updateBossBar(); const BD = G.lvl.boss; showBanner(BD.name + "!", BD.tip || ""); }
+      return true;
+    }
+    if (B.st === "ult") {
+      const t = B.t;
+      B.jz = t < FB.ULT_RISE ? 700 * rsEase(t / FB.ULT_RISE) : t < FB.ULT_RISE + FB.ULT_W + FB.ULT_ON ? 700 : 700 * (1 - rsEase(clamp((t - FB.ULT_RISE - FB.ULT_W - FB.ULT_ON) / FB.ULT_FALL, 0, 1)));
+      if (t >= FB.ULT_RISE && !B.ultCast) { B.ultCast = true; fbDark(B, "ult", FB.ULT_W, FB.ULT_ON, 380); showBanner(FB_SAY.ult.join(" "), FB_SAY.ultTip); }
+      const end = FB.ULT_RISE + FB.ULT_W + FB.ULT_ON + FB.ULT_FALL;
+      if (t >= end) { B.st = "rest"; B.t = 0; B.jz = 0; B.tired = FB.TIRED; SFX.slam(); SFX.boom(); G.shake = 30; dust(B.x, B.y, 40); burst(B.x, B.y - 100, 40, HEX_COLS, 600, 1); }
+      return true;
+    }
+    if (B.tired > 0) { B.tired -= dt; if (B.st === "rest") { B.t = 0; return true; } }
+    // the next change of form, once the move she was making is over (her health is held at each mark until then: damageBoss)
+    if ((B.st === "walk" || B.st === "rest") && !(B.tired > 0)) {
+      if (B.fs === 2 && B.hp <= B.max * FB.AT2) { B.fs = 3; startMorph(B); return true; }
+      if (B.fs === 3 && B.hp <= B.max * FB.AT3) { B.fs = 4; startMorph(B); return true; }
+      if (B.fs === 4 && B.hp <= B.max * FB.ULT_AT && !B.ultDone && !G.hexes.length) { B.ultDone = true; B.ultCast = false; B.st = "ult"; B.t = 0; B.move = null; G.hexes = []; SFX.roar(); G.shake = Math.max(G.shake, 14); return true; }
+    }
+    return false;
+  }
+  function fbStartDescend(B) {
+    B.st = "fly"; B.t = 0; B.fx0 = B.x; B.fy0 = B.y; B.landed2 = false; G.hexes = G.hexes.filter((o) => !FB_GEO[o.k]);
+    SFX.roar(); sample("laugh1", 0.6);
+  }
+  // ---- her moves (bossAct): beams, stars, dragon fire, meteors, her leap, the dark
+  function fbMove(B, T) {
+    const A = G.arena, gs = girls().filter((g) => !g.dead), who = gs.length ? gs : [T], lim = A.r - 170;
+    const into = (x, y, l = lim) => { const dx = x - A.x, dy = y - A.y, d = Math.hypot(dx, dy); return d > l ? [A.x + dx / d * l, A.y + dy / d * l] : [x, y]; };
+    const mv = B.move;
+    if (mv === "beams" || mv === "beams2") {
+      // beams of dark lightning out from her to the fence: one at the nearest girl, the others evenly round (a wide gap between each two);
+      // the second form fires four, then four more halfway between them: the second set shows only once the first is over (v: when it
+      // appears, in ms), and is warned as long
+      const a0 = Math.atan2(T.y - B.y, T.x - B.x), sets = mv === "beams2" ? [[4, 0, 0], [4, Math.PI / 4, 1.2 + 0.5 + 0.1]] : [[3, 0, 0]];
+      for (const [n, off, ap] of sets) for (let i = 0; i < n; i++) {
+        const a = a0 + off + i * TAU / n, [x1, y1] = into(B.x + Math.cos(a) * 4000, B.y + Math.sin(a) * 4000, A.r - 40);
+        addFb("beam", B.x + Math.cos(a) * 90, B.y + Math.sin(a) * 90, { w: ap + 1.2, fly: 0.5, cx: x1, cy: y1, r: 110, v: Math.round(ap * 1000) });
+      }
+      SFX.zap(); G.shake = Math.max(G.shake, 8);
+    } else if (mv === "stars" || mv === "stars2") {
+      // dark stars fall onto warned circles: one under each girl first, then all round (never two overlapping)
+      const n = mv === "stars2" ? 14 : 9, at = who.map((g) => into(g.x, g.y));
+      for (let k = 0; at.length < n && k < 900; k++) {
+        const g = who[k % who.length], a = Math.random() * TAU, r = rnd(300, 900), [x, y] = into(g.x + Math.cos(a) * r, g.y + Math.sin(a) * r);
+        if (at.every(([px, py]) => Math.hypot(px - x, py - y) > 2 * 150 + 110)) at.push([x, y]);
+      }
+      at.forEach(([x, y], i) => addFb("star", x, y, { w: 1.2 + i * 0.1, fly: 0.4, r: 150 }));
+      if (mv === "stars2") who.forEach((g, i) => { const [x, y] = into(g.x, g.y); addFb("star", x, y, { w: 1.2 + n * 0.1 + 0.5 + i * 0.1, fly: 0.4, r: 150 }); });   // (and a last one where each girl was)
+      sample("bell", 0.5); SFX.swirl();
+    } else if (mv === "breath") {
+      // Rồng Hắc Ám breathes purple fire: a cone from her mouth at the nearest girl (40° wide), out to the fence
+      const a = Math.atan2(T.y - B.y, T.x - B.x), ox = B.x + Math.cos(a) * 120, oy = B.y + Math.sin(a) * 60;
+      addFb("breath", ox, oy, { w: 1.5, fly: 0.8, cx: ox + Math.cos(a) * 1150, cy: oy + Math.sin(a) * 1150, r: 1150, v: 350 });
+      B.dir = Math.cos(a) < 0 ? -1 : 1; SFX.roar();
+    } else if (mv === "meteor") {
+      // a storm of dark meteors in three waves: the first on the girls and round them, never two of a wave overlapping
+      for (let wv = 0; wv < 3; wv++) {
+        const at = wv === 0 ? who.map((g) => into(g.x, g.y)) : [];
+        for (let k = 0; at.length < 6 && k < 600; k++) {
+          const a = Math.random() * TAU, r = Math.sqrt(Math.random()) * lim, [x, y] = [A.x + Math.cos(a) * r, A.y + Math.sin(a) * r];
+          if (at.every(([px, py]) => Math.hypot(px - x, py - y) > 2 * 170 + 140) && d2(x, y, B.x, B.y) > 250 * 250) at.push([x, y]);
+        }
+        at.forEach(([x, y], i) => addFb("meteor", x, y, { w: 1.3 + wv * 0.55 + i * 0.05, fly: 0.4, r: 170 }));
+      }
+      SFX.roar(); G.shake = Math.max(G.shake, 10);
+    } else if (mv === "dark") fbDark(B, "dark", 2.0, 0.6, 340);
+    // (stomp: her leap, warned from the wind-up: bossPrep / the "leap" state)
+  }
+  // the dark that fills the arena but for a circle of light near each girl (two girls close together share one): the light is
+  // 380-520 from her, inside the fence and clear of the boss, so she has to step over to it, with time to spare
+  function fbDark(B, k, w, on, r) {
+    const A = G.arena, gs = girls().filter((g) => !g.dead), who = gs.length ? gs : [P], spots = [];
+    const groups = [];
+    for (const g of who) { const c = groups.find((o) => Math.hypot(o.x - g.x, o.y - g.y) < 500); if (c) { c.x = (c.x + g.x) / 2; c.y = (c.y + g.y) / 2; } else groups.push({ x: g.x, y: g.y }); }
+    for (const c of groups.slice(0, 2)) {
+      let best = null, bs = -Infinity;
+      for (let i = 0; i < 48; i++) {
+        const a = i / 48 * TAU + 0.3, dd = 380 + (i % 3) * 70, x = c.x + Math.cos(a) * dd, y = c.y + Math.sin(a) * dd;
+        if (d2(x, y, A.x, A.y) > (A.r - r - 40) ** 2) continue;
+        const sc = Math.hypot(x - B.x, y - B.y) - Math.abs(dd - 420) * 0.5 - spots.reduce((s, p) => s + (Math.hypot(p[0] - x, p[1] - y) < 2 * r ? 900 : 0), 0);
+        if (sc > bs) { bs = sc; best = [x, y]; }
+      }
+      if (!best) { const [nx, ny] = norm(A.x - c.x, A.y - c.y); best = [c.x + nx * 420, c.y + ny * 420]; }
+      spots.push(best);
+    }
+    const [s1, s2] = [spots[0], spots[1] || spots[0]];
+    addFb(k, A.x, A.y, { w, fly: on, r, cx: s1[0], cy: s1[1], vx: s2[0], vy: s2[1], m: spots.length });
+    SFX.roar(); sample("laugh1", 0.5); G.shake = Math.max(G.shake, 10);
+  }
+  // the moment one of the final pieces starts to hurt (both pages): sound, shake, sparks
+  function fbStart(o) {
+    const near = d2(o.x, o.y, P.x, P.y) < 2600 * 2600, g = FB_GEO[o.k];
+    if (!near && g !== "dark") return;
+    if (o.k === "beam" || o.k === "dive") { SFX.zap(); G.shake = Math.max(G.shake, 6); }
+    else if (o.k === "kslash" || o.k === "breath") { SFX.swoosh(); if (o.k === "breath") { play("fire"); G.shake = Math.max(G.shake, 10); } }
+    else if (g === "dark") { SFX.boom(); SFX.slam(); G.shake = Math.max(G.shake, o.k === "ult" ? 30 : 20); }
+    else { SFX.slam(); play("fire"); G.shake = Math.max(G.shake, o.k === "stomp" || o.k === "kslam" ? 14 : 7); burst(o.x, o.y - 60, 14, HEX_COLS, 400, 0.6); }
+  }
+  // ---- the test bot: out of (or away from walking into) any warned final piece, to the nearest spot clear of all of them (inside the
+  // fence, clear of the boss, not across one that is hurting now); in the dark, into the middle of its circle of light
+  function fbDodge() {
+    const A = G.arena; if (!A || !G.hexes || !G.hexes.length) return null;
+    const live = G.hexes.filter((o) => FB_GEO[o.k] && o.t - o.w < o.fly && fbShown(o));
+    if (!live.length) return null;
+    const B = G.boss, br = B && B.alive && B.st !== "tele" && !(B.jz > 60) ? bossR(B) + 120 : 0;
+    const bad = (x, y, m) => live.some((o) => fbIn(o, x, y, FB_GEO[o.k] === "dark" ? m + 60 : m)) || (br && d2(x, y, B.x, B.y) < br * br) || d2(x, y, A.x, A.y) > (A.r - 110) ** 2;
+    const hot = (x, y, at) => live.some((o) => FB_GEO[o.k] !== "dark" && o.t + at >= o.w - 0.3 && fbIn(o, x, y, 50));   // (on the way there: a piece that will be hurting by the time she passes it; the dark is everywhere on the way, only where she ends up counts)
+    const px = P.x + P.vx * 0.25, py = P.y + P.vy * 0.25;
+    if (!bad(P.x, P.y, 80) && !bad(px, py, 80)) return null;
+    let best = null;
+    for (let r = 50; r < 1600 && !best; r += 50) for (let i = 0; i < 32; i++) {
+      const a = i / 32 * TAU + r * 0.01, x = P.x + Math.cos(a) * r, y = P.y + Math.sin(a) * r;
+      if (bad(x, y, 90)) continue;
+      let ok = true; for (let s = 0.1; s < 1 && ok; s += 0.1) if (hot(P.x + (x - P.x) * s, P.y + (y - P.y) * s, s * r / 330)) ok = false;
+      if (ok) { best = [x, y]; break; }
+    }
+    if (!best) return null;
+    const dx = best[0] - P.x, dy = best[1] - P.y, d = Math.hypot(dx, dy);
+    return d < 20 ? [0, 0] : [dx / d, dy / d];
+  }
+  // where the bot keeps in the final battle: round the lieutenants in stage 1 (the throne cannot be hurt), well off the giant
+  function fbBotFocus(B) {
+    if (B.fs === 1) { const L = fbLts(); if (L.length) { const m = L.reduce((a, b) => (d2(a.x, a.y, P.x, P.y) < d2(b.x, b.y, P.x, P.y) ? a : b)); return [m.x, m.y, 380, 520]; } return [G.arena.x, G.arena.y, 0, 300]; }
+    if (B.st === "fly" || B.st === "ult" || B.st === "throne") return [G.arena.x, G.arena.y, 0, 400];
+    return B.fs === 4 ? [B.x, B.y, 560, 720] : [B.x, B.y, 420, 580];
+  }
+  // what she says now in the final battle (both pages, from her state and clock): [lines, how much the bubble shows] or null
+  function fbTalk(B) {
+    const t = B.t, fade = (a, b) => Math.min(clamp((t - a) / 0.25, 0, 1), clamp((b - t) / 0.25, 0, 1));
+    if (B.st === "throne" && t > 2) {
+      // a taunt now and then from her throne (the same one on both pages: by her clock)
+      const n = Math.floor((t - 2) / FB.TAUNT), u = (t - 2) - n * FB.TAUNT;
+      if (u < FB.TAUNT_ON) return [FB_SAY.taunt[n % FB_SAY.taunt.length], Math.min(clamp(u / 0.25, 0, 1), clamp((FB.TAUNT_ON - u) / 0.25, 0, 1))];
+    }
+    if (B.st === "fly" && t > 0.2 && t < FB.DESC - 0.3) return [FB_SAY.desc, fade(0.2, FB.DESC - 0.3)];
+    if (B.st === "ult" && t > 0.1 && t < FB.ULT_RISE + 1.6) return [FB_SAY.ult, fade(0.1, FB.ULT_RISE + 1.6)];
+    if (B.tired > 0 && B.tired < FB.TIRED - 0.3) return [FB_SAY.tired, clamp((FB.TIRED - 0.3 - B.tired) / 0.3, 0, 1) * clamp(B.tired / 0.3, 0, 1)];
+    return null;
+  }
+  // the moment she changes (both pages): her painted purple smoke bursting out round her, light
+  function fbMorphBurst(B, big) {
+    for (let i = 0; i < (big ? 16 : 9); i++) { const a = i / (big ? 16 : 9) * TAU; hexSmoke(B.x + Math.cos(a) * rnd(80, 260), B.y - 200 + Math.sin(a) * rnd(60, 200), big ? 2 : 1.5); }
+    const n = fbFr("fbx_morph0", "fbp_boom1", "hx_burst"); if (n) G.parts.push({ type: "fx", name: n, x: B.x, y: B.y - 260, sc: big ? 3.2 : 2.2, life: 0.9, max: 0.9, grow: 0.8 });
+    G.parts.push({ type: "fx", name: "fx_rays", x: B.x, y: B.y - 300, sc: big ? 2.2 : 1.4, life: 1.0, max: 1.0, grow: 1.0 });
+    if (big) { SFX.boom(); G.shake = Math.max(G.shake, 22); }
+  }
+  // a friend in the dark runs into the nearest circle of light (on her girl's page: trailGirl)
+  function fbShelter(p) {
+    const o = G.hexes && G.hexes.find((q) => FB_GEO[q.k] === "dark" && q.t < q.w + q.fly); if (!o) return null;
+    const sp = [[o.cx, o.cy]]; if (o.m >= 2) sp.push([o.vx, o.vy]);
+    const s = sp.reduce((a, b) => (d2(a[0], a[1], p.x, p.y) < d2(b[0], b[1], p.x, p.y) ? a : b)), an = (p.i || 0) * 1.7 + 0.5;
+    return [s[0] + Math.cos(an) * o.r * 0.45, s[1] + Math.sin(an) * o.r * 0.35];
+  }
+  // ---- the final battle's look. Painted: her new effect sheets (fbx_*) once packed; until then purple turns of old paintings (fbArt:
+  // the lava demon's meteors, bursts, pillars and fire streams, Simmy's lightning, the snow gusts, made once like hexArt's), her own and
+  // her lieutenants' old frames. Code adds only light (the warned ground glows, the dark veil), sparks, the dashed edge of what hurts,
+  // a ring closing in for when, and the words.
+  let fbArtDone = false;
+  function fbArt() {
+    // (made once: only when the paintings it turns are decoded, else on a later frame)
+    const src = [0, 1, 2, 3, 4].flatMap((i) => ["fxlv_meteor" + i, "fxlv_boom" + i, "fxlv_pillar" + i, "fxlv_stream" + i, "castle_boss2_w" + i]).concat(["fxlv_scorch", "cls_lightning", "fxsn_gust0", "fxsn_gust1"]);
+    if (!src.map((n) => frameReady(FR[n])).every(Boolean)) return;
+    fbArtDone = true;
+    const hue = (from, to, deg, dark = 1) => {
+      const f = FR[from]; if (!f || FR[to]) return;
+      const c = document.createElement("canvas"); c.width = Math.max(1, Math.ceil(f.w)); c.height = Math.max(1, Math.ceil(f.h));
+      const g = c.getContext("2d"); g.drawImage(f.img, f.sx, f.sy, f.w, f.h, 0, 0, f.w, f.h);
+      const a = deg * Math.PI / 180, C = Math.cos(a), S = Math.sin(a), M = [0.213 + C * 0.787 - S * 0.213, 0.715 - C * 0.715 - S * 0.715, 0.072 - C * 0.072 + S * 0.928,
+        0.213 - C * 0.213 + S * 0.143, 0.715 + C * 0.285 + S * 0.14, 0.072 - C * 0.072 - S * 0.283, 0.213 - C * 0.213 - S * 0.787, 0.715 - C * 0.715 + S * 0.715, 0.072 + C * 0.928 + S * 0.072];
+      try { const d = g.getImageData(0, 0, c.width, c.height), p = d.data; for (let i = 0; i < p.length; i += 4) if (p[i + 3]) { const r = p[i], gg = p[i + 1], b = p[i + 2]; p[i] = (r * M[0] + gg * M[1] + b * M[2]) * dark; p[i + 1] = (r * M[3] + gg * M[4] + b * M[5]) * dark; p[i + 2] = (r * M[6] + gg * M[7] + b * M[8]) * dark; } g.putImageData(d, 0, 0); } catch (e) {}
+      FR[to] = { img: c, sx: 0, sy: 0, w: f.w, h: f.h, s: f.s, ax: f.ax, ay: f.ay };
+    };
+    for (let i = 0; i < 4; i++) { hue("fxlv_meteor" + i, "fbp_meteor" + i, 245); hue("fxlv_boom" + i, "fbp_boom" + i, 250); hue("fxlv_pillar" + i, "fbp_pillar" + i, 250); }
+    for (let i = 0; i < 3; i++) hue("fxlv_stream" + i, "fbp_fire" + i, 255);
+    hue("fxlv_scorch", "fbp_scorch", 250, 0.8); hue("cls_lightning", "fbp_beam", 60);
+    hue("fxsn_gust0", "fbp_slash0", 70); hue("fxsn_gust1", "fbp_slash1", 70); hue("fx_aura_shard", "fbp_feather", 0, 0.45);
+    // (Rồng Hắc Ám's stand-in: her second form's frames in a darker violet, drawn FB.GIANT_K as big)
+    for (let i = 0; i < 5; i++) if (FR["castle_boss2_w" + i] && !FR["fbp_giant_w" + i]) FR["fbp_giant_w" + i] = colorFrame("castle_boss2_w" + i, "#3c1c70", 0.4);
+  }
+  // the first frame that is there: the packed painting (fbx_*), else its stand-in
+  const fbFr = (...n) => { for (const k of n) if (FR[k]) return k; return null; };
+  // a painted bolt laid along angle a, len long and thick across, added as light (fbp_beam: Simmy's lightning turned purple stands
+  // upright in its painting; the new fbx_beam lies along its width)
+  function fbAlong(name, x, y, a, len, thick, al = 1, flip = false) {
+    const f = FR[name]; if (!f || al <= 0.01) return;
+    const up = name === "fbp_beam";
+    ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha *= Math.min(1, al); ctx.translate(x, y); ctx.rotate(a + (up ? Math.PI / 2 : 0)); if (flip) ctx.scale(1, -1);
+    if (up) ctx.drawImage(f.img, f.sx, f.sy, f.w, f.h, -thick / 2, -len / 2, thick, len); else ctx.drawImage(f.img, f.sx, f.sy, f.w, f.h, -len / 2, -thick / 2, len, thick);
+    ctx.restore();
+  }
+  const FBF = {
+    star: () => fbFr("fbx_star" + (Math.floor(G.t * 8) % 2), "fbp_meteor0", "hx_orb"), boom: (i) => fbFr("fbx_boom" + Math.min(2, i), "fbp_boom" + i, "hx_burst"), pillar: (i) => fbFr("fbx_dark" + (i % 2), "fbp_pillar" + i, "hx_pillar"),
+    fire: (i) => fbFr("fbx_fire" + i, "fbp_fire" + i, "hx_fire"), beam: () => fbFr("fbx_beam0", "fbp_beam"), slash: (i) => fbFr("fbx_slash" + (i % 2), "fbp_slash" + (i % 2), "hx_wisp"),
+    feather: () => fbFr("fbx_feather", "fbp_feather"), scorch: () => fbFr("fbx_scorch", "fbp_scorch"), safe: () => fbFr("fbx_safe", "fx_circle_g"), shock: () => fbFr("fbx_shock0", "qk_crack3", "qk_crack1"),
+  };
+  // the ground under a warned piece (drawn in drawHexes, clipped to the arena)
+  function fbGround(o, warn, k, e, pulse, fade) {
+    if (!fbShown(o)) return;
+    if (o.v && FB_GEO[o.k] === "lane") k = clamp((o.t - o.v / 1000) / Math.max(0.01, o.w - o.v / 1000), 0, 1);   // (shown late: its own warning's share)
+    const g = FB_GEO[o.k], rgb = FB_RGB[o.k] || HEX_RGB;
+    const edge = (path) => {   // (the dashed edge of what hurts, a dark line under it)
+      ctx.save(); path(); ctx.globalAlpha = 0.45; ctx.strokeStyle = "#1a0830"; ctx.lineWidth = 12; ctx.stroke();
+      ctx.globalAlpha = 0.85; ctx.strokeStyle = "#f3e2ff"; ctx.lineWidth = 6; ctx.setLineDash([26, 16]); ctx.lineDashOffset = -G.t * 80; ctx.stroke(); ctx.restore();
+    };
+    if (g === "circle") {
+      if (warn) {
+        glow(o.x, o.y, o.r * 1.25, rgb, 0.25 + 0.25 * k);
+        hexCircle(o.k === "feather" ? "hx_ring" : "hx_circle", o.x, o.y, o.r * 1.12, (0.5 + 0.4 * k) * (0.85 + 0.15 * pulse), (o.id % 2 ? 0.6 : -0.6) * G.t);
+        if (o.k === "kslam" || o.k === "stomp") { const s = FBF.shock(); if (s) { if (s === "fbx_shock0") fitFrame(s, o.x, o.y, o.r * 2.3, o.r * 1.5, 0.3 + 0.6 * k, 0, o.id % 2 === 1, true); else groundCircle(s, o.x, o.y, (o.r * 1.6) / (FR[s].w * FR[s].s), 0.25 + 0.45 * k, o.id); } }
+        edge(() => { ctx.beginPath(); ctx.arc(o.x, o.y, o.r, 0, TAU); });
+        ctx.save(); ctx.globalAlpha = 0.75; ctx.strokeStyle = "#ff9ae6"; ctx.lineWidth = 9; ctx.beginPath(); ctx.arc(o.x, o.y, Math.max(4, o.r * (1 - k)), 0, TAU); ctx.stroke(); ctx.restore();
+      } else {
+        const f = clamp(1 - e / 0.7, 0, 1); glow(o.x, o.y, o.r * 1.4, rgb, 0.7 * f);
+        const sc = FBF.scorch(); if (sc && e > 0.15) fitFrame(sc, o.x, o.y + 4, o.r * 2.3, o.r * 1.4, 0.75 * fade);
+      }
+    } else if (g === "lane" || g === "cone") {
+      const ax = o.x, ay = o.y, a = Math.atan2(o.cy - ay, o.cx - ax), L = Math.hypot(o.cx - ax, o.cy - ay);
+      const path = g === "lane"
+        ? () => { ctx.translate(ax, ay); ctx.rotate(a); ctx.beginPath(); ctx.rect(0, -o.r, L, 2 * o.r); }
+        : () => { const h = o.v / 1000; ctx.beginPath(); ctx.moveTo(ax, ay); ctx.arc(ax, ay, L, a - h, a + h); ctx.closePath(); };
+      if (warn) {
+        // (light on the ground where it will hurt, brighter as it comes, and a band sweeping along it to show when)
+        ctx.save(); path(); ctx.globalAlpha = 0.28 + 0.12 * k; ctx.fillStyle = "#12051f"; ctx.fill(); ctx.restore();   // (a shadow first, so the light reads on the dark floor)
+        ctx.save(); path(); ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = (0.3 + 0.3 * k) * (0.8 + 0.2 * pulse); ctx.fillStyle = `rgb(${rgb})`; ctx.fill(); ctx.restore();
+        ctx.save(); path(); ctx.clip(); ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = 0.35; ctx.fillStyle = "#ffd6ff";
+        if (g === "lane") ctx.fillRect(L * k - 40, -o.r, 80, 2 * o.r); else { ctx.lineWidth = 50; ctx.strokeStyle = "#ffd6ff"; ctx.beginPath(); ctx.arc(ax, ay, Math.max(10, L * k), a - 1, a + 1); ctx.stroke(); }
+        ctx.restore();
+        edge(path);
+      } else {
+        const f = clamp(1 - e / Math.max(0.3, o.fly + 0.3), 0, 1);
+        ctx.save(); path(); ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = 0.3 * f; ctx.fillStyle = `rgb(${rgb})`; ctx.fill(); ctx.restore();
+      }
+    } else if (g === "dark") {
+      // the dark: a veil over the whole arena but the circles of light; then the arena erupts (fbPiece)
+      const A = G.arena, sp = [[o.cx, o.cy]]; if (o.m >= 2) sp.push([o.vx, o.vy]);
+      const veil = warn ? 0.32 + 0.4 * k : 0.72 * fade;
+      ctx.save(); ctx.beginPath(); ctx.arc(A.x, A.y, A.r + 40, 0, TAU);
+      for (const [x, y] of sp) { ctx.moveTo(x + o.r, y); ctx.arc(x, y, o.r, 0, TAU, true); }
+      ctx.globalAlpha = veil; ctx.fillStyle = "#14051f"; ctx.fill("evenodd"); ctx.restore();
+      for (const [x, y] of sp) {
+        glow(x, y, o.r * 1.3, "255,230,150", 0.45 + 0.2 * pulse);
+        const s = FBF.safe(); if (s === "fbx_safe") fitFrame(s, x, y - o.r * 0.12, o.r * 2.25, o.r * 1.7, 0.95, 0, false, true); else if (s) groundCircle(s, x, y, (o.r * 2.1) / (FR[s].w * FR[s].s), 0.9, G.t * 0.4);
+        if (warn) {
+          ctx.save(); ctx.globalAlpha = 0.9; ctx.strokeStyle = "#fff2b0"; ctx.lineWidth = 8; ctx.setLineDash([30, 14]); ctx.lineDashOffset = G.t * 60; ctx.beginPath(); ctx.arc(x, y, o.r, 0, TAU); ctx.stroke(); ctx.restore();
+          if (Math.random() < 0.4 && G.parts.length < 380) G.parts.push({ type: "fx", name: "fx_twinkle", x: x + rnd(-o.r, o.r) * 0.7, y: y + rnd(-o.r, o.r) * 0.5 - 40, sc: rnd(0.4, 0.8), life: 0.7, max: 0.7, grow: 0.5 });
+        }
+      }
+      if (warn) for (const [x, y] of sp) { if (API.drawn) API.drawn.push(["fbSafe", o.id, x | 0, y | 0]); }   // (the words over it: drawBossTalk, over everyone)
+    }
+  }
+  // what stands up out of the floor (the y-sorted pass, with her other magic): falling stars and feathers, bursts, beams, fire, the eruption
+  function fbPieces(o, out) {
+    if (!fbShown(o)) return;
+    const g = FB_GEO[o.k], e = o.t - o.w;
+    if (g === "circle") { if (e < 0 && e > -0.55) out.push({ o, k: "fall", y: o.y + 2 }); else if (e >= 0 && e < 0.7) out.push({ o, k: "fbBoom", y: o.y + 2 }); }
+    else if (g === "lane" && o.k === "beam" && e >= -0.12 && e < o.fly + 0.2) out.push({ o, k: "beam", y: Math.max(o.y, o.cy) });
+    else if (g === "cone" && e >= 0 && e < o.fly + 0.25) out.push({ o, k: o.k, y: o.y + 40 });
+    else if (g === "dark" && e >= 0 && e < o.fly + 0.4) out.push({ o, k: "erupt", y: G.arena ? G.arena.y + G.arena.r : o.y });
+  }
+  function fbPiece(p) {
+    const o = p.o, e = o.t - o.w, rgb = FB_RGB[o.k] || HEX_RGB;
+    if (p.k === "fall") {
+      // a dark star (a meteor in the giant's storm, a feather of the raven) coming down onto its circle
+      const u = clamp(1 + e / 0.55, 0, 1), z = (1 - u) * 900, nm = o.k === "feather" ? FBF.feather() : FBF.star();
+      glow(o.x, o.y - z, o.r * 0.7, rgb, 0.5);
+      if (nm) { const f = FR[nm], own = nm.startsWith("fbx_"), m = (o.k === "feather" ? 150 : o.r * 1.5) / (f.w * f.s); fx(nm, o.x + (own && o.k !== "feather" ? z * 0.8 : -(1 - u) * 160), o.y - z - 40, m, 0.95, o.k === "feather" ? (own ? Math.sin(G.t * 6 + o.id) * 0.25 : 2.6) : own ? 0 : 0.5); }   // (a star comes down from the upper right, as painted; a feather flutters straight down)
+      return;
+    }
+    if (p.k === "fbBoom") {
+      const k = clamp(e / 0.6, 0, 1), sc = o.r / 150;
+      glow(o.x, o.y - 80 * sc, o.r * 1.5, rgb, 0.8 * (1 - k));
+      const n = FBF.boom(Math.min(3, Math.floor(k * 4))); if (n) { const f = FR[n]; fx(n, o.x, o.y - f.h * f.s * 0.3 * (o.r * 2.3 / (f.w * f.s)), o.r * 2.3 / (f.w * f.s), 1 - k * 0.6); }
+      if (o.k === "kslam" || o.k === "stomp") for (let j = 0; j < 8; j++) { const a = j / 8 * TAU + o.id, b = FBF.pillar(j % 4); if (b) { const f = FR[b], m = 160 * sc / (f.w * f.s); fx(b, o.x + Math.cos(a) * o.r * 0.75, o.y + Math.sin(a) * o.r * 0.45, m * (1 - k * 0.5), 1 - k, 0, j % 2 === 1); } }
+      return;
+    }
+    if (p.k === "beam") {
+      // dark lightning down the lane: the painted bolt stretched along it, light along it, sparks
+      const ax = o.x, ay = o.y, a = Math.atan2(o.cy - ay, o.cx - ax), L = Math.hypot(o.cx - ax, o.cy - ay), on = e >= 0, f = on ? clamp((o.fly + 0.2 - e) / 0.25, 0, 1) : 0.35, z = 70;
+      const b = FBF.beam();
+      for (let s = 0; s < L; s += 360) { const l = Math.min(360, L - s), cx = ax + Math.cos(a) * (s + l / 2), cy = ay + Math.sin(a) * (s + l / 2) - z; glow(cx, cy, o.r * 1.5, rgb, 0.45 * f); if (b) fbAlong(b, cx, cy, a, l * 1.08, o.r * (on ? 2.4 : 0.8) * (0.9 + 0.2 * Math.sin(G.t * 40 + s)), f, s / 360 % 2 === 1); }
+      if (on && Math.random() < 0.6) hexSpark(ax + Math.cos(a) * rnd(0, L), ay + Math.sin(a) * rnd(0, L) - z);
+      return;
+    }
+    if (p.k === "kslash" || p.k === "breath") {
+      // the knight's slash: painted shadow crescents sweeping across the cone; the dragon's fire: painted purple flames filling it
+      const ax = o.x, ay = o.y, a = Math.atan2(o.cy - ay, o.cx - ax), L = Math.hypot(o.cx - ax, o.cy - ay), h = o.v / 1000, f = clamp((o.fly + 0.25 - e) / 0.3, 0, 1), k = clamp(e / o.fly, 0, 1);
+      if (p.k === "kslash") {
+        for (let j = 0; j < 3; j++) { const n = FBF.slash(j); if (!n) continue; const fr = FR[n], aa = a + (k * 2 - 1) * h * 0.8 + (j - 1) * h * 0.4, r = L * (0.45 + 0.18 * j); fxDir(n, ax + Math.cos(aa) * r, ay + Math.sin(aa) * r - 90, Math.cos(aa + Math.PI / 2), Math.sin(aa + Math.PI / 2), L * 0.75 / (fr.w * fr.s), f * 0.95); }
+        glow(ax + Math.cos(a) * L * 0.5, ay + Math.sin(a) * L * 0.5 - 80, L * 0.6, rgb, 0.4 * f);
+      } else {
+        for (let i = 0; i < 9; i++) for (let j = -1; j <= 1; j++) {
+          const d = 120 + i * (L - 120) / 9 * Math.min(1, e / 0.35 * 1.5), aa = a + j * h * 0.6, n = FBF.fire((i + j + 3 + Math.floor(G.t * 10)) % 3); if (!n) continue;
+          const fr = FR[n], w = (90 + d * Math.tan(h) * 1.1) / (fr.w * fr.s);
+          fxDir(n, ax + Math.cos(aa) * d, ay + Math.sin(aa) * d - lerp(380, 70, clamp(d / L, 0, 1)), Math.cos(a), Math.sin(a), w, f * 0.85);
+        }
+        glow(ax + Math.cos(a) * L * 0.5, ay + Math.sin(a) * L * 0.5 - 70, L * 0.55, rgb, 0.55 * f);
+      }
+      return;
+    }
+    if (p.k === "erupt") {
+      // the whole arena erupts in dark pillars, all but the circles of light
+      const A = G.arena, f = clamp((o.fly + 0.4 - e) / 0.4, 0, 1), k = clamp(e / 0.2, 0, 1), sp = [[o.cx, o.cy]]; if (o.m >= 2) sp.push([o.vx, o.vy]);
+      const V = viewBox(), step = 300;
+      for (let x = Math.max(A.x - A.r, V[0] - 200); x < Math.min(A.x + A.r, V[2] + 200); x += step) for (let y = Math.max(A.y - A.r, V[1]); y < Math.min(A.y + A.r, V[3] + 400); y += step * 0.6) {
+        const j = Math.floor((x * 7 + y * 13) / step) & 3, xx = x + ((j * 97) % step) * 0.4, yy = y + ((j * 53) % 120);
+        if (d2(xx, yy, A.x, A.y) > (A.r - 40) ** 2 || sp.some(([sx, sy]) => d2(xx, yy, sx, sy) < (o.r + 30) ** 2)) continue;
+        const n = FBF.pillar(j); if (!n) continue; const fr = FR[n], m = 210 / (fr.w * fr.s) * (0.8 + 0.25 * j);
+        fx(n, xx, yy - fr.h * fr.s * m * 0.45 * k, m, f * (0.75 + 0.25 * Math.sin(G.t * 20 + j)), 0, j % 2 === 1, 0.6 + 0.5 * k);
+      }
+      return;
+    }
+  }
+  // ---- her throne (stage 1), behind her: its painting (fb_throne) when packed, else two candelabra and a dais of light
+  function fbThronePiece(out) { const B = G.boss; if (!B || !B.fs || !G.arena || B.fs > 1) return; const [x, y] = fbThrone(); out.push({ o: null, k: "throne", y: y - 6, x }); }
+  function drawThrone(p) {
+    const [x, y] = fbThrone(), f = FR.fb_throne;
+    glow(x, y - 160, 330, HEX_RGB, 0.3 + 0.1 * Math.sin(G.t * 2));
+    if (f) { spr(f, x, y + 30, false, 1); return; }
+    hexCircle("hx_circle", x, y, 230, 0.6, G.t * 0.3);
+    for (const s of [-1, 1]) { const c = FR.cs_candelabra; if (c) spr(c, x + s * 230, y - 10, s < 0, 0.9); }
+    const pl = FR.cs_pillar; if (pl) for (const s of [-1, 1]) spr(pl, x + s * 360, y - 30, s > 0, 0.9);
+  }
+  // ---- the lieutenants: their own paintings when packed (five poses, mirrored to face her), else their old breed's frames, bigger;
+  // their light, a health bar and their name over them
+  function drawLt(m) {
+    const D = m.ltD, wi = !m.alive ? (m.die < 0.3 ? 3 : 4) : m.st === "prep" ? 1 : m.st === "atk" ? 2 : m.flash > 0.06 ? 3 : 0, own = FR[m.kind + "_w" + wi];
+    let f, flip = m.flip, mul;
+    if (own) { f = own; mul = 1; flip = (m.evx || 0) < -20 ? true : (m.evx || 0) > 20 ? false : !!m.flip; }
+    else { const k = m.kind; m.kind = D.base; const [fn, fl] = monFrame(m); m.kind = k; f = tierFrame(fn); flip = fl; mul = CHAR_M * D.sc; }
+    if (!f) return;
+    const fly = m.c.fly, a = m.alive ? 1 : clamp(1 - m.die / 0.6, 0, 1), lift = fly ? m.hgt + Math.sin(G.t * 3 + m.ph) * 14 - (m.st === "atk" ? 80 : 0) : 0, y = m.y - lift;
+    shadow(m.x, m.y, m.r * 1.2, m.r * 0.34, 0.3 * a);
+    const p = 0.5 + 0.5 * Math.sin(G.t * 3 + m.ph), cy = y - f.ay * f.s * mul * 0.5;
+    glow(m.x, m.y, m.r * 2.4, D.rgb, 0.25 + 0.1 * p);
+    glow(m.x, cy, 220 * D.sc / 2, D.rgb, 0.22 + 0.1 * p);
+    if (m.st === "prep" && m.alive) glow(m.x, cy, 260, "255,70,120", 0.25 + 0.2 * Math.sin(G.t * 25));
+    if (m.alive) statusGlow(m, m.x, cy, 160);
+    const sh = m.st === "prep" ? Math.sin(G.t * 60) * 5 * Math.min(1, m.t / 0.3) : 0;
+    spr(f, m.x + sh, y, flip, mul, a);
+    if (m.flash > 0) sprFlash(f, m.x + sh, y, flip, mul, 0.6);
+    if (m.alive && m.frz > 0) drawIceBlock(f, m.x, y, flip, mul, m.frz, m.frzMax);
+    if (m.alive && m.burn > 0) drawFlames(m.x, cy, m.r * 2.4, 200, m.ph);
+    if (API.drawn) API.drawn.push(["lt", m.id, m.kind, own ? m.kind + "_w" + wi : "stand-in"]);
+    if (m.alive) guardBar({ ...m, gd: { name: D.name, rgb: D.rgb } }, y - f.ay * f.s * mul - 40);
   }
   // the candles of the castle's props light up a little (code light over their painted flames)
   const CANDLES = { cs_candelabra: [[0, -0.86, 120]], cs_lamp: [[0.27, -0.6, 100]], cs_bookshelf: [[0.3, -0.72, 70]], cs_pumpkins: [[0, -0.42, 120]], cs_cauldron: [[0, -0.8, 90]] };
@@ -6311,7 +7025,9 @@
     }
   }
   function damageBoss(dmg, x, y, dot, big) {
-    const B = G.boss; if (!B || !B.alive || B.st === "enter" || B.st === "quiz" || B.st === "morph" || B.st === "tele") return;   // (nothing hurts him while he changes form)
+    const B = G.boss; if (!B || !B.alive || B.st === "enter" || B.st === "quiz" || B.st === "morph" || B.st === "tele" || B.st === "throne" || B.st === "fly" || B.st === "ult") return;   // (nothing hurts him while he changes form; the final battle: nor on her throne, in her descent or her desperation move)
+    // (the final battle: her health stops at each change's mark until she has changed, and at her desperation move's until she has made it)
+    if (B.fs) { const hold = B.fs === 2 ? Math.floor(B.max * FB.AT2) : B.fs === 3 ? Math.floor(B.max * FB.AT3) : B.fs === 4 && !B.ultDone ? Math.floor(B.max * FB.ULT_AT) : 0; if (B.fs === 1) return; if (hold && B.hp - dmg < hold) dmg = Math.max(0, B.hp - hold); if (dmg <= 0) { B.flash = 0.06; return; } }
     // the next quiz mark stops the health there and starts the quiz
     if (B.quizHp && B.quizHp.length && B.hp - dmg <= B.quizHp[0]) { B.hp = B.quizHp.shift(); updateBossBar(); startQuiz(B); return; }
     // a short guard after each hit so the fight lasts, however fast the bolts fly
@@ -6335,12 +7051,22 @@
   }
   // ---------------------------------------------------------------- the finale, after the last boss (a level with `finale`: Màn 5)
   // A short victory film over the castle: the whole team walks in and cheers together on the screen (Mèo Simmy and Sammy Đào on the left,
-  // Mochi and Matcha in the middle with Coca and Cafe in front of them, Kairon and Phong Cận on the right), fireworks and confetti (code),
-  // a big "CHIẾN THẮNG!" and the thank-you line (the level's `end`). After FIN_END s (or a tap once FIN_SKIP s have gone) the end screen:
-  // "Hết", "Cảm ơn hai bé đã chơi!" and a button back to the title. Each co-op page plays it for itself (the host's world says `won`).
+  // the girls who played in the middle (both together, else the one alone in the very middle: Dad saw Matcha in Mochi's solo film) with
+  // their pets in front, Kairon and Phong Cận on the right), fireworks and confetti (code), a big "CHIẾN THẮNG!" and the thank-you line
+  // (the level's `end`, naming the girls who played). After FIN_END s (or a tap once FIN_SKIP s have gone) the end screen: "Hết", the
+  // thank-you and a button back to the title. Each co-op page plays it for itself (the host's world says `won`).
+  // Everyone walks in facing the way they walk (the left half from the left, facing right; the right half from the right, facing left;
+  // never moonwalking), then turns to the camera to cheer; the pets (painted facing right only, so mirrored for left as in the world: no
+  // right hand to keep) end facing out to their own side, a mirror image of each other (Dad: Cafe on the left looked off to the right).
   const FIN_END = 11, FIN_SKIP = 3, FIN_TITLE = 1.4, FIN_LINE = 2.8, FIN_IN = 1.7;
   const FIN_TEAM = [["simmy", 0.12], ["sammy", 0.27], ["g", 0.43], ["s", 0.57], ["kairon", 0.73], ["phong", 0.88]];
-  const FIN_PETS = [["coca", 0.35], ["cafe", 0.65]];
+  const FIN_PETS = [["coca", 0.35, "g"], ["cafe", 0.65, "s"]];
+  // the team of the film: [char, x share] and the pets [art, x share]: only the girls who played (alone: in the middle) and their pets
+  function finCast() {
+    const gs = girlsIn(), team = FIN_TEAM.filter(([c]) => (c !== "g" && c !== "s") || gs.includes(c)).map(([c, x]) => [c, gs.length === 1 && c === gs[0] ? 0.5 : x]);
+    const pets = FIN_PETS.filter(([, , o]) => gs.includes(o)).map(([a, x]) => [a, gs.length === 1 ? 0.5 : x]);
+    return { team, pets };
+  }
   const FIN_NAMES = { g: "Mochi", s: "Matcha", simmy: "Mèo Simmy", sammy: "Sammy Đào", kairon: "Kairon", phong: "Phong Cận" };
   const FW_COLS = ["255,211,77", "255,154,213", "185,164,255", "124,242,198", "255,138,61", "150,210,255"];
   const FIN = { t: 0, fw: [], cf: [], nextFw: 0 };
@@ -6399,20 +7125,23 @@
     const lg = g.createRadialGradient(W / 2, gy - ht * 0.1, 10, W / 2, gy - ht * 0.1, W * 0.55); lg.addColorStop(0, `rgba(255,226,160,${0.32 * veil})`); lg.addColorStop(1, "rgba(255,226,160,0)");
     g.fillStyle = lg; g.fillRect(0, 0, W, H);   // (the whole screen: the light fades out on its own, no edge)
     const outfitOf = (c) => (c === hero ? P.outfit || "base" : Q && Q.hero === c ? Q.of || "base" : "base");
-    const at = (fx, i) => { const s = 0.15 + Math.abs(fx - 0.5) * 0.9, p = clamp((t - s) / FIN_IN, 0, 1), e = 1 - (1 - p) * (1 - p), from = fx < 0.5 ? -0.12 : 1.12; return { s, p, x: (from + (fx - from) * e) * W }; };
-    FIN_TEAM.forEach(([c, fx], i) => {
+    const at = (fx, i) => { const s = 0.15 + Math.abs(fx - 0.5) * 0.9, p = clamp((t - s) / FIN_IN, 0, 1), e = 1 - (1 - p) * (1 - p), from = fx <= 0.5 ? -0.12 : 1.12; return { s, p, x: (from + (fx - from) * e) * W, left: from > 0.5 }; };   // (left: walking in to the left)
+    const cast = finCast();
+    cast.team.forEach(([c, fx], i) => {
       const { s, p, x } = at(fx, i), walking = p < 1, hop = walking ? 0 : Math.abs(Math.sin((t - s) * 5.5 + i * 0.9)) * ht * 0.035;
-      const th = ht * (ART_H[c] || 400) / 400, o = { face: walking ? 2 : 0, flip: walking && fx > 0.5, moving: walking, dist: (t - s) * 260, winT: walking ? 0 : 1 };
+      const th = ht * (ART_H[c] || 400) / 400, o = { face: walking ? 2 : 0, flip: walking && at(fx).left, moving: walking, dist: (t - s) * 260, winT: walking ? 0 : 1 };
       g.fillStyle = "rgba(0,0,0,.35)"; g.beginPath(); g.ellipse(x, gy, th * 0.2, th * 0.04, 0, 0, TAU); g.fill();
       if (c === "g" || c === "s") drawHeroAt(g, c, outfitOf(c), o, x, gy - hop, th, false); else drawAllyAt(g, c, x, gy - hop, th, t, "base", o);
-      if (API.drawn) API.drawn.push(["finale", c, walking ? "walk" : "cheer"]);
+      if (API.drawn) API.drawn.push(["finale", c, walking ? "walk" : "cheer", walking ? (at(fx).left ? -1 : 1) : 0, Math.round(x)]);
       if (!walking) { g.font = `800 ${Math.round(H * 0.03)}px Grandstander, system-ui, sans-serif`; g.textAlign = "center"; g.lineWidth = H * 0.008; g.strokeStyle = "rgba(40,16,70,.85)"; g.fillStyle = "#fff6e5"; g.strokeText(FIN_NAMES[c], x, gy + H * 0.045); g.fillText(FIN_NAMES[c], x, gy + H * 0.045); }
     });
-    // Coca and Cafe in front, hopping for joy
-    FIN_PETS.forEach(([art, fx], i) => {
-      const { s, p, x } = at(fx, i), walking = p < 1, ph = walking ? 0 : Math.abs(Math.sin((t - s) * 7 + i * 1.7)) * ht * 0.06, py = gy + H * 0.02;
+    // Coca and Cafe in front, hopping for joy (alone: her pet in front of her, a little lower)
+    cast.pets.forEach(([art, fx], i) => {
+      const { s, p, x, left } = at(fx, i), walking = p < 1, ph = walking ? 0 : Math.abs(Math.sin((t - s) * 7 + i * 1.7)) * ht * 0.06, py = gy + H * (cast.pets.length === 1 ? 0.045 : 0.02);
+      // walking: the way it walks; then facing out to its own side (the left one left, the right one right; alone in the middle: right)
+      const faceL = walking ? left : fx < 0.5;
       g.fillStyle = "rgba(0,0,0,.3)"; g.beginPath(); g.ellipse(x, py, ht * 0.09, ht * 0.02, 0, 0, TAU); g.fill();
-      if (drawPetAt(g, art, walking ? "w" + (Math.floor((t - s) * 9) % 4) : "joy", x, py - ph, ht) && API.drawn) API.drawn.push(["finale", art, walking ? "walk" : "joy"]);
+      if (drawPetAt(g, art, walking ? "w" + (Math.floor((t - s) * 9) % 4) : "joy", x, py - ph, ht, faceL) && API.drawn) API.drawn.push(["finale", art, walking ? "walk" : "joy", faceL ? -1 : 1, Math.round(x)]);
     });
     // CHIẾN THẮNG! (pops in and bounces), then the thank-you line
     const k = clamp((t - FIN_TITLE) / 0.55, 0, 1);
@@ -6430,7 +7159,7 @@
     }
     const lk = clamp((t - FIN_LINE) / 0.6, 0, 1);
     if (lk > 0) {
-      const line = (G.lvl && G.lvl.end) || "Cảm ơn Mochi và Matcha đã cứu cả nhóm SKSP!", fs = Math.round(H * 0.05);
+      const line = finLine(), fs = Math.round(H * 0.05);
       g.save(); g.globalAlpha = lk; g.font = `800 ${fs}px Grandstander, system-ui, sans-serif`; g.textAlign = "center"; g.textBaseline = "middle";
       const fit = Math.min(1, W * 0.92 / Math.max(1, g.measureText(line).width)); g.translate(W / 2, H * 0.32 + (1 - lk) * H * 0.02); g.scale(fit, fit);
       g.lineJoin = "round"; g.lineWidth = fs * 0.2; g.strokeStyle = "rgba(40,16,70,.9)"; g.strokeText(line, 0, 0); g.fillStyle = "#ffffff"; g.fillText(line, 0, 0);
@@ -6449,7 +7178,7 @@
   function showEnd() {
     G.mode = "win"; G.won = true;
     $("winTitle").textContent = "Hết";
-    $("winText").textContent = "Cảm ơn hai bé đã chơi!";
+    $("winText").textContent = girlsIn().length > 1 ? "Cảm ơn hai bé đã chơi!" : "Cảm ơn " + HEROES[hero].name + " đã chơi!";   // (alone: her name only)
     // (the monsters defeated over the whole adventure; a start from the picker has only this map's, none if she went straight to the
     // witch: then the number is left out)
     $("winStats").textContent = `Bé nhặt được ${G.stars} ngôi sao, lên tới cấp ${P.lv}` + (G.kills > 0 ? ` và hạ ${G.kills} yêu quái.` : ".");
@@ -6504,7 +7233,7 @@
   function ultHit(cx, cy, hw, hh, all, chip = 0) {
     for (const m of G.mons) {
       if (!m.alive || (!all && !(Math.abs(m.x - cx) < hw && Math.abs(m.y - cy) < hh))) continue;
-      if (m.guard) { damageMon(m, ultCap(m, Math.ceil(m.max * (all ? 0.35 : 0.15)), all ? 0.5 : GUARD.ULT), m.x, m.y, true); continue; }   // (a cage guardian: a bite, as a boss)
+      if (m.guard || m.ltD) { damageMon(m, ultCap(m, Math.ceil(m.max * (all ? 0.35 : 0.15)), all ? 0.5 : m.ltD ? FB.LT_ULT : GUARD.ULT), m.x, m.y, true); continue; }   // (a cage guardian: a bite, as a boss)
       killMon(m, false);
     }
     G.foes = G.foes.filter((f) => !(Math.abs(f.x - cx) < hw && Math.abs(f.y - cy) < hh));
@@ -6819,7 +7548,8 @@
     updateShots(dt);
     // camera: follow the girl, a little ahead of where she walks
     qzK = clamp(qzK + (G.quiz && G.quiz.ph !== "down" ? dt : -dt) / 0.6, 0, 1);
-    const MB = G.boss, morphing = !!(MB && MB.alive && MB.st === "morph");
+    const MB = G.boss, morphing = !!(MB && MB.alive && (MB.st === "morph" || MB.st === "fly"));
+    fbK = clamp(fbK + (MB && MB.alive && (MB.phase === 3 || MB.st === "ult") ? dt : -dt) / 1.0, 0, 1);
     mzK = clamp(mzK + (morphing ? dt : -dt) / 0.4, 0, 1);
     let qc = qzK > 0 && G.arena ? [lerp(P.x, G.arena.x, rsEase(qzK)), lerp(P.y - 70, G.arena.y - QZ_CAM_DY, rsEase(qzK))] : null;
     if (!qc && mzK > 0 && MB) { const e = 0.6 * rsEase(mzK); qc = [lerp(P.x, MB.x, e), lerp(P.y - 70, MB.y - 400, e)]; }
@@ -6827,8 +7557,8 @@
     G.camX = lerp(G.camX, tx, k); G.camY = lerp(G.camY, ty, k);
     G.shake = Math.max(0, G.shake - 40 * dt);
     updateParts(dt);
-    // the ultimate also charges by itself, a point at a time (full in at most 30 s, sooner with kills)
-    if (!G.ult && G.energy < 100 && (G.enAcc = (G.enAcc || 0) + dt * 3.4) >= 1) { G.enAcc -= 1; addEnergy(1); }
+    // the ultimate also charges by itself, a point at a time (full in at most ULT_SELF_T s, sooner with kills; each girl on her own page)
+    if (!G.ult && G.energy < 100 && (G.enAcc = (G.enAcc || 0) + dt * 100 / ULT_SELF_T) >= 1) { G.enAcc -= 1; addEnergy(1); }
     const ultOff = G.energy < 100; if (ultOff !== G.ultOff) { G.ultOff = ultOff; $("bUlt").classList.toggle("off", ultOff); }
     if (G.frame % 6 === 0) { updateQuest(); drawMini(); }
   }
@@ -6892,7 +7622,8 @@
     burst(G.portal.x, G.portal.y - 150, 40, ["#c08bff", "#fff", "#ffb3e0"], 420, 1);
     const next = nextLevelAfter(G.level);
     if (next < 0) { winGame(); return; }   // the last level so far: for now the "to be continued" screen
-    setTimeout(() => fadeTo(() => { buildLevel(next); arrive(next); }), 1100);
+    // (a fresh set of hearts on every new map: through the gate as after a shop, and as on the guest's page; Dad's run started Màn 3 on 2)
+    setTimeout(() => fadeTo(() => { G.hearts = 5; buildLevel(next); renderHearts(); updateHud(); arrive(next); }), 1100);
   }
   function fadeTo(fn) { G.onFade = fn; G.fadeDir = 1; }
   // ---- arriving in a new map through the magic gate: a short story card tells its goal (the level's intro: the title screen's words, its
@@ -7102,6 +7833,7 @@
     const T = tierOf(); if (!T.col || /_m\d_d/.test(fn)) return FR[fn];   // themed breeds keep their own colours
     const key = G.level + fn; let t = TIER_FR.get(key);
     if (t) return t;
+    if (!frameReady(FR[fn])) return FR[fn];   // (its sheet is being decoded: tinted from a later frame on)
     const f = FR[fn], w = Math.ceil(f.w * f.s), h = Math.ceil(f.h * f.s), c = document.createElement("canvas"); c.width = w; c.height = h;
     const g = c.getContext("2d");
     g.drawImage(f.img, f.sx, f.sy, f.w, f.h, 0, 0, w, h);
@@ -7259,6 +7991,7 @@
   }
   const HOVER = { castle_zombie: 34 };   // monsters that float a little over the ground (drawn up there, a soft shadow below)
   function drawMon(m) {
+    if (m.ltD) return drawLt(m);   // (a lieutenant of the final battle)
     const [fn, flip] = monFrame(m); if (!FR[fn]) return;
     const f = m.c.like ? candyFrame(fn, CANDY_TINT[m.kind]) : tierFrame(fn), fly = m.c.fly;
     let y = m.y - m.hgt, a = 1, rot = 0, mul = CHAR_M * (m.elite ? 1.3 : m.guard ? GUARD.SC : m.champ ? CHAMP.SC : m.mini ? CHAMP.SPLIT.sc : 1), x = m.x;
@@ -7319,19 +8052,26 @@
     else if (B.st === "slam") pose = B.t < 0.7 ? "slam" : "stand";
     else if (B.hurtPose > 0) pose = "hurt";
     // the Pumpkin King's frames are named by pose; the mini bosses' come from one sheet, one row each (their second form: <art>2_w*)
+    if (B.fs === 4 && B.st === "ult" && B.jz > 200) pose = "prep";
+    if (B.tired > 0 && B.alive) pose = "hurt";
     const wi = ["stand", "prep", "slam", "hurt", "dead"].indexOf(pose), two = B.phase === 2 && FR[`${art}2_w${wi}`];
-    const name = art === "boss" ? "boss_" + pose : `${art}${two ? "2" : ""}_w${wi}`;
+    // (Rồng Hắc Ám: her own painting `<art>3_w*`, else her second form's darkened and FB.GIANT_K as big: fbArt)
+    const three = B.phase === 3, own3 = three && FR[`${art}3_w${wi}`];
+    if (three && !own3 && !fbArtDone) fbArt();
+    const name = art === "boss" ? "boss_" + pose : three ? (own3 ? `${art}3_w${wi}` : FR["fbp_giant_w" + wi] ? "fbp_giant_w" + wi : `${art}2_w${wi}`) : `${art}${two ? "2" : ""}_w${wi}`;
     const f = FR[name], flip = B.dir < 0; if (!f) return;
     if (API.drawn) API.drawn.push(["boss", name]);
-    let y = B.y + (B.dropY || 0) - (B.jz || 0) - hexLift(B), sy = 1, x = B.x, rot = 0, sc = 1;   // (hexLift: the grey witch's second form floats)
+    let y = B.y + (B.dropY || 0) - (B.jz || 0) - hexLift(B), sy = 1, x = B.x, rot = 0, sc = three && !own3 ? FB.GIANT_K : 1;   // (hexLift: the grey witch's second form floats)
+    if (B.tired > 0 && B.alive) { y += 30; sy = 0.96; }
     if (B.alive && B.st === "walk") y -= Math.abs(Math.sin(B.t * 6)) * 10;
     if (B.alive && B.st !== "enter") sy = 1 + Math.sin(G.t * 2) * 0.012;
     // changing form: he swells and trembles, then bursts out in his bigger painting (which grows the last bit into its full size)
     const morph = B.alive && B.st === "morph", aura = bossLook().rgb;
     if (morph) {
       const t = B.t;
-      sc = t < MORPH_SWAP ? 1 + 0.08 * rsEase(clamp(t / MORPH_SWAP, 0, 1)) : 0.93 + 0.07 * rsEase(clamp((t - MORPH_SWAP) / 0.4, 0, 1));
-      x += Math.sin(G.t * 50) * 6 * (t < MORPH_SWAP ? t / MORPH_SWAP : 0.3);
+      const SW = mSwap(B);
+      sc *= t < SW ? 1 + (B.fs === 4 ? 0.2 : 0.08) * rsEase(clamp(t / SW, 0, 1)) : 0.93 + 0.07 * rsEase(clamp((t - SW) / 0.4, 0, 1));
+      x += Math.sin(G.t * 50) * 6 * (t < SW ? t / SW : 0.3);
       glow(B.x, B.y - 260, 380 + 120 * Math.sin(G.t * 9), aura, 0.35 + 0.2 * Math.sin(G.t * 17));
     } else if (B.alive && B.phase === 2) glow(B.x, B.y - 270, 270, aura, 0.16 + 0.06 * Math.sin(G.t * 4));   // (his second form's glow)
     // laughing: he shakes and bounces
@@ -7340,15 +8080,17 @@
     const stag = !B.alive && B.die < BD_FALL;
     if (stag) { const w = clamp(B.die / 0.3, 0, 1); x += Math.sin(B.die * 15) * 12 * w; rot = Math.sin(B.die * 3.2) * 0.07 * w; }
     B.headY = y - f.ay * f.s * sc;
-    shadow(B.x, B.y + 3, 150 * (B.phase === 2 ? BOSS2_K : 1) * (B.dropY < -200 || B.jz > 200 ? 0.6 : 1), 32, 0.35);
-    if (B.alive && B.st === "prep") glow(B.x, B.y - 220, 300, isSea(B.move) ? "90,190,255" : isSnow(B.move) ? "160,220,255" : isHex(B.move) ? HEX_RGB : "255,90,40", 0.25 + 0.15 * Math.sin(G.t * 20));
+    shadow(B.x, B.y + 3, 150 * (B.phase === 3 ? FB.GIANT_R / 120 : B.phase === 2 ? BOSS2_K : 1) * (B.dropY < -200 || B.jz > 200 ? 0.6 : 1), 32, 0.35);
+    if (B.tired > 0 && B.alive) for (let i = 0; i < 3; i++) { const a = G.t * 3 + i * TAU / 3; fx("fx_twinkle", B.x + Math.cos(a) * 90, B.headY + 30 + Math.sin(a) * 26, 0.9, 0.9, G.t * 6); }   // (worn out: stars round her head)
+    if (B.alive && B.st === "ult" && B.jz > 100) { shadow(B.x, B.y + 3, 260 + B.jz * 0.25, 70 + B.jz * 0.06, 0.4); glow(B.x, B.y - 60, 420, "120,60,200", 0.3 + 0.15 * Math.sin(G.t * 6)); }   // (up in the sky for her desperation move: her great shadow on the floor)
+    if (B.alive && B.st === "prep") glow(B.x, B.y - 220, 300, isSea(B.move) ? "90,190,255" : isSnow(B.move) ? "160,220,255" : isHex(B.move) || isFb(B.move) ? HEX_RGB : "255,90,40", 0.25 + 0.15 * Math.sin(G.t * 20));
     if (B.alive) glow(B.x + (flip ? -1 : 1) * 30, y - 380, 110, "255,170,60", 0.3);
     else glow(B.x, B.y - 60, 200, "255,220,140", 0.35 * clamp(1 - Math.max(0, B.die - BD_FALL) / 2, 0, 1));
     if (stag) glow(B.x, B.y - 240, 340, "255,190,120", 0.3 + 0.2 * Math.sin(B.die * 9));
     if (B.alive) statusGlow(B, B.x, B.y - 220, 280);
     spr(f, x, y, flip, sc, 1, rot, sy);
     if (B.morphFlash > 0) sprFlash(f, x, y, flip, sc, Math.min(1, B.morphFlash * 2.5));   // (the flash as he changes)
-    else if (morph && B.t < MORPH_SWAP) sprFlash(f, x, y, flip, sc, 0.25 * B.t / MORPH_SWAP * (0.5 + 0.5 * Math.sin(G.t * 30)));
+    else if (morph && B.t < mSwap(B)) sprFlash(f, x, y, flip, sc, 0.25 * B.t / mSwap(B) * (0.5 + 0.5 * Math.sin(G.t * 30)));
     // (the overlays at his drawn size: sc, swollen while he changes form)
     if (B.alive && B.slow > 0) sprFlash(f, x, y, flip, sc, 0.3);
     if (B.alive && B.frz > 0) drawIceBlock(f, x, y, flip, sc, B.frz, B.frzMax);
@@ -7855,7 +8597,7 @@
       for (const m of G.mons) {
         if (!m.alive) continue;
         const dx = m.x - x, dy = (m.y - y) / 0.62;   // (flattened onto the ground, as the bosses' quakes)
-        if (dx * dx + dy * dy < UB_HIT * UB_HIT) { if (m.shd > 0) { m.shd = 0; shieldBreakFx(m); } m.hp -= m.guard ? ultCap(m, Math.ceil(m.max * 0.03), GUARD.ULT) : Math.ceil(m.max * 0.45); m.flash = 0.12; if (m.hp <= 0) killMon(m, false, "ult"); }
+        if (dx * dx + dy * dy < UB_HIT * UB_HIT) { if (m.shd > 0) { m.shd = 0; shieldBreakFx(m); } m.hp -= m.guard || m.ltD ? ultCap(m, Math.ceil(m.max * 0.03), m.ltD ? FB.LT_ULT : GUARD.ULT) : Math.ceil(m.max * 0.45); m.flash = 0.12; if (m.hp <= 0) killMon(m, false, "ult"); }
       }
       // the boss: a little each (at most 4 % of his health a show, taken out of the blast's 12 %: in all the same as before);
       // never while he changes form or asks his question (bossOpen), never past his quiz mark nor his last bit of health
@@ -8524,7 +9266,7 @@
     drawAfxAir();   // (the friends' skills and hits)
     drawQuakesAir(); drawMeteors(); drawCreepAir(L, R, T, B);
     drawBlizzard(L, R, T, B);
-    drawQuizRain();
+    drawQuizNums(); drawQuizRain();
     drawBossTalk(L, T, R, B);
     drawWalkTalk(); drawSay();
     drawRescue();
@@ -8658,6 +9400,8 @@
     G.mode = "title"; G.pmode = null; G.say = null; $("quiz").hidden = true; closeStory(); renderHeroes();
     $("titleScreen").hidden = false; $("hud").hidden = true; $("controls").hidden = true; $("bossbar").hidden = true; $("winScreen").hidden = true;
     SH.open = false; $("shop").hidden = true; $("photo").hidden = true; G.cine = null; G.rescue = null; $("skipFilm").hidden = true;
+    // behind the title's Màn 1 words: Màn 1's world again, as when the page opens (Dad's run: back from the end the castle scrolled there)
+    if (G.level !== 0) buildLevel(0);
   }
   // (starting straight at a later level gives the girl a head start in experience)
   // (at: the beta shortcut after the candy boss, Màn 1 behind her: "shop" = Màn 2, the clothes shop before the island; G.level stays 0
@@ -8818,7 +9562,8 @@
 
   // ---- drawing a girl onto any 2d canvas (anchor = her feet at x, gy; th = her height in pixels)
   function tinted(f, w, h) {
-    const key = f.sx + "," + f.sy + "," + f.w + "," + f.h + "," + f.img.src;
+    const key = f.sx + "," + f.sy + "," + f.w + "," + f.h + "," + (f.S ? f.S.i : f.img.src);
+    if (!frameReady(f)) return NOIMG;
     if (SH.tint && SH.tint.key === key) return SH.tint.c;
     const c = document.createElement("canvas"); c.width = Math.max(1, Math.round(w)); c.height = Math.max(1, Math.round(h));
     const g = c.getContext("2d");
@@ -8886,6 +9631,8 @@
     $("shopSay").textContent = th.line;
     $("shop").hidden = false;
     shopRefresh();
+    // (the cards are pictures drawn once: drawn again when every outfit's sheets are decoded)
+    { const gs = SH.cards.map((c) => hero + "." + cardOutfit(c)); if (!gs.every((g) => groupSheets(g).every((S) => S.img))) atlasLoad(gs).then(() => { if (SH.open) shopRefresh(); }); }
     play("unlock");
     { const n = LEVELS[1] ? LEVELS[1].name.split(": ") : ["Màn 2", "Đảo Cướp Biển"]; showBanner(n[1], n[0]); }   // (Màn 2 starts in the shop)
   }
@@ -9050,6 +9797,10 @@
   }
   // who is in the runway, the photo, the dock and the boarding film: the girls who are playing (one alone; both together) and Simmy;
   // teamAll() is the whole team whoever is playing (the opening film)
+  // the girls who are playing: her alone, or both sisters when her sister's page is here (co-op)
+  function girlsIn() { const other = hero === "g" ? "s" : "g"; return NET.role && Q && Q.hero === other ? ["g", "s"] : [hero]; }
+  const girlsName = () => girlsIn().map((c) => HEROES[c].name).join(" và ");
+  const finLine = () => ((G.lvl && G.lvl.end) || "Cảm ơn {girls} đã cứu cả nhóm SKSP!").replace("{girls}", girlsName());
   function teamMembers() {
     const all = teamAll(), other = hero === "g" ? "s" : "g";
     if (NET.role && Q && Q.hero === other) return all;
@@ -9087,10 +9838,12 @@
     return out;
   }
   // a pet's frame at its feet (x, gy); th = a grown-up's height (400 units) on this screen, so the pet is as big as in the world (Coca ~110, Cafe ~95)
-  function drawPetAt(g, art, pose, x, gy, th) {
+  // (faceL: facing left: the pets are painted facing right only and are mirrored for left, as in the world)
+  function drawPetAt(g, art, pose, x, gy, th, faceL) {
     const f = FR[art + "_sail_" + pose]; if (!f) return false;
     const k = f.s * th / 400;
-    g.drawImage(f.img, f.sx, f.sy, f.w, f.h, x - f.ax * k, gy - f.ay * k, f.w * k, f.h * k);
+    if (faceL) { g.save(); g.translate(x, 0); g.scale(-1, 1); g.drawImage(f.img, f.sx, f.sy, f.w, f.h, -f.ax * k, gy - f.ay * k, f.w * k, f.h * k); g.restore(); }
+    else g.drawImage(f.img, f.sx, f.sy, f.w, f.h, x - f.ax * k, gy - f.ay * k, f.w * k, f.h * k);
     return true;
   }
   // the whole team on a stage: walking in one after the other (t seconds), then cheering; `final` = already standing in their places
@@ -9169,7 +9922,7 @@
   function showTrialEnd() {
     G.won = true;
     $("winTitle").innerHTML = "Còn <span>tiếp…</span>"; $("endHomeBtn").hidden = true;
-    $("winText").textContent = (G.lvl && G.lvl.end) || "Cuộc phiêu lưu của các bé vẫn còn tiếp!";
+    $("winText").textContent = ((G.lvl && G.lvl.end) || "Cuộc phiêu lưu của các bé vẫn còn tiếp!").replace("{girls}", girlsName());
     $("winStats").textContent = `Bé nhặt được ${G.stars} ngôi sao, lên tới cấp ${P.lv} và hạ ${G.kills} yêu quái.` + (NET.role === "guest" ? " Chờ bạn kia bấm Chơi lại nhé." : "");
     G.mode = "win"; $("winScreen").hidden = false; $("controls").hidden = true; $("bossbar").hidden = true; $("hud").hidden = true;
   }
@@ -10925,7 +11678,7 @@
   const TINT = new Map();
   function fishTint(fr, mode) {
     const key = fr + "|" + mode; let c = TINT.get(key); if (c) return c;
-    const f = FR[fr]; if (!f) return null;
+    const f = FR[fr]; if (!f || !frameReady(f)) return null;
     c = document.createElement("canvas"); c.width = Math.max(1, Math.ceil(f.w)); c.height = Math.max(1, Math.ceil(f.h));
     const x = c.getContext("2d"); x.drawImage(f.img, f.sx, f.sy, f.w, f.h, 0, 0, f.w, f.h);
     x.globalCompositeOperation = "source-atop"; x.fillStyle = mode === "shadow" ? "rgba(8,26,58,.9)" : "rgba(25,115,170,.42)"; x.fillRect(0, 0, c.width, c.height);
@@ -11123,7 +11876,8 @@
     const say = sayAt(G.say.seq, G.say.t); if (!say) return;
     const [spk, lines] = G.say.seq[say.i], sm = PETE.find((e) => e.kind === "simmy");
     const at = spk === "simmy" ? (sm ? [sm.x, sm.y - CHAR_H.simmy - 50] : [P.x, P.y - CHAR_H[hero] - 40]) : girlSpot(spk);
-    talkBubble(lines, at[0], at[1], say.k, 44 * WT);
+    const [bx, by] = bubbleInView(lines, at[0], at[1], 44 * WT);   // (kept in view and under the HUD's map name and quest pill)
+    talkBubble(lines, bx, by, say.k, 44 * WT);
   }
 
   // ---------------------------------------------------------------- Simmy leads the team off to the clothes shop (after the candy boss)
@@ -11209,7 +11963,9 @@
     ctx.font = `800 ${fs}px Grandstander, system-ui`;
     const w = Math.max(...lines.map((l) => ctx.measureText(l).width)) + fs * 1.6, h = lines.length * fs * 1.18 + fs * 0.8;
     const hw = VW / 2 / zm, hh = VH / 2 / zm, cx = G.camX + VW / 2, cy = G.camY + VH / 2;
-    return [clamp(x, cx - hw + w / 2 + 24 / zm, cx + hw - w / 2 - 24 / zm), clamp(y, cy - hh + h + 34 + 150 * WT / zm, cy + hh - 24 / zm)];
+    // (and under the HUD's middle column, the map's name and the quest pill: Simmy's line at the start of Màn 2 covered them)
+    const hy = hudMidY(8), top = Math.max(cy - hh + h + 34 + 150 * WT / zm, hy === null ? -Infinity : hy + h + 34);
+    return [clamp(x, cx - hw + w / 2 + 24 / zm, cx + hw - w / 2 - 24 / zm), clamp(y, top, Math.max(top, cy + hh - 24 / zm))];
   }
   // the end of the film (or a tap on skip): the host / a solo girl opens the shop; a guest waits for the host's shop (syncShop opens hers)
   function endWalkIn() {
@@ -11237,7 +11993,7 @@
   }
 
   // ---------------------------------------------------------------- the opening film (Màn 1)
-  // SKSP are making a vlog on a meadow; Phù thủy Xám Xịt opens a grey portal and sucks the four of them in; Mochi and Matcha jump in after them.
+  // SKSP are making a vlog on a meadow; Phù thủy Hắc Ám opens a grey portal and sucks the four of them in; Mochi and Matcha jump in after them.
   // It is a stage of its own (drawn straight to the canvas like the runway), ~17 s, skippable; the world waits and the game starts where it ends.
   // G.cine = { ph: "opening", t, lock: true }; null when there is no film.
   const OP_END = 17.0, OP_FEET = 0.72;
@@ -11379,7 +12135,7 @@
       }
       drawFilmActor(g, C.art, x, y, kh, { t, hop: speaking ? Math.abs(Math.sin(t * 9)) * 0.03 : 0, rot: pulled ? sp : lean * (k === "phong" ? -0.4 : 1), alt: Math.floor(t * 2) % 2 === 1 });
     });
-    // Phù thủy Xám Xịt, floating beside the portal
+    // Phù thủy Hắc Ám, floating beside the portal
     const wIn = ss(6.4, 7.4, t), wOut = ss(14.0, 15.0, t);
     if (wIn > 0 && wOut < 1) {
       const wx = lerp(px - W * 0.075, px, wOut), wy = lerp(H * 0.52 + Math.sin(t * 2) * H * 0.012, py, wOut), ws = (1 - 0.9 * wOut) * (0.4 + 0.6 * wIn);
@@ -11440,7 +12196,7 @@
   // and reports its spell hits, ultimate and revive back as room events. Each camera follows its own girl.
   const FTYPES = ["fire", "web", "webball"];
   const MKINDS = Object.keys(MON), MST = ["walk", "prep", "atk", "rest", "web", "fly", "back", "skw", "sk", "howl", "csum"];   // (skw, sk, howl: the creep skills; csum: a champion summoning; appended)
-  const BST = ["enter", "walk", "prep", "slam", "rest", "leap", "dash", "quiz", "morph", "tele"], DTYPES = ["heart", "energy", "fire", "ice", "poison"], ELS = [null, "fire", "ice", "poison"];
+  const BST = ["enter", "walk", "prep", "slam", "rest", "leap", "dash", "quiz", "morph", "tele", "throne", "fly", "ult"], DTYPES = ["heart", "energy", "fire", "ice", "poison"], ELS = [null, "fire", "ice", "poison"];
   const NET = { hb: 0, room: null, state: "wait", me: null, role: null, partner: null, pp: null, applied: null, co: null,
     sendT: 0, startT: 0, goneT: 0, portalSent: false, lvBusy: false, hq: [], sq: [], fq: [] };   // hq/sq/fq: hits, shots and pet moves batched per send
   let Q = null;   // the other girl, as last reported in their presence
@@ -11716,7 +12472,7 @@
   function girlState() {
     const bits = (P.dead ? 1 : 0) | (P.inv > 0 ? 2 : 0) | (P.slowT > 0 ? 4 : 0) | (P.castT > 0.1 ? 8 : 0) | (P.winT ? 16 : 0) | (P.flip ? 32 : 0) | (G.mode === "pause" ? 64 : 0) | (G.story ? 128 : 0);   // (64: this page is paused; 128: it shows a story card)
     return [P.x | 0, P.y | 0, P.face, (G.mode === "play" && P.fn) || "", bits, ELS.indexOf(P.elem), G.ult ? Math.round(G.ult.t * 10) : 0, hero, G.hearts, 0, P.vx | 0, P.vy | 0, P.pets.join(","), P.lv,
-      PETE.map((p) => [p.x | 0, p.y | 0, p.face + (p.flip ? 8 : 0) + (p.faintT > 0 ? 16 : 0), ...(isCls(p) ? [Math.round(100 * p.hp / p.max), p.faintT > 0 ? Math.round(100 * clamp(Math.max(p.rev / ALLY_REVIVE_T, 1 - p.faintT / ALLY_FAINT_T), 0, 1)) : 0] : [])]), P.dead ? Math.round((1 - clamp(G.reviveT / FAINT_T, 0, 1)) * 100) : 0, P.helped ? 1 : 0, P.elem ? Math.ceil(P.elemT * 10) : 0, P.outfit || "base", onShip() && SHIP.ph !== "dock" ? 1 : 0, rodSlot(), onShip() && NET.role === "guest" && SHIPX.mine.length ? SHIPX.mine : 0];   // [18] = outfit id (`of`); older copies send 18 slots; [19] = on the ship's deck (x, y are deck px then); [20] = her fishing rod (rodSlot) or 0; [21] = a guest's last landed fish on the ship ([[id, kind], ...]) or 0
+      PETE.map((p) => [p.x | 0, p.y | 0, p.face + (p.flip ? 8 : 0) + (p.faintT > 0 ? 16 : 0), ...(isCls(p) ? [Math.round(100 * p.hp / p.max), p.faintT > 0 ? Math.round(100 * clamp(Math.max(p.rev / ALLY_REVIVE_T, 1 - p.faintT / (p.fmax || ALLY_FAINT_T)), 0, 1)) : 0] : [])]), P.dead ? Math.round((1 - clamp(G.reviveT / FAINT_T, 0, 1)) * 100) : 0, P.helped ? 1 : 0, P.elem ? Math.ceil(P.elemT * 10) : 0, P.outfit || "base", onShip() && SHIP.ph !== "dock" ? 1 : 0, rodSlot(), onShip() && NET.role === "guest" && SHIPX.mine.length ? SHIPX.mine : 0];   // [18] = outfit id (`of`); older copies send 18 slots; [19] = on the ship's deck (x, y are deck px then); [20] = her fishing rod (rodSlot) or 0; [21] = a guest's last landed fish on the ship ([[id, kind], ...]) or 0
   }
   function worldState() {
     const B = G.boss, near = Q ? (o) => d2(o.x, o.y, Q.x, Q.y) < 1900 * 1900 : () => true;
@@ -11728,7 +12484,7 @@
         (m.hurt > 0 ? 1 : 0) | (m.flash > 0 ? 2 : 0) | sb(m) | (m.summoned ? 64 : 0) | (m.elite ? 128 : 0) | (m.sk ? 256 : 0) | (m.guard ? 512 : 0) | (m.champ ? 1024 : 0) | (m.mini ? 2048 : 0), Math.round(m.t * 10), m.max,
         ...(m.fa !== undefined || m.guard || m.champ ? [m.fa !== undefined ? Math.round(m.fa * 100) : null] : []), ...(m.guard || m.champ ? [m.guard ? MKINDS.indexOf(m.skk || m.kind) : null] : []),
         ...(m.champ ? [AFF_K.indexOf(m.champ.k), m.shdMax ? Math.ceil(100 * m.shd / m.shdMax) : 0] : [])]),   // (256: skilled; 512: a cage guardian; 1024: a champion; 2048: a split half; [10]: the ice skeleton's shield facing; [11]: a guardian's attack's breed; [12] / [13]: a champion's affix, its shield %)
-      b: B ? [B.x | 0, B.y | 0, B.dir, BST.indexOf(B.st), B.hp, Math.round(B.t * 10), (B.flash > 0 ? 1 : 0) | (B.hurtPose > 0 ? 2 : 0) | sb(B), B.dropY | 0, B.alive ? 1 : 0, B.ix | 0, B.iy | 0, B.jz | 0, B.max, BMOVES.indexOf(B.move), Math.round((B.ax || 0) * 100), Math.round((B.ay || 0) * 100), B.phase === 2 ? 2 : 1] : 0,   // [16]: his form (older pages send 16 slots)
+      b: B ? [B.x | 0, B.y | 0, B.dir, BST.indexOf(B.st), B.hp, Math.round(B.t * 10), (B.flash > 0 ? 1 : 0) | (B.hurtPose > 0 ? 2 : 0) | sb(B), B.dropY | 0, B.alive ? 1 : 0, B.ix | 0, B.iy | 0, B.jz | 0, B.max, BMOVES.indexOf(B.move), Math.round((B.ax || 0) * 100), Math.round((B.ay || 0) * 100), B.phase || 1, B.fs || 0, B.tired > 0 ? Math.ceil(B.tired * 10) : 0] : 0,   // [17]: the final battle's stage, [18]: her worn-out time   // [16]: his form (older pages send 16 slots)
       qz: G.quiz ? [QPH.indexOf(G.quiz.ph), Math.round(G.quiz.t * 10), G.quiz.T, G.quiz.ok, G.quiz.a, G.quiz.b, G.quiz.op === "+" ? 0 : 1, ...G.quiz.ans, G.quiz.n || 0] : 0,
       bc: G.bcut ? [BCPH.indexOf(G.bcut.ph), Math.round(G.bcut.t * 10)] : 0,
       q: G.quakes.map((q) => [q.id, q.x | 0, q.y | 0, q.r | 0, Math.round(q.t * 20), Math.round(q.w * 20), q.k === "bomb" ? 1 : q.k === "meteor" ? 2 : q.k === "lolli" ? 3 : 0, q.sx | 0, q.sy | 0]),
@@ -11843,12 +12599,12 @@
     for (const m of G.mons) if (m.alive && !seen.has(m.id)) {
       m.alive = false; m.die = 0;
       // gone near me: it was defeated (far away it may just have been recycled)
-      if (d2(m.x, m.y, P.x, P.y) < 1600 * 1600) { play("pop"); burst(m.x, m.y - (m.hgt || 90), 14, ["#fff4c2", "#ffd34d", "#ff9ad5", "#b9a4ff"], 380, 0.7); }
+      if (d2(m.x, m.y, P.x, P.y) < 1600 * 1600) { play("pop"); burst(m.x, m.y - (m.hgt || 90), 14, ["#fff4c2", "#ffd34d", "#ff9ad5", "#b9a4ff"], 380, 0.7); if (m.ltD) ltBeatenFx(m); }
       else m.die = 1;
     }
     // boss
     if (Array.isArray(w.b) && G.arena) {
-      const [x, y, dir, si, hp, t10, bits, dropY, alive, ix, iy, jz, bmax, mv, ax, ay, ph] = w.b.map(num);
+      const [x, y, dir, si, hp, t10, bits, dropY, alive, ix, iy, jz, bmax, mv, ax, ay, ph, fs, tired] = w.b.map(num);
       if (!G.boss) {
         G.boss = { x, y, tx: x, ty: y, dir: -1, hp, max: 70, st: "enter", t: 0, flash: 0, hurtPose: 0, alive: true, die: 0, dropY };
         const BD = G.lvl.boss || { name: "Trùm", tip: "" };
@@ -11858,7 +12614,10 @@
       if (st === "slam" && B.st !== "slam") { SFX.slam(); G.shake = 24; dust(ix, iy, 26); }
       if (st === "enter" && dropY >= 0 && B.dropY < 0) { SFX.slam(); G.shake = 20; }
       if (st === "morph" && B.st !== "morph") { B.mfx = {}; G.quakes = G.quakes.filter((q) => q.done); G.foes = []; G.waters = []; G.lavas = []; clearCps(); G.hexes = []; }   // (his change begins: as on the host)
-      B.phase = ph === 2 ? 2 : 1;
+      B.phase = ph === 3 ? 3 : ph === 2 ? 2 : 1;
+      if (fs && B.fs !== fs) { if (fs === 2 && B.fs === 1) { const BD = G.lvl.boss; showBanner(BD.name + "!", BD.tip || ""); } if (fs === 1 && !B.fs) showBanner(FB_SAY.lts, FB_SAY.ltsTip); }
+      B.fs = fs || 0; B.tired = tired / 10;
+      if (st === "fly" && B.st !== "fly") { G.hexes = G.hexes.filter((o) => !FB_GEO[o.k]); }
       if (B.tt) { const gap = Math.max(0.03, now - B.tt); B.evx = clamp((x - B.tx) / gap, -1500, 1500); B.evy = clamp((y - B.ty) / gap, -1500, 1500); }
       if (B.st === "tele" && st !== "tele") { B.x = x; B.y = y; }   // (the grey witch is back from her smoke: there at once, no slide)
       B.tt = now; B.tx = x; B.ty = y; B.dir = dir < 0 ? -1 : 1; B.st = st; B.t = t10 / 10; B.hp = hp; B.dropY = dropY; B.ix = ix; B.iy = iy;
@@ -11975,7 +12734,7 @@
         const id = num(a[0]), t = num(a[4]) / 20, end = num(a[6]) / 20, bits = num(a[14]); let o = have.get(id);
         if (!o) {
           if (t > end - 0.3) continue;
-          o = { id, k: HKINDS[num(a[1])], x: num(a[2]), y: num(a[3]), t, w: num(a[5]) / 20, end, r: clamp(num(a[7]), 0, 900), vx: num(a[8]), vy: num(a[9]), cx: num(a[10]), cy: num(a[11]), v: num(a[12]), fly: num(a[13]) / 20,
+          o = { id, k: HKINDS[num(a[1])], x: num(a[2]), y: num(a[3]), t, w: num(a[5]) / 20, end, r: clamp(num(a[7]), 0, 1600), vx: num(a[8]), vy: num(a[9]), cx: num(a[10]), cy: num(a[11]), v: num(a[12]), fly: num(a[13]) / 20,
             n: bits & 7, m: Math.max(1, (bits >> 3) & 7), weak: bits & 64 ? 1 : 0, mon: bits & 128 ? 1 : 0 };
         } else {
           if (Math.abs(o.t - t) > 0.25) o.t = t;
@@ -12104,6 +12863,7 @@
     requestAnimationFrame(loop);
     const dt = Math.min(0.033, (now - last) / 1000); last = now;
     if (!ready) return;
+    atlasSweep(now / 1000);
     try {
       if (G.mode === "play" && !API.hold) update(dt);
       else if (G.mode === "pause") syncShop();
@@ -12146,6 +12906,7 @@
     G, P, IN, joy, keys, NET, FR, LEVELS, MON, HEROES, PETS, TIERS, startGame, buildLevel, toTitle, snowSlow, nextLevelAfter, levelIdx,
     autopilot: false,
     trial: false,   // the game has its real end now (Màn 5's finale and the end screen); sim.js / coop.js print WIN (tests read this)
+    FB, FB_SAY, FB_MOVES, FB_GEO, LTS, fbIn, fbHurts, fbDodge, fbTalk, fbLts, fbThrone, fbMove, fbDark, bossOpen: (B) => bossOpen(B || G.boss), bossR: (B) => bossR(B || G.boss), updateBossBar,
     fin: () => ({ t: FIN.t, fw: FIN.fw.length, cf: FIN.cf.length }), FIN_END, FIN_SKIP, showEnd, hexMove, hexDodge, HOVER, HEX: { ORB_R, ORB_V, ORB_V2, ORB_VW, ORB_TURN, TELE_R, CIR_R, RING_R, RING_CR, HEX_LIFT },
     getQ: () => Q,
     setHero: (k) => { hero = k === "s" ? "s" : "g"; loadOutfit(); loadPets(); renderHeroes(); },
@@ -12156,17 +12917,17 @@
     ship: () => SHIP, ISO, ISO_K, startShip, shipAct, shipSolo, stationAt, buttonAction, shipCam, boardCam, shipBars, ctrlZones, deckFix, inPoly, navNext, floatAt, aquaBlock, boardAt, boardT, edgeCall, petJoy, shipFrameName, sim: SIM, drawn: null,
     SHIPPT: { spots: SPOTS, pans: PAN_STAND, spices: SPICE_STAND, bucket: BUCKET_STAND, table: TABLE_STAND, tank: TANK_STAND, simmy: SIM_AT, simCook: SIM_COOK, open: OPEN_DECK, panUiTop: PAN_UI_TOP, walk: WALK, blocks: BLOCKS, hull: HULL, water: WATER, mastY: MAST_Y, galleyX: GALLEY_X },   // (drawn: an array -> drawShip records who / what it draws: [name, deck x, deck y, frame], ["pet", k, art, pose, x, lift], ["board", char, frame], ...)
     rodStep, newRod, rodSlot, pickFish, castDist, fishSize, FISH_TIERS, WIND_HZ, CAST_T, APP_T, BITE_HOLD, LAND_T, BAR0, DRAIN, PULL_ADD, TUG_ADD, SIM_TUG_HZ, schoolsAt, panStep, DONE, BURN, BURN2, SOLO_RATE,
-    scene, SCENE_RETRY,
+    scene, SCENE_RETRY, atlasMem, atlasPins, AT, frameReady,   // (the atlas sheets decoded now, the groups kept decoded)
     refreshFrames: () => DIRN.clear(),   // call after adding frames to FR at run time
     audio: () => ({ ctx: AC && AC.state, samples: Object.keys(SAMPLE).length, music: !!musicSrc, track: musicNow, want: musicWanted() }),
     hz: () => G.hz || [], HZ, hzLive, hzGround: (o) => ({ x: o.x, y: o.y, rx: o.rx, ry: o.ry }), hzHit, hzPhase, placeHazards,
     lpools: () => G.lpools || [], LP: { M: LP_M, CLEAR: LP_CLEAR, GAP: LP_GAP, WARN: LP_WARN, PERIOD: LP_PERIOD }, lpEll, lpScale, lpWarn, lpHit,
-    CLS, COMBOS, ALLY_FAINT_T, ALLY_REVIVE_T, AURA_R, allyLog: null, allyAct: (p, k, T) => startAct(p, k, T || nearestFoes(p.x, p.y, 900, 1)[0] || null), afx: () => G.afx, allyOutfit, hitables, qpets: () => QPETE,
+    CLS, COMBOS, ALLY_FAINT_T, ALLY_REVIVE_T, ALLY_BOSSFIGHT_K, allyDamage, AURA_R, allyLog: null, allyAct: (p, k, T) => startAct(p, k, T || nearestFoes(p.x, p.y, 900, 1)[0] || null), afx: () => G.afx, allyOutfit, hitables, qpets: () => QPETE,
     heroFrame4, monFrame, guideTarget, heroStats, lavaMove, snowMove, xpNeed, gainXp, BOSS_HIT, bossHit, hurtInv, hurtTarget, COOP_XP, COOP_HP, creepHp, spawnGem, addEnergy, startUlt, rescuePet, ultBlast, ultFx: () => UFX, ULT_DRAW_CAP, ULT_PART_CAP, UFX_E, UFX_RAIN, ultLight, viewSize: () => ({ VW, VH }), startBoss, pets: () => PETE,
     groundPaints: () => groundPaints, viewBox, saidPx: null, saidBox: null, saidRect: null, touch: undefined,   // (touch: true / false overrides the touch-screen check (COARSE); groundPaints: ground chunks painted so far; saidPx: an array -> talkBubble records [text, its drawn font size in world px])
     spawnMon: (kind, x, y) => spawnMon(kind, x === undefined ? P.x + 400 : x, y === undefined ? P.y : y),
     SKILL, CREEP_LV, creepLv, teleCap, cps: () => G.cps, clearCps, addCp, cpArt, cpStats: () => ({ ...CPST, free: CP_POOL.length }), shieldUp, monLift, LOB_WIND,   // (the monsters' own attacks)
-    damageBoss: (n) => damageBoss(n, 0, 0, false, true), makeSum, carryShare,
+    damageBoss: (n) => damageBoss(n, 0, 0, false, true), makeSum, carryShare, ULT_SELF_T, WT, hudMidY, nextQuestion,
     // (party scaling, champions, who the monsters go for: Dad's "Game khó hơn" 1, 2, 5)
     PARTY, partyN, partyHp, CHAMP, AFFIX, AGGRO, champShare, setPets: (list) => { P.pets = list.slice(); makePetEnts(); },
     spawnChamp: (kind, x, y, k) => { const m = spawnMon(kind, x, y); makeChamp(m, k); return m; },
