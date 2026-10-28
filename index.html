@@ -318,6 +318,7 @@
   <div class="card">
     <h1 id="winTitle">Còn <span>tiếp…</span></h1>
     <p id="winText"></p>
+    <p>Cả nhóm đã an toàn! Về ăn bữa tiệc cắm trại thôi!</p>
     <p id="winStats"></p>
     <button class="btn" id="againBtn">Chơi lại</button><button class="btn" id="endHomeBtn" hidden>Về trang chính</button>
   </div>
@@ -414,7 +415,7 @@
   let META = null, ready = false;
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261028.1821", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261028.1840", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -779,7 +780,7 @@
     // its lava pools, lavaPools)
     { name: "Màn 1: Rừng Kẹo Ngọt", seed: 1101, path: "river", arena: true, shop: "pirate", hazard: "goo",
       // the title card (intro, trusted markup) and the end screen (end) of this level
-      intro: "Phù thủy Hắc Ám cướp pha lê mở cổng và giam các bạn SKSP ở bốn vùng đất để ngăn cả nhóm lấy lại. Mochi và Matcha đuổi theo cổng phép tới Rừng Kẹo Ngọt. Hãy cứu Mèo Simmy và đánh bại <b>Bánh Kem Khổng Lồ</b> để tìm đường tới các bạn còn lại!",
+      intro: "Một buổi cắm trại bỗng thành chuyến giải cứu! Cả nhóm vô tình dựng lều trong vườn của Phù thủy Hắc Ám. Bà ta bắt các bạn SKSP đi khi Mochi và Matcha đang lấy nước. Hãy cứu Mèo Simmy và đánh bại <b>Bánh Kem Khổng Lồ</b> để tìm đường tới các bạn còn lại!",
       end: "Bánh Kem Khổng Lồ đã bị đánh bại và Mèo Simmy đã được cứu! Nhưng Phù thủy Hắc Ám vẫn nhốt Kairon, Sammy và Phong Cận. Đi cứu các bạn thôi!",
       // the boss leaps twice (at 2/3 and 1/3 of his health), each leap asks quiz.n[i] questions in a row
       boss: { art: "candy_boss", name: "Bánh Kem Khổng Lồ", hp: 45, tip: "Bánh kem đập đất nứt, đàn kẹo mút bay tới!", summon: "candy_lolli", style: "furrow", fence: "cd_wafer_fence", quiz: { op: "+", lim: 10, T: 3, n: [2, 2], hz: "qk_bomb" },
@@ -12736,25 +12737,25 @@
   }
 
   // ---------------------------------------------------------------- the opening film (Màn 1)
-  // Establish the crystal, the theft and the rescue party before the ambush.
+  // A camping trip goes wrong: the witch owns the meadow and scatters the campers.
   // It is a stage of its own (drawn straight to the canvas like the runway), ~29 s, skippable; the world waits and the game starts where it ends.
   // G.cine = { ph: "opening", t, lock: true }; null when there is no film.
   const OP_CONTEXT = 12, OP_END = 17.0, OP_FEET = 0.72;
   const OP_INTRO = [
-    ["Mochi, Matcha và nhóm SKSP đang", "khám phá năm vùng đất phép thuật.", "Viên pha lê của nhóm mở các cổng phép", "để mọi người đi chơi rồi trở về nhà."],
-    ["Nhưng đêm ấy, Phù thủy Hắc Ám", "đánh cắp viên pha lê.", "Bà ta muốn khóa các cổng phép,", "giữ mọi người trong vương quốc của mình."],
-    ["SKSP lần theo dấu phép tới lâu đài", "để lấy lại pha lê và mở đường về.", "Mochi và Matcha cùng hai thú cưng", "đang chờ tin ở phía sau…"],
+    ["Cuối tuần, Mochi và Matcha cùng SKSP", "đi cắm trại, mang theo Coca và Cafe.", "Cả nhóm tìm được một bãi cỏ thật đẹp,", "bèn dừng lại dựng lều, chuẩn bị bữa tối."],
+    ["Nhưng không ai biết bãi cỏ ấy", "nằm trong khu vườn của một phù thủy.", "Bà ta đang ngủ trong lâu đài gần đó,", "còn SKSP đang chuẩn bị bữa tối."],
+    ["Mochi và Matcha dẫn Coca, Cafe", "đi lấy nước ở con suối gần đó.", "Các bạn SKSP ở lại trông lều.", "Cả nhóm sắp ăn tối cùng nhau."],
   ];
   // who says what, when: [speaker, from, to, lines, who says it while the speaker has no art yet]
   const OP_SAY = [
-    ["simmy", 0.9, 3.5, ["Tìm ra đường tới", "lâu đài rồi cả nhà ơi!"]],
-    ["kairon", 3.5, 6.0, ["Lấy lại pha lê rồi", "đưa mọi người về nhà nhé!"], "sammy"],
-    ["witch", 6.9, 9.4, ["Pha lê giờ là của ta!", "Các ngươi không được trở về!"]],
-    ["sammy", 9.5, 10.9, ["Cẩn thận! Cổng bẫy!"], "simmy"],
-    ["phong", 10.4, 11.9, ["Nắm tay nhau!", "Đừng để bị tách ra!"], "simmy"],
-    ["witch", 11.9, 14.0, ["Mỗi đứa một nơi!", "Xem còn ai cản được ta!"]],
-    ["mochi", 12.6, 13.8, ["Simmy! Các bạn ơi!"]],
-    ["matcha", 13.8, 15.0, ["Cổng chưa đóng!", "Mình đi cứu các bạn!"]],
+    ["simmy", 0.9, 3.5, ["Lều dựng xong rồi!", "Chờ hai bé về là ăn nhé!"]],
+    ["kairon", 3.5, 6.0, ["Bật nhạc lên nào!", "Anh chuẩn bị bữa tối!"], "sammy"],
+    ["witch", 6.9, 9.4, ["Ai cho các ngươi dựng trại", "trong vườn của ta?"]],
+    ["sammy", 9.5, 10.9, ["Bọn cháu xin lỗi!", "Bọn cháu thu dọn ngay!"], "simmy"],
+    ["phong", 10.4, 11.9, ["Cẩn thận! Cổng phép!", "Nắm tay nhau!"], "simmy"],
+    ["witch", 11.9, 12.6, ["Ta sẽ nhốt các ngươi lại!"]],
+    ["simmy", 12.6, 13.8, ["Bọn chị bị bắt rồi!", "Cứu với!"]],
+    ["hero", 13.8, 15.0, ["Simmy! Chờ bọn em!", "Mình đi cứu các bạn!"]],
   ];
   // the four of SKSP on the meadow. Only a member whose frames are in the atlas is shown (no drawn-by-code stand-ins):
   // Kairon and Phong Cận are in once their frames are packed (`kairon.base.*` / `phong.base.*`, tools/g4_pack.py; a lone `<art>_a` / `<art>_stand` also counts).
@@ -12780,7 +12781,7 @@
     return on.map((k, i) => [k, m + (i - (on.length - 1) / 2) * gap]);
   }
   // who speaks a line: its speaker, or the friend standing in for one who is not in the film yet
-  const opSpeaker = (l, cast) => (l[0] in OP_CAST && !cast.some((c) => c[0] === l[0]) ? l[4] || "" : l[0]);
+  const opSpeaker = (l, cast) => (l[0] === "hero" ? (hero === "g" ? "mochi" : "matcha") : l[0] in OP_CAST && !cast.some((c) => c[0] === l[0]) ? l[4] || "" : l[0]);
   // is a bubble up in the opening at t? (the lines drawOpening shows: a speaker who is in the film, or a friend standing in for her)
   function opTalking(t) {
     if (t < OP_CONTEXT) return true;
@@ -12928,6 +12929,8 @@
     // wind lines while they are pulled
     const wind = ss(9.0, 9.6, t) * (1 - ss(12.0, 12.6, t));
     if (wind > 0) { g.strokeStyle = `rgba(235,235,250,${0.5 * wind})`; g.lineWidth = H * 0.004; g.lineCap = "round"; for (let i = 0; i < 16; i++) { const wy2 = H * (0.2 + ((i * 0.61) % 1) * 0.6), wx2 = ((i * 0.27 + t * 1.6) % 1) * W; g.beginPath(); g.moveTo(wx2, wy2); g.lineTo(wx2 + W * 0.08, wy2 - H * 0.02); g.stroke(); } }
+    // Simmy calls from inside the portal after her sprite has disappeared.
+    if (t >= 12.6 && t < 13.8) spots.simmy = [px, py];
     // the speech bubbles
     const fs = Math.round(H * 0.04);
     for (const l of OP_SAY) {
