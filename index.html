@@ -415,7 +415,7 @@
   let META = null, ready = false;
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261028.1849", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261028.1858", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -6700,7 +6700,13 @@
   const FB_ART_LEFT = new Set(["castle_boss3_w0", "castle_boss3_w2"]);
   const fbArtFlip = (name, facingLeft) => !!facingLeft !== FB_ART_LEFT.has(name);
   function drawLt(m) {
-    const D = m.ltD, wi = !m.alive ? (m.die < 0.3 ? 3 : 4) : m.st === "prep" ? 1 : m.st === "atk" ? 2 : m.flash > 0.06 ? 3 : 0, own = FR[m.kind + "_w" + wi];
+    // Visual-only recoil: repeated bullets (including guest flash snapshots)
+    // cannot extend it or interrupt the warning/attack paintings.
+    if (m.alive && m.flash > 0.06 && G.t >= (m.ltFlinchNext || 0)) {
+      m.ltFlinchUntil = G.t + 0.12;
+      m.ltFlinchNext = G.t + 1;
+    }
+    const D = m.ltD, wi = !m.alive ? (m.die < 0.3 ? 3 : 4) : m.st === "prep" ? 1 : m.st === "atk" ? 2 : G.t < (m.ltFlinchUntil || 0) ? 3 : 0, own = FR[m.kind + "_w" + wi];
     let f, flip = m.flip, mul;
     if (own) { f = own; mul = 1; flip = fbArtFlip(m.kind + "_w" + wi, (m.evx || 0) < -20 ? true : (m.evx || 0) > 20 ? false : !!m.flip); }
     else { const k = m.kind; m.kind = D.base; const [fn, fl] = monFrame(m); m.kind = k; f = tierFrame(fn); flip = fl; mul = CHAR_M * D.sc; }
