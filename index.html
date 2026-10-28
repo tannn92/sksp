@@ -32,6 +32,14 @@
     touch-action: none;
   }
   #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  /* Safari's browser bars can change the available height without a rotation. */
+  @supports (height: 100dvh) {
+    :root { --u: min(1dvh, 1.6vw); }
+    body, #game, .screen, #storyCard, #joyZone { height: 100dvh; bottom: auto; box-sizing: border-box; }
+  }
+
+  #dialogue { position: fixed; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; z-index: 20; }
+  @supports (height: 100dvh) { #dialogue { height: 100dvh; bottom: auto; } }
 
   /* HUD */
   .hud { position: fixed; top: calc(env(safe-area-inset-top, 0px) + 1.6 * var(--u)); left: calc(env(safe-area-inset-left, 0px) + 2 * var(--u)); right: calc(env(safe-area-inset-right, 0px) + 2 * var(--u)); display: flex; justify-content: space-between; align-items: flex-start; pointer-events: none; font-size: calc(2.6 * var(--u)); }
@@ -109,7 +117,7 @@
   #banner.show { opacity: 1; transform: scale(1); }
 
   /* the story card on arrival in a new map (through the magic gate): the level's goal, a few seconds or a tap; the world waits */
-  #storyCard { position: fixed; inset: 0; z-index: 4; display: grid; place-items: center; padding: 4vh 6vw; background: rgba(18,14,38,.5); touch-action: manipulation; }
+  #storyCard { position: fixed; inset: 0; z-index: 21; display: grid; place-items: center; padding: 4vh 6vw; background: rgba(18,14,38,.5); touch-action: manipulation; }
   #storyCard .sbox { width: min(100%, 78 * var(--u)); display: grid; gap: calc(1.6 * var(--u)); justify-items: center; text-align: center; padding: calc(3 * var(--u)) calc(4 * var(--u)) calc(2.4 * var(--u));
     border-radius: calc(3.2 * var(--u)); background: rgba(28,16,48,.94); border: 3px solid var(--gold); box-shadow: 0 0 34px rgba(255,211,77,.35), 0 14px 40px rgba(0,0,0,.5); animation: popIn .45s cubic-bezier(.2,1.6,.4,1) both; }
   #storyTitle { font: 800 calc(5.4 * var(--u)) / 1.05 var(--display); color: var(--gold); text-shadow: 0 3px 0 rgba(0,0,0,.35); }
@@ -204,7 +212,7 @@
   #shopTeam .rd.ok { background: rgba(124,242,198,.94); color: #063b2a; box-shadow: 0 3px 0 #167a5c; }
   #shopTeam .rd i { font-style: normal; font-weight: 700; opacity: .8; }
   #shopTeam .rd svg { width: 1em; height: 1em; }
-  #photo { z-index: 7; background: radial-gradient(90% 90% at 50% 40%, rgba(18,14,38,.82), rgba(8,6,20,.97)); }
+  #photo { z-index: 7; background: linear-gradient(rgba(18,14,38,.36), rgba(8,6,20,.65)), url(assets/scene_stage.webp) center / cover no-repeat; }
   #photoFrame { position: relative; padding: calc(1.6 * var(--u)) calc(1.6 * var(--u)) calc(4 * var(--u)); background: #fffaf0; border-radius: 6px; transform: rotate(-1.6deg); box-shadow: 0 16px 50px rgba(0,0,0,.6); animation: photoIn .7s cubic-bezier(.2,1.3,.4,1) both; }
   #photoFrame img { display: block; max-width: 78vw; max-height: 60vh; border-radius: 3px; }
   #photoFrame b { display: block; margin-top: .3em; text-align: center; color: #3a2350; font: 800 calc(3.4 * var(--u)) var(--display); }
@@ -219,12 +227,29 @@
   .help span b { color: var(--cream); }
   .row { display: flex; gap: .8em; justify-content: center; flex-wrap: wrap; }
   #loading { font-weight: 800; color: var(--muted); }
-  #rotate { position: fixed; inset: 0; z-index: 9; display: none; place-items: center; text-align: center; background: var(--night); font-family: var(--display); font-weight: 800; font-size: 6vw; padding: 10vw; }
-  @media (orientation: portrait) and (max-width: 900px) { #rotate { display: grid; } }
+  .screen, #storyCard { box-sizing: border-box; padding-top: max(4vh, env(safe-area-inset-top, 0px)); padding-bottom: max(4vh, env(safe-area-inset-bottom, 0px)); }
+  .screen { overflow-y: auto; touch-action: pan-y; }
+  #shopCards { touch-action: pan-y; }
+  #joy:not(.on) { left: calc(env(safe-area-inset-left, 0px) + 16 * var(--u)) !important; top: auto !important; bottom: calc(env(safe-area-inset-bottom, 0px) + 6 * var(--u)); }
+  @media (orientation: portrait) {
+    :root { --u: min(1vh, 1vw); }
+    .hud { gap: calc(1 * var(--u)); font-size: calc(2.4 * var(--u)); }
+    .hud > .col { min-width: 0; }
+    .hud > .col:nth-child(2) { max-width: 33%; }
+    .quest { text-align: center; }
+    #mini { width: 5.5em; height: 5.5em; }
+    #bossbar { top: calc(env(safe-area-inset-top, 0px) + 24 * var(--u)); width: 64vw; }
+    #quiz { top: calc(env(safe-area-inset-top, 0px) + 1.2 * var(--u)); max-width: 90vw; box-sizing: border-box; }
+    #shop { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 38fr) minmax(0, 62fr); padding-top: max(calc(2 * var(--u)), env(safe-area-inset-top, 0px)); padding-bottom: max(calc(2 * var(--u)), env(safe-area-inset-bottom, 0px)); }
+    #shopSide { min-width: 0; }
+    #shopCards { grid-auto-rows: calc(23 * var(--u)); }
+    .iconbtn { min-width: 44px; min-height: 44px; }
+  }
   @media (prefers-reduced-motion: reduce) { #bUlt:not(.off)::before, .bar.full .fill { animation: none; } #bUlt:not(.off)::before { opacity: 1; } }
 </style>
 
 <canvas id="game" aria-label="Màn chơi phiêu lưu"></canvas>
+<canvas id="dialogue" aria-hidden="true"></canvas>
 
 <div class="hud" id="hud" hidden>
   <div class="col">
@@ -330,13 +355,13 @@
   <div id="photoFlash"></div>
 </div>
 
-<div id="rotate">Xoay ngang iPad để chơi nhé</div>
 
 <script>
 (() => {
   "use strict";
   const $ = (id) => document.getElementById(id);
   const cv = $("game"), ctx = cv.getContext("2d");
+  const dialogueCv = $("dialogue"), dialogueCtx = dialogueCv.getContext("2d");
   // top-down 3/4 view: VH world units are visible vertically, the world is WORLD x WORLD
   // (1720: game3 shows 1500 and its walkers are 178 tall; ours are 205, so the same share of the screen needs 1500 * 205 / 178)
   const VH = 1720, WORLD = 12000, TAU = Math.PI * 2;
@@ -356,20 +381,36 @@
 
   function fit() {
     DPR = Math.min(window.devicePixelRatio || 1, 2);
-    const w = window.innerWidth, h = window.innerHeight;
-    VW = Math.round(clamp(VH * w / h, VH * 1.0, VH * 2.4));
+    const rect = cv.getBoundingClientRect && cv.getBoundingClientRect();
+    const w = rect && rect.width || window.innerWidth, h = rect && rect.height || window.innerHeight;
+    // Portrait shows a narrower world at the same character scale, without a square letterbox.
+    VW = w < h ? VH * w / h : Math.round(clamp(VH * w / h, VH, VH * 2.4));
     SCALE = Math.min(h / VH, w / VW);
     cv.width = Math.round(w * DPR); cv.height = Math.round(h * DPR);
+    dialogueCv.width = cv.width; dialogueCv.height = cv.height;
     resDirty = true;
   }
   window.addEventListener("resize", fit); fit();
+  if (window.visualViewport) window.visualViewport.addEventListener("resize", fit);
+  document.addEventListener("fullscreenchange", fit);
+  document.addEventListener("webkitfullscreenchange", fit);
+  // Called synchronously from Play taps: iPad fullscreen requires user activation.
+  // Unsupported/denied requests leave the already playable viewport in place.
+  function requestGameFullscreen() {
+    if (!window.matchMedia || !window.matchMedia("(pointer: coarse)").matches || document.fullscreenElement || document.webkitFullscreenElement) return;
+    const root = document.documentElement;
+    if (!root) return;
+    const request = root.requestFullscreen || root.webkitRequestFullscreen;
+    if (!request) return;
+    try { const result = request.call(root); if (result && result.catch) result.catch(() => {}); } catch (_) {}
+  }
 
   // ---------------------------------------------------------------- assets
   const IMG = {}, FR = {};
   let META = null, ready = false;
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261028.1337", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261028.1758", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -441,6 +482,12 @@
   function atlasPins() {
     const p = new Set(["common", hero + ".base"]);
     if (G.mode === "title") { p.add("g.base"); p.add("s.base"); }
+    if (G.petTheme) p.add(G.petTheme);
+    if (G.petTheme === "pirate") p.add("ship");   // existing sailor pet sheets
+    if (SH.open || G.mode === "runway" || G.mode === "photo") {
+      const next = LV_ART[nextLevelAfter(G.level)]; p.add(next);
+      if (next === "pirate") p.add("ship");
+    }
     if (onShip()) for (const g of ["ship", hero + ".sailor", "simmy.sailor", Q && Q.hero ? Q.hero + ".sailor" : "ship"]) p.add(g); else if (G.lvl && G.mode !== "title") p.add(LV_ART[G.level]);
     p.add(hero + "." + (P.outfit || "base"));
     if (Q && Q.hero) { p.add(Q.hero + ".base"); p.add(Q.hero + "." + (Q.of || "base")); }
@@ -728,7 +775,7 @@
     // its lava pools, lavaPools)
     { name: "Màn 1: Rừng Kẹo Ngọt", seed: 1101, path: "river", arena: true, shop: "pirate", hazard: "goo",
       // the title card (intro, trusted markup) and the end screen (end) of this level
-      intro: "Phù thủy Hắc Ám đã bắt cả nhóm SKSP vào Rừng Kẹo Ngọt! Chọn Mochi hoặc chị Matcha, đi theo con đường để đánh bại <b>Bánh Kem Khổng Lồ</b> và cứu bạn nhé.",
+      intro: "Phù thủy Hắc Ám cướp pha lê mở cổng và giam các bạn SKSP ở bốn vùng đất để ngăn cả nhóm lấy lại. Mochi và Matcha đuổi theo cổng phép tới Rừng Kẹo Ngọt. Hãy cứu Mèo Simmy và đánh bại <b>Bánh Kem Khổng Lồ</b> để tìm đường tới các bạn còn lại!",
       end: "Bánh Kem Khổng Lồ đã bị đánh bại và Mèo Simmy đã được cứu! Nhưng Phù thủy Hắc Ám vẫn nhốt Kairon, Sammy và Phong Cận. Đi cứu các bạn thôi!",
       // the boss leaps twice (at 2/3 and 1/3 of his health), each leap asks quiz.n[i] questions in a row
       boss: { art: "candy_boss", name: "Bánh Kem Khổng Lồ", hp: 45, tip: "Bánh kem đập đất nứt, đàn kẹo mút bay tới!", summon: "candy_lolli", style: "furrow", fence: "cd_wafer_fence", quiz: { op: "+", lim: 10, T: 3, n: [2, 2], hz: "qk_bomb" },
@@ -739,8 +786,9 @@
         stone: ["#fff1d6", "#ffe3c2", "#f7d2a8"], gap: "#d3a07c", edge: "#8b5236" } },
     // Màn 2: a sand-and-sea island. The boss is a ghost captain who calls up the sea (a tsunami, geysers, a whirlpool) and calls parrots.
     // Props are drawn about 12% smaller than the candy ones, so each deco entry carries a scale: [sprite, weight, scale].
-    // (next: Màn 3, Núi Tuyết (id "snow"); see nextLevelAfter)
-    { name: "Màn 2: Đảo Cướp Biển", seed: 2207, path: "river", arena: true, next: "snow", hazard: "tide",
+    // (next: Màn 3, Núi Tuyết (id "snow"); see nextLevelAfter). After the captain Simmy leads the team to the snow clothes shop (shop
+    // "snow": the warm clothes for the mountain), then the runway, the team photo and Màn 3 with its story card
+    { name: "Màn 2: Đảo Cướp Biển", seed: 2207, path: "river", arena: true, next: "snow", hazard: "tide", shop: "snow",
       intro: "Phù thủy Hắc Ám đã đưa cả nhóm tới Đảo Cướp Biển! Mặc đồ cướp biển, đi theo lối cát vàng, đánh bại <b>Thuyền Trưởng Ma</b> và cứu anh Kairon nhé.",
       end: "Thuyền Trưởng Ma đã bị đánh bại và Kairon đã được cứu! Kairon kể: Sammy Đào bị nhốt ở Núi Tuyết!",
       handoff: "handoffSnow",   // (the hand-off talk after the boss: SAYS[handoff], before the gate opens)
@@ -755,7 +803,7 @@
     // Màn 3: a snowy mountain (white and pale blue snow, frozen ponds; the world's edge is ice). The boss is a yeti who rolls snowballs,
     // calls up ice spikes and a blizzard (style "yeti"); Sammy waits in a standing ice cage (`cage`). The snow props are cut at the
     // island props' world size, so they take the island's scales.
-    { id: "snow", name: "Màn 3: Núi Tuyết", seed: 3301, path: "river", arena: true, hazard: "ice",
+    { id: "snow", name: "Màn 3: Núi Tuyết", seed: 3301, path: "river", arena: true, hazard: "ice", shop: "lava",
       intro: "Kairon nói đúng: Sammy Đào bị nhốt trong lồng băng trên Núi Tuyết! Đi theo lối tuyết, đánh bại <b>Người Tuyết Yeti</b> và cứu chị Sammy Đào nhé.",
       end: "Yeti đã bị đánh bại và Sammy Đào đã được cứu! Sammy kể: Phong Cận bị nhốt ở Núi Dung Nham!",
       handoff: "handoffLava",
@@ -1068,7 +1116,7 @@
 
   function buildLevel(i) {
     const L = LEVELS[i], R = mulberry(L.seed);
-    G.lvl = L; G.level = i; G.combo = null;
+    G.lvl = L; G.level = i; G.combo = null; G.petTheme = LV_ART[i] || "candy";
     const path = genPath(L, R); G.path = path;
     G.arena = null; G.portal = null;
     if (L.arena) {
@@ -1450,6 +1498,8 @@
     let tx, ty, dx, dy, d;
     if (G.quiz && G.arena) { const [qx, qy] = quadCentre(G.quiz.ok); dx = qx - P.x; dy = qy - P.y; d = Math.hypot(dx, dy); return d < 40 ? [0, 0] : [dx / d, dy / d]; }
     if (G.hexes && G.hexes.some((o) => FB_GEO[o.k] === "dark" && o.t < o.w + o.fly)) { const fd = fbDodge(); return fd || [0, 0]; }   // (the final battle's dark: into the light and stay there, whatever else)
+    // Summoned monsters must not steer her back into a final-boss warning.
+    if (B && B.alive && B.fs) { const fd = fbDodge(); if (fd) return fd; }
     { const cd = creepDodge(); if (cd) return cd; }   // (out of the monsters' warnings first)
     { const gw = botGuardWave(); if (gw) return gw; }   // (a cage guardian awake close by / an ambush she is in)
     if (B && B.alive && B.st !== "enter") {
@@ -1724,7 +1774,7 @@
     // aimed from where it starts: the wand tip is up to 200 off her feet, and a bolt aimed from her feet flies past on a parallel line
     const a = Math.atan2(ty - y, tx - x) + (slot ? slot * fanStep(dist, S.r + (t === G.boss ? 120 : t.r), slots) : 0);
     if (G.parts.length < 400) G.parts.push({ type: "fx", name: "fx_twinkle", x, y: y - BOLT_Z, sc: 0.5, life: 0.18, max: 0.18, grow: 1.2, vx: 0, vy: 0 });
-    G.shots.push({ x, y, vx: Math.cos(a) * S.speed, vy: Math.sin(a) * S.speed, life: S.range / S.speed + 0.12, r: S.r, dmg: S.dmg, bounce: S.bounce, hit: S.bounce ? new Set() : null, elem: P.elem, hk: hero, sc: S.sc, kb: S.kb, tgt: t });
+    G.shots.push({ x, y, vx: Math.cos(a) * S.speed, vy: Math.sin(a) * S.speed, life: S.range / S.speed + 0.12, r: S.r, dmg: S.dmg, bounce: S.bounce, hit: S.bounce ? new Set() : null, elem: P.elem, hk: hero, sc: S.sc, kb: S.kb, tgt: t, frost: frostOn(P.outfit) });
     netShot(x, y, a, S.sc);
     return a;
   }
@@ -1747,12 +1797,12 @@
         const rr = s.r + m.r; if (d2(s.x, s.y, m.x, aimY(m, z)) > rr * rr) continue;
         s.tgt = null;
         if (shieldBlocks(m, s.vx, s.vy)) { s.life = 0; blockFx(m, s.x, s.y); break; }   // (the ice skeleton's shield, in front of him)
-        hitMon(m, s.dmg, s.elem, s.x, s.y, s.kb); hitFx(s.x, s.y - BOLT_Z, s.hk);
+        hitMon(m, s.dmg, s.elem, s.x, s.y, s.kb, 0, s.frost); hitFx(s.x, s.y - BOLT_Z, s.hk);
         if (s.pierce) s.hit.add(m.id); else if (s.bounce > 0) bounceShot(s, m); else s.life = 0;
       }
       const B = G.boss;
       if (bossOpen(B) && s.life > 0 && d2(s.x, s.y, B.x, B.y) < (s.r + bossR(B)) ** 2) {
-        s.life = 0; hitBoss(s.elem, s.x, s.y); hitFx(s.x, s.y - BOLT_Z - 60, s.hk);
+        s.life = 0; hitBoss(s.elem, s.x, s.y, s.frost); hitFx(s.x, s.y - BOLT_Z - 60, s.hk);
       }
     }
     G.shots = G.shots.filter((s) => s.life > 0);
@@ -1771,14 +1821,16 @@
     burst(from.x, from.y - BOLT_Z, 8, HEROES[s.hk].cols, 260, 0.35);
     netShot(s.x, s.y, a, s.sc);
   }
-  function hitMon(m, dmg, el, fx, fy, kb, slow) {
-    if (NET.role === "guest") { NET.hq.push([m.id, ELS.indexOf(el), dmg, Math.round(kb || 0), Math.round((slow || 0) * 10)]); m.flash = 0.12; play("hit"); return; }
+  // (frost: her ice-queen bolt on Núi Tuyết; a guest's hit carries it to the host as a sixth field, 1)
+  function hitMon(m, dmg, el, fx, fy, kb, slow, frost) {
+    if (NET.role === "guest") { NET.hq.push([m.id, ELS.indexOf(el), dmg, Math.round(kb || 0), Math.round((slow || 0) * 10), frost ? 1 : 0]); m.flash = 0.12; play("hit"); return; }
     damageMon(m, dmg, fx, fy, false, "p", kb); applyElem(m, el, "p");
     if (slow > 0 && m.alive) m.slow = Math.max(m.slow || 0, slow);   // (a friend's frost nova / war cry: slowed, not frozen)
+    if (frost) applyFrost(m);
   }
-  function hitBoss(el, x, y) {
-    if (NET.role === "guest") { NET.hq.push([-1, ELS.indexOf(el), 1]); G.boss.flash = 0.12; play("hit"); return; }
-    damageBoss(1, x, y); applyElem(G.boss, el, "p");
+  function hitBoss(el, x, y, frost) {
+    if (NET.role === "guest") { NET.hq.push([-1, ELS.indexOf(el), 1, 0, 0, frost ? 1 : 0]); G.boss.flash = 0.12; play("hit"); return; }
+    damageBoss(1, x, y); applyElem(G.boss, el, "p"); if (frost) applyFrost(G.boss);
   }
   // ---- experience and automatic level-ups
   function gainXp(n) {
@@ -2677,13 +2729,9 @@
   // sides, then one every WAVE.GAP s (n each, WAVE.COOP times as many together) for its `dur` s; meanwhile the stream and surges wait and
   // a fog ring (WAVE.R) keeps the girls inside it (each page keeps its own girl in). Then "Đã trụ vững!" and a reward chest in the middle
   // (WAVE.STARS). Its monsters left stay as any other. The host runs it; the guest follows its state and clock (world state `wv`).
-  const WAVES = [
-    { at: [0.72], dur: 20, n: 8 },
-    { at: [0.72], dur: 22, n: 10 },
-    { at: [0.28, 0.72], dur: 24, n: 12 },
-    { at: [0.28, 0.72], dur: 26, n: 14 },
-    { at: [0.28, 0.72], dur: 28, n: 16 },
-  ];
+  // Dad removed the forced 20–30 second mid-path survival stops. No map creates these encounters.
+  // Retain the empty protocol slot for the existing co-op snapshot reader.
+  const WAVES = [];
   const WAVE = { R: 650, TRIG: 0.55, WARN: 1.5, GAP: 5, RING: 230, STARS: 10, BOX: 0.8, COOP: 1.4 };
   function placeWaves(i, path, endI, cages) {
     const cfg = WAVES[i], out = [], A = G.arena; if (!cfg) return out;
@@ -2936,6 +2984,28 @@
     if (o.frzImm > 0) return;
     o.frz = o.frzMax = o.elite || o.guard ? E.frzElite : E.frz; o.vx = o.vy = 0;
   }
+  // ---- the ice queen's frost (snow11, both girls; Dad 2026-10-27): on Núi Tuyết her bolts freeze what they hit. A monster is crusted in
+  // ice (o.crust: crystals round its legs, frost under it) and slowed (o.slow, the ice spell's pace) for FROST_T s, again with every hit;
+  // never frozen solid (that stays the ice spell's). A boss is only chilled (o.chill, slowed) for FROST_BOSS s, and only while he walks,
+  // rests or winds up: never through his change of form or his quiz (the chill ends there at once)
+  const FROST_T = 1.8, FROST_BOSS = 0.7, FROST_ST = ["walk", "rest", "prep"];
+  const frostOn = (outfit) => outfit === "snow11" && !!G.lvl && G.lvl.id === "snow";
+  const chillable = (B) => FROST_ST.includes(B.st) && !G.quiz;
+  function applyFrost(o) {
+    if (!o || o.alive === false) return;
+    if (o === G.boss) { if (chillable(o)) o.chill = Math.max(o.chill || 0, FROST_BOSS); return; }
+    o.slow = Math.max(o.slow || 0, FROST_T); o.crust = Math.max(o.crust || 0, FROST_T);
+  }
+  // its look over a monster's (or the boss's) frame f drawn at (x, y) with scale mul: frost on the ground under it and ice crystals grown
+  // round its legs (the painted snow pieces fxsn_frost / fxsn_spike0), fading in and out over 0.3 s
+  // (layer 0: the frost on the ground, under it; 1: the crystals, over its legs)
+  function drawCrust(f, x, y, flip, mul, left, w0, layer) {
+    const k = clamp(left / 0.3, 0, 1); if (k <= 0.01 || !f) return;
+    const s = f.s * mul, w = Math.min(f.w * s, w0 || 1e9), cx = x + (f.w / 2 - f.ax) * s * (flip ? -1 : 1) * 0.3, foot = y;
+    if (!layer) { fitFrame("fxsn_frost", cx, foot + 4, w * 1.35, w * 1.35 * 0.45, 0.8 * k); return; }
+    glow(cx, foot - w * 0.2, w * 0.7, ELEM.ice.rgb, 0.35 * k);
+    fitFrame("fxsn_spike0", cx, foot - w * 0.16, w * 1.15, w * 1.15 * 0.6, 0.92 * k);
+  }
   // the ice cracks open: its pieces fly off and fall, with a puff of frost
   function iceShatter(x, y, w) {
     const k = clamp(w / 150, 0.6, 2.2);
@@ -2967,7 +3037,9 @@
       if (!busy && Math.random() < dt * 8) G.parts.push({ type: "dot", x: cx + rnd(-45, 45), y: cy + rnd(-20, 50), vx: rnd(-15, 15), vy: rnd(-110, -60), life: 0.9, max: 0.9, r: rnd(5, 10), col: ELEM.poison.cols[Math.floor(Math.random() * 3)] });
       if (o.poisonT <= 0) { o.poisonT = ELEM.poison.tick; hurt(1); }
     }
-    return o.frz > 0 ? 0 : o.slow > 0 ? 0.4 : 1;
+    if (o.crust > 0) o.crust -= dt;
+    if (o.chill > 0) { o.chill -= dt; if (o === G.boss && !chillable(o)) o.chill = 0; }   // (the ice queen's chill: never through his change or quiz)
+    return o.frz > 0 ? 0 : o.slow > 0 || o.chill > 0 ? 0.4 : 1;
   }
   const ULT_SELF_T = 40;   // s: the ultimate fills by itself in this long (Dad: 30 s was too quick)
   function addEnergy(n, x, y) {
@@ -3088,6 +3160,24 @@
     afterCandyBossSolo: [
       ["simmy", ["Hoan hô! Giờ mình ra đảo", "cứu các bạn thôi!"]],
       ["simmy", ["Sắp tới Đảo Cướp Biển rồi!", "Em đi thay đồ", "cướp biển nhé!"]],
+    ],
+    // after the captain: on to the snowy mountain, so first the warm clothes (the snow shop); together "Hai em", alone "Em"
+    afterCaptain: [
+      ["simmy", ["Hoan hô! Kairon được cứu rồi!", "Giờ lên Núi Tuyết cứu Sammy!"]],
+      ["simmy", ["Trên núi lạnh lắm!", "Hai em đi thay đồ", "ấm nhé!"]],
+    ],
+    afterCaptainSolo: [
+      ["simmy", ["Hoan hô! Kairon được cứu rồi!", "Giờ lên Núi Tuyết cứu Sammy!"]],
+      ["simmy", ["Trên núi lạnh lắm!", "Em đi thay đồ", "ấm nhé!"]],
+    ],
+    // after the yeti: on to the volcano, so first the fire clothes (the lava shop)
+    afterYeti: [
+      ["simmy", ["Hoan hô! Sammy được cứu rồi!", "Giờ tới Núi Dung Nham cứu Phong!"]],
+      ["simmy", ["Núi lửa nóng lắm!", "Hai em đi thay", "đồ núi lửa nhé!"]],
+    ],
+    afterYetiSolo: [
+      ["simmy", ["Hoan hô! Sammy được cứu rồi!", "Giờ tới Núi Dung Nham cứu Phong!"]],
+      ["simmy", ["Núi lửa nóng lắm!", "Em đi thay", "đồ núi lửa nhé!"]],
     ],
     // on the ship: the sailor clothes (the boarding film), why they fish, why they cook, the island in sight and the pirate clothes for it
     // (together "Hai em", alone "Em"); then the island's first line
@@ -3617,10 +3707,10 @@
   const HIT_AT = 0.4, ALLY_FAINT_T = 12, ALLY_REVIVE_T = 1.5, ALLY_INV = 1.0, ALLY_REGEN_WAIT = 6, ALLY_REGEN = 0.03, ALLY_Z = 120;
   const ALLY_MON_K = [0.6, 0.8, 1.2, 1.4, 1.5], ALLY_BOSS_K = 0.6;
   // in a boss fight (Dad: the girls carry the boss fights) the friends take ALLY_BOSSFIGHT_K x the damage and lie fainted ALLY_BOSSFIGHT_K x
-  // as long before they get up by themselves (24 s); a girl beside them still gets them up in ALLY_REVIVE_T s, Kairon's aura at once
-  const ALLY_BOSSFIGHT_K = 2;
+  // as long to recover: 48 s alone or 6 s with a girl beside them. Kairon's aura still revives at once.
+  const ALLY_BOSSFIGHT_K = 4;
   const bossFight = () => !!(G.boss && G.boss.alive);
-  const allyFaintT = () => ALLY_FAINT_T * (bossFight() ? ALLY_BOSSFIGHT_K : 1);
+  const allyFaintT = (inBoss = bossFight()) => ALLY_FAINT_T * (inBoss ? ALLY_BOSSFIGHT_K : 1);
   const AURA_R = 520, AURA_CD = 12, LEAP_T0 = 0.15, LEAP_T1 = 0.7, LEAP_H = 280;
   const ACTS = ["combo", "bolt", "fireball", "nova", "chain", "multishot", "ljav", "pierce", "bhammer", "charge", "aura", "whirl", "leap", "warcry"];
   // each action's poses: [[until t, frame], ...] (sk0..2: the skill poses facing us; atkN: the combo frame N facing the way she faces);
@@ -3669,24 +3759,26 @@
     if (p.q) {
       if (p.hostInv > 0) return;
       p.hostInv = ALLY_INV; p.flash = 0.2;
-      netEmit("ally", { to: NET.partner, t: "hurt", i: p.i, n, fx: fx | 0, fy: fy | 0 });
+      netEmit("ally", { to: NET.partner, t: "hurt", i: p.i, n, bf: bossFight(), fx: fx | 0, fy: fy | 0 });
       return;
     }
     allyDamage(p, n, fx, fy);
   }
-  function allyDamage(p, n, fx, fy) {
+  // Remote damage keeps the host's boss context, even if the boss died before delivery.
+  function allyDamage(p, n, fx, fy, inBoss = bossFight()) {
     const C = CLS[p.kind];
     if (!C || p.faintT > 0 || p.inv > 0) return;
-    const esc = escOf(p), cost = esc ? (n >= 2 ? 2 : 1) : (n >= 2 ? n / 5 * C.hp * ALLY_BOSS_K : n * ALLY_MON_K[clamp(G.level || 0, 0, 4)]) * (bossFight() ? ALLY_BOSSFIGHT_K : 1);
+    const esc = escOf(p), cost = esc ? (n >= 2 ? 2 : 1) : (n >= 2 ? n / 5 * C.hp * ALLY_BOSS_K : n * ALLY_MON_K[clamp(G.level || 0, 0, 4)]) * (inBoss ? ALLY_BOSSFIGHT_K : 1);
     if (esc && G.esc && G.t - G.esc.hurtT > ESC.HURT_SAY && p.hp - cost > 0) { G.esc.hurtT = G.t; escSay(p.kind, "hurt"); }
     p.hp = Math.max(0, p.hp - cost); p.inv = ALLY_INV; p.hurtT = 0.3; p.calm = 0;
     const [nx, ny] = norm(p.x - (fx ?? p.x - 1), p.y - (fy ?? p.y)); p.x += nx * 30; p.y += ny * 20;
     if (G.parts.length < 430) burst(p.x, p.y - 150 * CHAR_K, 8, ["#ff9ab8", "#fff"], 220, 0.4);
     allyLog(p.kind, "hurt", +cost.toFixed(2));
-    if (p.hp <= 0.001) allyFaint(p);
+    if (p.hp <= 0.001) allyFaint(p, inBoss);
   }
-  function allyFaint(p) {
-    p.hp = 0; p.faintT = p.fmax = escOf(p) ? 1e9 : allyFaintT(); p.rev = 0; p.act = null; p.chase = null; p.z = 0; p.moving = false;   // (in her escort she gets up only with a girl beside her)
+  function allyFaint(p, inBoss = bossFight()) {
+    p.revMax = ALLY_REVIVE_T * (!escOf(p) && inBoss ? ALLY_BOSSFIGHT_K : 1);
+    p.hp = 0; p.faintT = p.fmax = escOf(p) ? 1e9 : allyFaintT(inBoss); p.rev = 0; p.act = null; p.chase = null; p.z = 0; p.moving = false;   // (in her escort she gets up only with a girl beside her)
     play("hurt"); if (G.parts.length < 420) burst(p.x, p.y - 80, 14, ["#fff4c2", "#ffd34d", "#b9a4ff"], 260, 0.6);
     allyLog(p.kind, "faint"); TALLY.allyFaint[p.kind] = (TALLY.allyFaint[p.kind] || 0) + 1;
   }
@@ -3705,7 +3797,7 @@
       p.faintT -= dt; p.moving = false; p.act = null; p.chase = null; p.z = 0;
       const gs = Q && NET.role ? [P, Q] : [P];
       if (gs.some((g) => !g.dead && d2(g.x, g.y, p.x, p.y) < RESCUE_R * RESCUE_R)) p.rev += dt;
-      if (p.rev >= ALLY_REVIVE_T || p.faintT <= 0) allyRevive(p);
+      if (p.rev >= (p.revMax || ALLY_REVIVE_T) || p.faintT <= 0) allyRevive(p);
       return;
     }
     if (escOf(p)) return escortStep(p, dt);   // (no gear yet: she leads the team to it, she does not fight)
@@ -4230,7 +4322,7 @@
     spr(fn, p.x, p.y, false, m, 1);
     const f = FR[fn], hx = f ? p.x + (f.w * 0.22 - f.ax) * f.s * m : p.x - 60, hy = p.y - (f ? f.ay * f.s * m * 0.75 : 60);
     for (let i = 0; i < 3; i++) { const an = G.t * 4 + i * TAU / 3; fx("fx_twinkle", hx + Math.cos(an) * 42, hy - 24 + Math.sin(an) * 14, 0.6, 1, G.t * 6); }
-    const k = clamp(p.fk ?? Math.max((p.rev || 0) / ALLY_REVIVE_T, 1 - p.faintT / (p.fmax || ALLY_FAINT_T)), 0, 1), rx = p.x, ry = p.y - 170 * CHAR_K, R = 26, help = p.rev > 0;   // (teal while a girl helps her up: her own page knows)
+    const k = clamp(p.fk ?? Math.max((p.rev || 0) / (p.revMax || ALLY_REVIVE_T), 1 - p.faintT / (p.fmax || ALLY_FAINT_T)), 0, 1), rx = p.x, ry = p.y - 170 * CHAR_K, R = 26, help = p.rev > 0;   // (teal while a girl helps her up: her own page knows)
     ctx.save(); ctx.fillStyle = "rgba(28,16,48,.8)"; ctx.beginPath(); ctx.arc(rx, ry, R + 7, 0, TAU); ctx.fill();
     ctx.lineWidth = 8; ctx.lineCap = "round"; ctx.strokeStyle = "rgba(255,255,255,.2)"; ctx.beginPath(); ctx.arc(rx, ry, R, 0, TAU); ctx.stroke();
     ctx.strokeStyle = help ? "#7cf2c6" : "#ffd34d"; ctx.beginPath(); ctx.arc(rx, ry, R, -Math.PI / 2, -Math.PI / 2 + TAU * k); ctx.stroke(); ctx.restore();
@@ -4410,37 +4502,50 @@
   // (box: { L, R, B } the view in world units: the bubble is kept inside it; pushed down far over the speaker's face, its body moves
   // aside, toward the middle of the view, its tail still on him)
   function talkBubble(lines, x, y, k, fs, up, dx, minTop, box) {
+    // DOM HUD/minimap/boss bars sit above the world canvas. Speech has its own
+    // pointer-transparent top layer, with the exact current camera/DPR transform.
+    const g = dialogueCtx;
+    const matrix = ctx.getTransform();
+    g.setTransform(matrix);
     if (API.said) API.said.push(lines.join(" "));   // (tests: which bubbles are drawn)
-    ctx.save(); ctx.globalAlpha = k; const s = 0.8 + 0.2 * k;
-    ctx.font = `800 ${fs}px Grandstander, system-ui`;
-    const lh = fs * 1.18, w = Math.max(...lines.map((l) => ctx.measureText(l).width)) + fs * 1.6, h = lines.length * lh + fs * 0.8;
+    g.save(); g.globalAlpha = k; const s = 0.8 + 0.2 * k;
+    g.font = `800 ${fs}px Grandstander, system-ui`;
+    if (matrix && matrix.a > 0 && matrix.d > 0 && !matrix.b && !matrix.c) {
+      const left = -matrix.e / matrix.a, right = (dialogueCv.width - matrix.e) / matrix.a;
+      const available = right - left - 32, measured = (Math.max(...lines.map(l => g.measureText(l).width)) + fs * 1.6) * s;
+      if (measured > available && available > 0) { fs *= available / measured; g.font = `800 ${fs}px Grandstander, system-ui`; }
+      if (!box) box = { L:left, R:right, B:(dialogueCv.height - matrix.f) / matrix.d };
+    }
+    const lh = fs * 1.18, w = Math.max(...lines.map((l) => g.measureText(l).width)) + fs * 1.6, h = lines.length * lh + fs * 0.8;
     let push = 0;
     if (!up && minTop !== undefined) { const y1 = Math.max(y, minTop + (h + 34) * s); push = y1 - y; y = y1; }
     if (box) {
       if (push > h * 0.5 * s && !dx) dx = (x < (box.L + box.R) / 2 ? 1 : -1) * (w / 2 - 50) * s;
       const b0 = dx ? clamp(dx / s, Math.min(0, -w / 2 + 50), Math.max(0, w / 2 - 50)) : 0;
-      // (as high as the hearts, magic and level bars at the top left: kept to their right)
-      const bL = box.hudR !== undefined && y - (h + 34) * s < box.hudB ? Math.max(box.L, box.hudR) : box.L;
+      // Avoid the left HUD only when the whole bubble fits there. On a narrow
+      // screen speech may cover the HUD, but must never be pushed off screen.
+      const hudL = box.hudR !== undefined && y - (h + 34) * s < box.hudB ? Math.max(box.L, box.hudR) : box.L;
+      const bL = box.R - hudL >= w * s + 32 ? hudL : box.L;
       x = clamp(x, bL + 16 - (b0 - w / 2) * s, Math.max(bL + 16 - (b0 - w / 2) * s, box.R - 16 - (b0 + w / 2) * s));
       if (box.B !== undefined) y = Math.min(y, box.B - 16 - 6 * s);
     }
     if (API.saidBox) API.saidBox.push([lines.join(" "), VIEWT.zs ? ((y - (up ? -34 : h + 34) * s - VIEWT.T) * VIEWT.zs + VIEWT.offY) / DPR : 0, k]);   // (tests: [text, its top in css px, alpha])
-    ctx.translate(x, y); ctx.scale(s, s);
+    g.translate(x, y); g.scale(s, s);
     if (API.saidPx) API.saidPx.push([lines.join(" "), fs * s]);
     const y0 = up ? 34 : -h - 34, bx = dx ? clamp(dx / s, Math.min(0, -w / 2 + 50), Math.max(0, w / 2 - 50)) : 0;
     if (API.saidRect && VIEWT.zs) {   // (tests: [text, left, top, right, bottom (its tail's tip), alpha] in css px)
       const cx = (wx) => ((wx - VIEWT.L) * VIEWT.zs + VIEWT.offX) / DPR, cy = (wy) => ((wy - VIEWT.T) * VIEWT.zs + VIEWT.offY) / DPR;
       API.saidRect.push([lines.join(" "), cx(x + (bx - w / 2) * s), cy(y + Math.min(y0, up ? -6 : y0) * s), cx(x + (bx + w / 2) * s), cy(y + (up ? y0 + h : 6) * s), k]);
     }
-    ctx.fillStyle = "#fff"; ctx.strokeStyle = "rgba(60,30,80,.55)"; ctx.lineWidth = 6;
-    rrect(ctx, bx - w / 2, y0, w, h, Math.min(40, h / 2)); ctx.fill(); ctx.stroke();
+    g.fillStyle = "#fff"; g.strokeStyle = "rgba(60,30,80,.55)"; g.lineWidth = 6;
+    rrect(g, bx - w / 2, y0, w, h, Math.min(40, h / 2)); g.fill(); g.stroke();
     const ty = up ? 36 : -36, tip = up ? -6 : 6;
-    ctx.beginPath(); ctx.moveTo(-30, ty); ctx.lineTo(0, tip); ctx.lineTo(30, ty); ctx.closePath(); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(-30, ty); ctx.lineTo(0, tip); ctx.lineTo(30, ty); ctx.stroke();
-    ctx.fillStyle = "#fff"; ctx.fillRect(-27, up ? ty - 1 : ty - 4, 54, 5);
-    ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle = "#4a2160";
-    lines.forEach((l, i) => ctx.fillText(l, bx, y0 + fs * 0.4 + lh * (i + 0.5)));
-    ctx.restore();
+    g.beginPath(); g.moveTo(-30, ty); g.lineTo(0, tip); g.lineTo(30, ty); g.closePath(); g.fill();
+    g.beginPath(); g.moveTo(-30, ty); g.lineTo(0, tip); g.lineTo(30, ty); g.stroke();
+    g.fillStyle = "#fff"; g.fillRect(-27, up ? ty - 1 : ty - 4, 54, 5);
+    g.textAlign = "center"; g.textBaseline = "middle"; g.fillStyle = "#4a2160";
+    lines.forEach((l, i) => g.fillText(l, bx, y0 + fs * 0.4 + lh * (i + 0.5)));
+    g.restore();
   }
   // the world view's top (world y), zoom and letterbox, set each frame by render: a screen y in css px is at T + (y * DPR - offY) / zs
   const VIEWT = { T: 0, zs: 0, offY: 0, L: 0, offX: 0 };
@@ -4723,7 +4828,7 @@
       // anyone on a wrong square faints on the spot
       if (!P.dead && quadOf(P.x, P.y) !== z.ok) { P.inv = 0; heroDown(); }
       else if (!P.dead) { floatText(P.x, P.y - 300, "Đúng rồi!"); G.stars += 3; updateHud(); SFX.level && SFX.level(); burst(P.x, P.y - 160, 40, ["#ffd34d", "#7cf2c6", "#fff"], 520, 1); }
-      for (const e of PETE) if (quadOf(e.x, e.y) !== z.ok) { e.faintT = FAINT_T; e.at = -1; e.st = "follow"; }
+      for (const e of PETE) if (quadOf(e.x, e.y) !== z.ok) { if (isCls(e)) { if (!(e.faintT > 0)) allyFaint(e); } else e.faintT = FAINT_T; e.at = -1; e.st = "follow"; }
     }
     updateQuizHud();
   }
@@ -4798,8 +4903,8 @@
   }
   // a friend knocked out: lying down with stars going round
   function drawPetFaint(p, D) {
-    const sail = islandSail(p.kind), fn = sail ? sail + "_sail_w0" : `pet_${p.kind}_d0_w0`, f = FR[fn], fit = sail ? sailFit(p.kind, fn) : 1, sc = CHAR_M * (p.sc || 1) * fit;
-    if (sail && API.drawn) API.drawn.push(["islandPet", p.kind, fn, !!p.flip, f ? f.h * f.s * fit : 0]);
+    const sail = petOutfitPrefix(p.kind), fn = sail ? sail + "_w0" : `pet_${p.kind}_d0_w0`, f = FR[fn], fit = sail ? sailFit(p.kind, fn) : 1, sc = CHAR_M * (p.sc || 1) * fit;
+    if (sail && API.drawn) { const row = ["petOutfit", p.kind, fn, !!p.flip, f ? f.h * f.s * fit : 0]; API.drawn.push(row); if (sail.endsWith("_sail")) API.drawn.push(["islandPet", ...row.slice(1)]); }
     shadow(p.x, p.y, 50, 12);
     if (f) spr(f, p.x + f.h * f.s * sc * 0.4, p.y - 10, false, sc, 1, -Math.PI / 2);
     const hx = p.x - (f ? f.h * f.s * sc * 0.1 : 0), hy = p.y - 60;
@@ -6083,7 +6188,7 @@
   // The host runs it; the guest follows the boss's state (BST "throne" / "fly" / "ult", her stage b[17], her form b[16]), the lieutenants
   // among the monsters (their kinds) and every warned piece among her hexes (`hx`, the kinds below).
   const FB = {
-    HP: 780, AT2: 0.65, AT3: 0.33, ULT_AT: 0.1, W: 1.0, TH_IN: 330,
+    HP: 800, AT2: 0.65, AT3: 0.33, ULT_AT: 0.1, W: 1.0, TH_IN: 330,
     TEMPO: [1, 1, 1.15, 1.35, 1.25],
     TAUNT: 8.5, TAUNT_ON: 2.8, DESC: 4.2, DESC_UP: 0.7, DESC_LAND: 3.0,
     M2: 2.6, M2S: 1.2, M3: 3.8, M3S: 1.9,
@@ -6107,8 +6212,8 @@
   // the two lieutenants: their own kinds among the monsters (MON: their old kind's ways; `ltD` holds the rest). Drawn from their own
   // five-pose paintings (`<kind>_w0..4`: stand, wind-up, strike, hurt, fallen) when packed, else from their old breed's frames, bigger.
   const LTS = {
-    fb_knight: { name: "Hiệp Sĩ Hắc Ám", base: "castle_mummy", sc: 2.1, r: 105, hp: 125, spd: 110, rgb: "160,120,255", moves: ["kslash", "kslam"], keep: [230, 420] },
-    fb_raven: { name: "Quạ Đêm Khổng Lồ", base: "castle_bat", sc: 2.5, r: 95, hp: 105, spd: 160, rgb: "120,90,210", moves: ["feather", "dive"], keep: [420, 640] },
+    fb_knight: { name: "Hiệp Sĩ Hắc Ám", base: "castle_mummy", sc: 2.1, r: 105, hp: 130, spd: 110, rgb: "160,120,255", moves: ["kslash", "kslam"], keep: [230, 420] },
+    fb_raven: { name: "Quạ Đêm Khổng Lồ", base: "castle_bat", sc: 2.5, r: 95, hp: 110, spd: 160, rgb: "120,90,210", moves: ["feather", "dive"], keep: [420, 640] },
   };
   MON.fb_knight = { ...MON.mummy, like: "mummy" }; MON.fb_raven = { ...MON.bat, like: "bat", hgt: 190 };
   // her moves in each stage, in turn (the moves without an `fb` look are her old ones: hexMove)
@@ -6585,10 +6690,14 @@
   }
   // ---- the lieutenants: their own paintings when packed (five poses, mirrored to face her), else their old breed's frames, bigger;
   // their light, a health bar and their name over them
+  // New ChatGPT knight/raven sheets face right in all five poses.
+  // Only the dragon's stand/breath paintings face left; aim each pose consistently.
+  const FB_ART_LEFT = new Set(["castle_boss3_w0", "castle_boss3_w2"]);
+  const fbArtFlip = (name, facingLeft) => !!facingLeft !== FB_ART_LEFT.has(name);
   function drawLt(m) {
     const D = m.ltD, wi = !m.alive ? (m.die < 0.3 ? 3 : 4) : m.st === "prep" ? 1 : m.st === "atk" ? 2 : m.flash > 0.06 ? 3 : 0, own = FR[m.kind + "_w" + wi];
     let f, flip = m.flip, mul;
-    if (own) { f = own; mul = 1; flip = (m.evx || 0) < -20 ? true : (m.evx || 0) > 20 ? false : !!m.flip; }
+    if (own) { f = own; mul = 1; flip = fbArtFlip(m.kind + "_w" + wi, (m.evx || 0) < -20 ? true : (m.evx || 0) > 20 ? false : !!m.flip); }
     else { const k = m.kind; m.kind = D.base; const [fn, fl] = monFrame(m); m.kind = k; f = tierFrame(fn); flip = fl; mul = CHAR_M * D.sc; }
     if (!f) return;
     const fly = m.c.fly, a = m.alive ? 1 : clamp(1 - m.die / 0.6, 0, 1), lift = fly ? m.hgt + Math.sin(G.t * 3 + m.ph) * 14 - (m.st === "atk" ? 80 : 0) : 0, y = m.y - lift;
@@ -7873,7 +7982,7 @@
     const next = nextLevelAfter(G.level);
     if (next < 0) { winGame(); return; }   // the last level so far: for now the "to be continued" screen
     // (a fresh set of hearts on every new map: through the gate as after a shop, and as on the guest's page; Dad's run started Màn 3 on 2)
-    setTimeout(() => fadeTo(() => { G.hearts = 5; buildLevel(next); renderHearts(); updateHud(); arrive(next); }), 1100);
+    startTravel(next);
   }
   function fadeTo(fn) { G.onFade = fn; G.fadeDir = 1; }
   // ---- arriving in a new map through the magic gate: a short story card tells its goal (the level's intro: the title screen's words, its
@@ -8256,6 +8365,7 @@
     if (skw && SK.shake) x += Math.sin(G.t * 60) * 5 * Math.min(1, m.t / 0.3);
     const roll = m.alive && m.st === "sk" && SK && SK.sk === "roll" && skillOf(m) === "roll";   // (a borrowed roll is a dash, not a barrel's turn)
     shadow(m.x, m.y, m.r * (fly || hov ? 0.8 : 1.15) * (1 - Math.min(0.4, Math.max(0, lift) / 500)), m.r * 0.32, (fly || hov ? 0.18 : 0.3) * a);
+    if (m.alive && m.crust > 0 && !(m.frz > 0)) drawCrust(f, x, m.y, flip, mul, m.crust, 0, 0);   // (the ice queen's frost on the ground under it)
     const cy = fly ? y : m.y - 95 - lift;
     if (m.guard && m.alive) guardAura(m, x, cy, mul);
     if (m.champ && m.alive) champAura(m, x, cy, mul);
@@ -8278,6 +8388,7 @@
     } else spr(f, x, y, flip, mul, a, rot, sq);
     if (skw && SK.sk === "boom") sprFlash(f, x, y, flip, mul, 0.6 * clamp(m.t / SK.w, 0, 1) * (0.6 + 0.4 * Math.sin(G.t * 30)), rot);
     if (m.alive && m.slow > 0) sprFlash(f, x, y, flip, mul, 0.35, rot);
+    if (m.alive && m.crust > 0 && !(m.frz > 0)) drawCrust(f, x, fly ? m.y : y, flip, mul, m.crust, 0, 1);   // (its crystals: a flyer's on the ground under it)
     if (m.alive && m.frz > 0) drawIceBlock(f, x, y, flip, mul, m.frz, m.frzMax);
     if (m.alive && m.burn > 0) drawFlames(x, cy, m.r * 2.4, fly ? 170 : 170, m.ph);
     if (m.flash > 0) sprFlash(f, x, y, flip, mul, 0.6, rot);
@@ -8309,7 +8420,7 @@
     const three = B.phase === 3, own3 = three && FR[`${art}3_w${wi}`];
     if (three && !own3 && !fbArtDone) fbArt();
     const name = art === "boss" ? "boss_" + pose : three ? (own3 ? `${art}3_w${wi}` : FR["fbp_giant_w" + wi] ? "fbp_giant_w" + wi : `${art}2_w${wi}`) : `${art}${two ? "2" : ""}_w${wi}`;
-    const f = FR[name], flip = B.dir < 0; if (!f) return;
+    const f = FR[name], flip = fbArtFlip(name, B.dir < 0); if (!f) return;
     if (API.drawn) API.drawn.push(["boss", name]);
     let y = B.y + (B.dropY || 0) - (B.jz || 0) - hexLift(B), sy = 1, x = B.x, rot = 0, sc = three && !own3 ? FB.GIANT_K : 1;   // (hexLift: the grey witch's second form floats)
     if (B.tired > 0 && B.alive) { y += 30; sy = 0.96; }
@@ -8338,11 +8449,13 @@
     else glow(B.x, B.y - 60, 200, "255,220,140", 0.35 * clamp(1 - Math.max(0, B.die - BD_FALL) / 2, 0, 1));
     if (stag) glow(B.x, B.y - 240, 340, "255,190,120", 0.3 + 0.2 * Math.sin(B.die * 9));
     if (B.alive) statusGlow(B, B.x, B.y - 220, 280);
+    if (B.alive && B.chill > 0 && !(B.frz > 0)) drawCrust(f, x, y, flip, sc, B.chill, 260, 0);
     spr(f, x, y, flip, sc, 1, rot, sy);
     if (B.morphFlash > 0) sprFlash(f, x, y, flip, sc, Math.min(1, B.morphFlash * 2.5));   // (the flash as he changes)
     else if (morph && B.t < mSwap(B)) sprFlash(f, x, y, flip, sc, 0.25 * B.t / mSwap(B) * (0.5 + 0.5 * Math.sin(G.t * 30)));
     // (the overlays at his drawn size: sc, swollen while he changes form)
     if (B.alive && B.slow > 0) sprFlash(f, x, y, flip, sc, 0.3);
+    if (B.alive && B.chill > 0 && !(B.frz > 0)) { sprFlash(f, x, y, flip, sc, 0.22); drawCrust(f, x, y, flip, sc, B.chill, 260, 1); }   // (the ice queen's chill: a little frost at his feet)
     if (B.alive && B.frz > 0) drawIceBlock(f, x, y, flip, sc, B.frz, B.frzMax);
     if (B.alive && B.burn > 0) drawFlames(B.x, B.y - 200, 220, 360, 1);
     if (B.flash > 0) sprFlash(f, x, y, flip, sc, 0.5);
@@ -8367,7 +8480,8 @@
   function drawHeroSprite(hk, fn, x, y, z, alpha, ultT, step) {
     if (ultT > 0) {
       // the ultimate: she floats up and spins in light
-      const spin = ultT > 0.25 && ultT < 1.7 ? (ultT - 0.25) * 9 : 0, sx = Math.cos(spin), lt = ultLight(ultT);
+      // (in her blizzard she stays herself in the eye of the storm: no spin, hardly any light over her: ultLightFor)
+      const bz = blizFrame(fn), spin = !bz && ultT > 0.25 && ultT < 1.7 ? (ultT - 0.25) * 9 : 0, sx = Math.cos(spin), lt = ultLightFor(fn, ultT);
       shadow(x, y, 46 * CHAR_K, 12, 0.25);
       glow(x, y - z - 100 * CHAR_K, 260 * CHAR_K, hk === "s" ? "190,220,255" : "255,200,236", 0.55 * lt);
       ctx.save(); ctx.translate(x, y - z); ctx.scale(Math.max(0.1, Math.abs(sx)), 1);   // (a squash that never goes negative: she is never mirrored)
@@ -8510,35 +8624,35 @@
     const D = PETS[p.kind];
     if (isCls(p)) return drawClassAlly(p);
     if (p.faintT > 0) return drawPetFaint(p, D);
-    // on the island (Màn 2) Coca and Cafe wear their sailor outfits (`<art>_sail_w0..3 / sit / joy`, facing right: mirrored for left)
-    const sail = islandSail(p.kind), pre = `pet_${p.kind}_d${p.face}_w`, n = sail ? 4 : dirN(pre);
+    // Coca and Cafe keep the current map's painted costume, including every attack pose.
+    const sail = petOutfitPrefix(p.kind), pre = `pet_${p.kind}_d${p.face}_w`, n = sail ? 4 : dirN(pre);
     if (n) {
       const ph = p.dist / 150 * TAU, hop = p.moving ? Math.abs(Math.sin(ph)) * 5 : 0, sc = CHAR_M * (p.sc || 1);
       const draw = (fn, x, y) => {
         const fit = sail ? sailFit(p.kind, fn) : 1, f = FR[fn];
-        if (sail && API.drawn) API.drawn.push(["islandPet", p.kind, fn, !!p.flip, f ? f.h * f.s * fit : 0]);
+        if (sail && API.drawn) { const row = ["petOutfit", p.kind, fn, !!p.flip, f ? f.h * f.s * fit : 0]; API.drawn.push(row); if (sail.endsWith("_sail")) API.drawn.push(["islandPet", ...row.slice(1)]); }
         spr(fn, x, y, p.flip, sc * fit);
       };
       shadow(p.x, p.y, 34, 10);
       if (p.at >= 0) {
-        const t = p.at, apre = `pet_${p.kind}_atk_d${p.face}_w`, an = sail ? 0 : dirN(apre), w0 = sail ? sail + "_sail_w0" : pre + "0";
+        const t = p.at, apre = `pet_${p.kind}_atk_d${p.face}_w`, an = sail ? 0 : dirN(apre), w0 = sail ? sail + "_w0" : pre + "0";
         let fn = an ? apre + "1" : w0, lift = 0, rot = 0;
-        if (t < PET_LEAP) { const k = t / PET_LEAP; lift = Math.sin(k * Math.PI) * 70; fn = an ? apre + "0" : sail ? sail + "_sail_w1" : fn; }
+        if (t < PET_LEAP) { const k = t / PET_LEAP; lift = Math.sin(k * Math.PI) * 70; fn = an ? apre + "0" : sail ? sail + "_w1" : fn; }
         else if (t < PET_COMBO) {
           // swipe after swipe: cycle the raise / strike frames, with a little shake
           const c = (t - PET_LEAP) / (PET_COMBO - PET_LEAP) * PET_HITS, f = c % 1;
-          fn = an ? apre + (f < 0.45 ? 1 : 2) : sail ? sail + (f < 0.45 ? "_sail_w1" : "_sail_w3") : fn; lift = 10 + Math.abs(Math.sin(c * Math.PI)) * 14;
+          fn = an ? apre + (f < 0.45 ? 1 : 2) : sail ? sail + (f < 0.45 ? "_w1" : "_w3") : fn; lift = 10 + Math.abs(Math.sin(c * Math.PI)) * 14;
           rot = Math.sin(c * TAU * 2) * 0.08;
         } else {
           // back-flip home: a full turn in the air
           const k = (t - PET_COMBO) / (PET_ATK - PET_COMBO); lift = Math.sin(k * Math.PI) * 80; rot = k * TAU * (p.flip ? 1 : -1);
-          fn = an ? apre + "3" : sail ? sail + "_sail_joy" : fn;
+          fn = an ? apre + "3" : sail ? sail + "_joy" : fn;
         }
         if (rot) { ctx.save(); ctx.translate(p.x, p.y - lift - 50); ctx.rotate(rot); draw(fn, 0, 50); ctx.restore(); }
         else draw(fn, p.x, p.y - lift);
         return;
       }
-      draw(sail ? sail + (p.moving ? "_sail_w" + Math.floor(p.dist / 150 * n) % n : "_sail_sit") : pre + (p.moving ? Math.floor(p.dist / 150 * n) % n : 0), p.x, p.y - hop);
+      draw(sail ? sail + (p.moving ? "_w" + Math.floor(p.dist / 150 * n) % n : "_sit") : pre + (p.moving ? Math.floor(p.dist / 150 * n) % n : 0), p.x, p.y - hop);
       return;
     }
     // no art for this pet yet: a glowing bubble with a paw print
@@ -8798,7 +8912,9 @@
   function ufxStep(S, hk, x, y, t, cx, cy, own) {
     if (!(t > 0)) { if (S.on) ufxEnd(S); return; }
     if (!S.on || hk !== S.hk || t < S.t - 0.5) {   // a new ultimate
-      S.on = true; S.hk = hk; S.boomed = false; S.st.fill(0); S.landed = S.onMon = S.parts = 0; S.title = ULT_TITLE[hk]; S.rm = reducedMotion();
+      // (in the ice-queen gown: her blizzard, see drawUltBliz; the partner's from her page's outfit)
+      S.bliz = blizOutfit(own ? P.outfit : Q && Q.hero === hk ? Q.outfit : "");
+      S.on = true; S.hk = hk; S.boomed = false; S.st.fill(0); S.landed = S.onMon = S.parts = 0; S.title = (S.bliz ? BLIZ_TITLE : ULT_TITLE)[hk]; S.rm = reducedMotion();
       S.et.fill(-1); S.eN = S.booms = S.merged = S.chip = 0; S.sndT = -1;
     }
     S.t = t;
@@ -8980,7 +9096,7 @@
     if (layer === 0) { S.drawn = 0; S.maxW = 0; }
     ufxW = 0; ufxBig = 0; ufxLim = n0 + Math.max(0, ULT_DRAW_CAP - S.drawn);   // (never more than ULT_DRAW_CAP sprites a frame)
     ctx.save();
-    if (S.hk === "g") drawUltMochi(S, A, x, y, t, cx, cy, layer, own); else drawUltMatcha(S, A, x, y, t, cx, cy, layer, own);
+    if (S.bliz) drawUltBliz(S, A, x, y, t, cx, cy, layer, own); else if (S.hk === "g") drawUltMochi(S, A, x, y, t, cx, cy, layer, own); else drawUltMatcha(S, A, x, y, t, cx, cy, layer, own);
     ctx.restore(); ufxLim = 1e9;
     S.drawn += ufxN - n0; S.maxW = Math.max(S.maxW, ufxW); if (layer === 1) S.bigA1 = ufxBig;
   }
@@ -9223,8 +9339,147 @@
   // the blast's short, soft flash over the screen (L, T, R, B): a see-through pink / blue veil (never a white-out); k: how strong
   function ufxFlash(S, L, T, R, B, k) {
     if (!S.on || !(S.flash > 0)) return;
-    ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = S.flash * k; ctx.fillStyle = S.hk === "g" ? "#ff6fbf" : "#7fb0ff";
+    ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = S.flash * k; ctx.fillStyle = S.bliz ? (S.hk === "g" ? "#ffd2ee" : "#d8ecff") : S.hk === "g" ? "#ff6fbf" : "#7fb0ff";
     ctx.fillRect(L - 50, T - 50, R - L + 100, B - T + 100); ctx.globalAlpha = 1;
+  }
+  // ---- the ice queen's blizzard (snow11, either girl, on any map; spec "Bổ sung cho Map 3"): in the ice-queen gown her ultimate is a
+  // snowstorm over her whole screen. Its trigger, timing and damage are her own ultimate's (the drops land where hers do and hurt as hers
+  // do, the blast at ULT_BOOM fells every monster in view); only the look is new: a cold veil, the storm cloud along the top (fxsn_cloud),
+  // the wind's painted gusts racing across (fxsn_gust0/1), snow driving across the view, a whirl of snow round her (fxsn_swirl), frost
+  // where each drop lands (fxsn_frost) and, at the blast, a burst of snow under her (fxsn_burst1) and rings. Mochi's: pink snowflakes and
+  // ice hearts (the painted pieces tinted pink once); Matcha's: silver-blue snow and sharp ice shards (fxsn_icicle, fxsn_shards). She stays
+  // herself in the eye of the storm (no spin, hardly any light over her: BLIZ_LIGHT). Within the ultimate's caps (ULT_DRAW_CAP sprites a
+  // frame; no particles of its own beyond ufxPop's).
+  const BLIZ_TITLE = { g: "Bão Tuyết Trái Tim!", s: "Bão Tuyết Băng Giá!" };
+  const BLIZ_RGB = { g: "255,175,225", s: "175,215,255" };
+  const BLIZ_DX = 760, BLIZ_DY = 820, BLIZ_ANG = Math.atan2(BLIZ_DY, BLIZ_DX);   // (the wind blows from the upper left)
+  const BLIZ_FLAKES = { g: 110, s: 96 }, BLIZ_LIGHT = 0.2;
+  const blizOutfit = (outfit) => outfit === "snow11";
+  const blizFrame = (fn) => typeof fn === "string" && fn.includes(".snow11.");
+  const ultLightFor = (fn, t) => ultLight(t) * (blizFrame(fn) ? BLIZ_LIGHT : 1);
+  const BLIZ_SEEN = {};   // (tests: which painted pieces the storm drew)
+  let BLA = null;
+  function blizArt() {
+    if (BLA) return BLA;
+    const sources = ["fxsn_gust0", "fxsn_gust1", "fxsn_cloud", "fxsn_glitter", "fxsn_swirl", "fxsn_frost", "fxsn_frost2", "fxsn_burst0", "fxsn_burst1"];
+    if (!sources.every((n) => FR[n])) return null;
+    // Request every source sheet, then wait: colorFrame must never cache NOIMG as a finished painting.
+    if (!sources.map((n) => frameReady(FR[n])).every(Boolean)) return null;
+    const mk = (w, h, f) => { const c = document.createElement("canvas"); c.width = w; c.height = h; f(c.getContext("2d")); return { img: c, sx: 0, sy: 0, w, h, s: 1, ax: w / 2, ay: h / 2 }; };
+    const flake = (rgb, core) => mk(64, 64, (g) => {
+      g.translate(32, 32); g.strokeStyle = core; g.lineCap = "round"; g.shadowColor = `rgba(${rgb},1)`; g.shadowBlur = 8; g.lineWidth = 4;
+      for (let i = 0; i < 6; i++) { g.rotate(Math.PI / 3); g.beginPath(); g.moveTo(0, 0); g.lineTo(0, -26); g.moveTo(0, -15); g.lineTo(-8, -22); g.moveTo(0, -15); g.lineTo(8, -22); g.stroke(); }
+    });
+    const heart = mk(128, 128, (g) => {   // an ice heart: frosted white to pink, a white rim, a glint and two cracks
+      g.beginPath();
+      for (let i = 0; i <= 48; i++) { const a = i / 48 * TAU, sn = Math.sin(a), hx = 16 * sn * sn * sn, hy = -(13 * Math.cos(a) - 5 * Math.cos(2 * a) - 2 * Math.cos(3 * a) - Math.cos(4 * a)) - 2.5; if (i) g.lineTo(64 + hx * 2.3, 64 + hy * 2.3); else g.moveTo(64 + hx * 2.3, 64 + hy * 2.3); }
+      g.closePath(); g.shadowColor = "rgba(255,150,215,1)"; g.shadowBlur = 16;
+      const gr = g.createLinearGradient(30, 30, 100, 110); gr.addColorStop(0, "#ffffff"); gr.addColorStop(0.45, "#ffd6ef"); gr.addColorStop(1, "#ff8fcf");
+      g.fillStyle = gr; g.fill(); g.shadowBlur = 0; g.strokeStyle = "rgba(255,255,255,.95)"; g.lineWidth = 5; g.stroke();
+      g.strokeStyle = "rgba(255,255,255,.8)"; g.lineWidth = 2; g.beginPath(); g.moveTo(70, 52); g.lineTo(78, 66); g.lineTo(72, 80); g.moveTo(78, 66); g.lineTo(90, 70); g.stroke();
+      g.fillStyle = "rgba(255,255,255,.9)"; g.beginPath(); g.ellipse(46, 46, 10, 6, -0.6, 0, TAU); g.fill();
+    });
+    const pk = (n, mix) => (FR[n] ? colorFrame(n, "#ff7cc8", mix) : null);
+    BLA = { flakeP: flake("255,110,200", "#fff"), flakeW: flake("255,190,235", "#fff4fb"), flakeB: flake("140,190,255", "#ffffff"), flakeS: flake("200,225,255", "#e8f2ff"), iceHeart: heart,
+      g: { gust: [pk("fxsn_gust0", 0.35), pk("fxsn_gust1", 0.35)], cloud: pk("fxsn_cloud", 0.25), glitter: pk("fxsn_glitter", 0.6), swirl: pk("fxsn_swirl", 0.4), frost: pk("fxsn_frost", 0.4), frost2: pk("fxsn_frost2", 0.4), burst: pk("fxsn_burst0", 0.35), burst1: pk("fxsn_burst1", 0.35) },
+      s: { gust: [FR.fxsn_gust0, FR.fxsn_gust1], cloud: FR.fxsn_cloud, glitter: FR.fxsn_glitter, swirl: FR.fxsn_swirl, frost: FR.fxsn_frost, frost2: FR.fxsn_frost2, burst: FR.fxsn_burst0, burst1: FR.fxsn_burst1 } };
+    return BLA;
+  }
+  // a painted (or painted-once) piece centred on (cx, cy), w wide, turned rot, counted in the show's sprites (nm: its name, for the tests)
+  function ufit(f, cx, cy, w, a, rot, nm) {
+    if (!f || !(a > 0.01) || !(w > 1) || ufxN >= ufxLim) return;
+    ufxN++; if (w > ufxW) ufxW = w; if (w > VW * 0.3 && a > ufxBig) ufxBig = a;
+    if (nm) BLIZ_SEEN[nm] = (BLIZ_SEEN[nm] || 0) + 1;
+    const h = w * f.h / f.w; ctx.globalAlpha = a > 1 ? 1 : a;
+    if (rot) { ctx.save(); ctx.translate(cx, cy); ctx.rotate(rot); ctx.drawImage(f.img, f.sx, f.sy, f.w, f.h, -w / 2, -h / 2, w, h); ctx.restore(); }
+    else ctx.drawImage(f.img, f.sx, f.sy, f.w, f.h, cx - w / 2, cy - h / 2, w, h);
+  }
+  function drawUltBliz(S, A, x, y, t, cx, cy, layer, own) {
+    const B = blizArt(), hk = S.hk, g = hk === "g", P2 = B ? B[hk] : null, env = ss(0, 0.4, t) * (1 - ss(2.15, 2.55, t)), fz = ultZ(t), hy = y - fz - 110 * CHAR_K;
+    const b = t - ULT_BOOM, dur = ufxDur(hk), nd = UFX_RAIN[hk].n, rgb = BLIZ_RGB[hk], wmax = VW * 1.3, L = cx - VW * 0.5, T = cy - VH * 0.5;
+    if (layer === 0) {
+      if (own) { ctx.globalAlpha = 0.4 * env; ctx.fillStyle = g ? "#2a1238" : "#0b2140"; ctx.fillRect(cx - VW * 0.6, cy - VH * 0.6, VW * 1.2, VH * 1.2); }   // (the storm darkens the sky)
+      if (P2) {
+        ufit(P2.frost2, x, y, 560 * CHAR_K * (0.55 + 0.45 * env), 0.8 * env, 0, g ? "frost2P" : "fxsn_frost2");   // (frost spreading under her)
+        // frost where each drop landed
+        if (g) for (let k = 0; k < UFX_E; k++) {
+          const e0 = S.et[k]; if (e0 < 0) continue;
+          const q = (t - e0) / UB_LIFE; if (q < 0 || q >= 1) continue;
+          ufit(P2.frost, S.ex[k], S.ey[k], 250 * S.es[k] * (0.7 + 0.3 * ss(0, 0.3, q)), Math.min(1, (1 - q) * 2) * 0.9, 0, "frostP");
+        }
+        else for (let i = 0; i < nd; i++) {
+          if (S.st[i] !== 2) continue;
+          const q = (t - ufxT0(hk, i) - dur) / 0.9; if (q < 0 || q >= 1) continue;
+          ufit(P2.frost, S.tx[i], S.ty[i], 230 * (0.7 + 0.3 * ss(0, 0.2, q)), Math.min(1, (1 - q) * 2) * 0.9, 0, "fxsn_frost");
+        }
+      }
+      ctx.globalCompositeOperation = "lighter";
+      uglow(x, y - 10, 340, rgb, 0.3 * env);
+      ublit(g ? A.ringP0 : A.ringB0, x, y, 520 * CHAR_K * (0.6 + 0.4 * env), 0.7 * env, t * 0.8, 0.5);
+      if (b > 0) {
+        for (let j = 0; j < 2; j++) { const q = (b - j * 0.14) / 0.85; if (q > 0 && q < 1) ublit(g ? A.ringP0 : A.ringB0, x, y, Math.min(wmax, 300 + q * wmax), 1 - q, 0, 0.5); }
+        ctx.globalCompositeOperation = "source-over";
+        // (the blast's snow burst rises under her, see-through: she and the monsters stay seen)
+        if (P2) { const q = b / 0.8; if (q < 1) ufit(P2.burst1, x, y - 150 * (1 + q), Math.min(wmax, 420 * (1 + q * 1.6)), ULT_BIG_A * (1 - q), 0, g ? "burstP" : "fxsn_burst1"); }
+      }
+      return;
+    }
+    S.nearA = 0;
+    // the storm cloud along the top of her view (see-through)
+    if (P2) for (let i = 0; i < 3; i++) ufit(P2.cloud, L + VW * (0.18 + 0.32 * i) + Math.sin(t * 0.8 + i * 2) * 50, T + 60 + (i % 2) * 50, VW * 0.42, 0.5 * env, 0, g ? "cloudP" : "fxsn_cloud");
+    // the wind's gusts racing across (painted streaks of snow), on a slant
+    if (P2) for (let i = 0; i < 8; i++) {
+      const ph = (t * 0.85 + i * 0.137) % 1, X = L - VW * 0.25 + ph * VW * 1.5, Y = T + VH * (0.12 + ((i * 0.618034) % 1) * 0.78) + ph * VH * 0.22;
+      ufit(P2.gust[i % 2], X, Y, VW * 0.34, 0.5 * env * Math.sin(ph * Math.PI), 0.24, g ? "gustP" : "fxsn_gust" + (i % 2));
+    }
+    // painted snowflake clusters tumbling on the wind
+    if (P2) for (let i = 0; i < 6; i++) {
+      const u = ((i * 0.618034) + t * 0.55) % 1, v = ((i * 0.754877) + t * 0.6) % 1;
+      ufit(P2.glitter, L + u * VW, T + v * VH, 150 + (i % 3) * 40, 0.75 * env, t * 0.6 + i, g ? "glitterP" : "fxsn_glitter");
+    }
+    // the whirl of snow round her (two turning the other way)
+    if (P2) { ufit(P2.swirl, x, hy - 30, 330 * CHAR_K, 0.55 * env, t * 2.2, g ? "swirlP" : "fxsn_swirl"); ufit(P2.swirl, x, hy - 10, 250 * CHAR_K, 0.45 * env, -t * 1.7 + 2); }
+    ctx.globalCompositeOperation = "lighter";
+    uglow(x, hy, 300, rgb, 0.3 * env);
+    // snow driving across the view: each flake's place from the clock, wrapping round her view
+    if (B) for (let i = 0, n = BLIZ_FLAKES[hk]; i < n; i++) {
+      const sp = 0.35 + ((i * 0.381966) % 1) * 0.45, u = ((i * 0.618034) + t * sp * 1.5) % 1, v = ((i * 0.754877) + t * sp * 1.65) % 1;
+      const X = L - VW * 0.05 + u * VW * 1.1 + Math.sin(t * 3 + i) * 12, Y = T - VH * 0.05 + v * VH * 1.1;
+      ublit(g ? (i % 3 ? B.flakeP.img : B.flakeW.img) : (i % 3 ? B.flakeS.img : B.flakeB.img), X, Y, 16 + (i % 4) * 9, env * (0.55 + 0.45 * ((i * 0.3) % 1)), t * 2 + i);
+    }
+    // the drops on the wind: their streaks and light
+    for (let i = 0; i < nd; i++) {
+      if (S.st[i] !== 1) continue;
+      const k = clamp((t - ufxT0(hk, i)) / dur, 0, 1), e = k * k, X = S.tx[i] - BLIZ_DX * (1 - e), Y = S.ty[i] - 60 - BLIZ_DY * (1 - e);
+      ustreak(g ? A.trailP : A.trailB, X, Y, g ? 300 : 480, g ? 26 : 40, BLIZ_ANG, 0.8); uglow(X, Y, g ? 80 : 110, rgb, 0.6);
+    }
+    // where they land: Mochi's a puff of pink snow (her hearts' bursts), Matcha's a spray of ice shards
+    ctx.globalCompositeOperation = "source-over";
+    if (P2 && g) for (let k = 0; k < UFX_E; k++) {
+      const e0 = S.et[k]; if (e0 < 0) continue;
+      const age = t - e0, kb = age / UB_BURST; if (kb < 0 || kb >= 1) continue;
+      const X = S.ex[k], Y = S.ey[k], dim = ufxDim(X, Y, x, y), fa = Math.min(1, (1 - kb) * 2.5) * 0.85 * dim;
+      ufit(P2.burst, X, Y - 70 * S.es[k], 190 * S.es[k] * (0.7 + 0.5 * kb), fa, 0, "burstP");
+      if (dim < 1 && fa > S.nearA) S.nearA = fa;
+    }
+    if (!g) for (let i = 0; i < nd; i++) {
+      if (S.st[i] !== 2) continue;
+      const q = (t - ufxT0(hk, i) - dur) / 0.35; if (q < 0 || q >= 1) continue;
+      ufit(FR.fxsn_shards, S.tx[i], S.ty[i] - 50, 170 * (1 + q * 0.6), 1 - q, q * 0.6, "fxsn_shards");
+    }
+    // the drops themselves: ice hearts / ice shards (tip first)
+    for (let i = 0; i < nd; i++) {
+      if (S.st[i] !== 1) continue;
+      const k = clamp((t - ufxT0(hk, i)) / dur, 0, 1), e = k * k, X = S.tx[i] - BLIZ_DX * (1 - e), Y = S.ty[i] - 60 - BLIZ_DY * (1 - e);
+      if (g) { if (B) ublit(B.iceHeart.img, X, Y, 78 + (i % 3) * 12, 1, Math.sin(t * 6 + i) * 0.35); }
+      else ufit(FR.fxsn_icicle, X, Y, 64 + (i % 3) * 10, 1, BLIZ_ANG + Math.PI / 2, "fxsn_icicle");
+    }
+    // at the blast: snowflakes (and hearts / shards) flung out over the screen
+    if (b > 0 && B) for (let i = 0; i < 28; i++) {
+      const C = ufxConf(i, x, hy, b, 260);
+      if (g && i % 4 === 0) ublit(B.iceHeart.img, C[0], C[1], C[2], C[3], Math.sin(b * 9 + i) * 0.6);
+      else ublit(g ? B.flakeP.img : B.flakeB.img, C[0], C[1], C[2] * 1.2, C[3] * ULT_BIG_A * 1.6, b * 5 + i);
+    }
   }
   const ufxFontOk = () => { try { return !document.fonts || document.fonts.check("800 160px Grandstander"); } catch (_) { return true; } };
   // the ultimate's name, big near the bottom of the screen (screen space; clear of the light over her and the HUD): it pops in, bumps at the blast and fades. k: its size
@@ -9235,14 +9490,15 @@
     const m = Math.min(W * 0.064, H * 0.1) * k * Math.max(0.05, pop) * bump / 100;
     ctx.save(); ctx.translate(W / 2, H * 0.8); ctx.scale(m, m);
     // (the words are painted once into their own picture, 1.6x sharp: big text is costly to draw afresh every frame on the iPad)
-    let tc = A.tg[hk];
-    if (tc && !A.tok[hk] && ufxFontOk()) tc = null;   // (painted before its font had loaded: paint it again now)
+    const tk = hk + (S.bliz ? "b" : "");   // (her blizzard has its own name)
+    let tc = A.tg[tk];
+    if (tc && !A.tok[tk] && ufxFontOk()) tc = null;   // (painted before its font had loaded: paint it again now)
     if (!tc) {
-      A.tok[hk] = ufxFontOk();
+      A.tok[tk] = ufxFontOk();
       const f = 1.6, c0 = document.createElement("canvas"), g0 = c0.getContext("2d");
       g0.font = "800 160px Grandstander, system-ui";
       const tw = (g0.measureText(S.title).width || 1300) / f;
-      tc = A.tg[hk] = c0; A.tw[hk] = tw;
+      tc = A.tg[tk] = c0; A.tw[tk] = tw;
       c0.width = Math.ceil((tw + 60) * f); c0.height = Math.ceil(170 * f);
       const g = c0.getContext("2d");
       g.font = "800 160px Grandstander, system-ui"; g.textAlign = "center"; g.textBaseline = "middle"; g.lineJoin = "round";
@@ -9254,7 +9510,7 @@
       g.lineWidth = 13; g.strokeStyle = "#fff"; g.strokeText(S.title, 0, 0);
       g.fillStyle = gr; g.fillText(S.title, 0, 0);
     }
-    const hw = A.tw[hk] / 2;
+    const hw = A.tw[tk] / 2;
     ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = 1;
     glow(-hw * 0.55, 0, 260, rgb, 0.45 * a); glow(0, 0, 300, rgb, 0.5 * a); glow(hw * 0.55, 0, 260, rgb, 0.45 * a);
     ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = a;
@@ -9420,9 +9676,14 @@
   const DL = [];
   function render() {
     const W = cv.width, H = cv.height;
+    // Clear even when shop/photo/travel returns early: no stale speech over the next scene.
+    dialogueCtx.setTransform(1, 0, 0, 1, 0, 0);
+    dialogueCtx.clearRect(0, 0, W, H);
+    dialogueCv.hidden = ["title", "pause", "shop", "photo", "win"].includes(G.mode);
     ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
     ctx.fillStyle = "#0b0710"; ctx.fillRect(0, 0, W, H);
     if (G.mode === "shop" || G.mode === "photo") return;   // (their own screens cover the canvas)
+    if (G.mode === "travel") { drawTravel(ctx, W, H); return; }
     if (G.mode === "runway") { drawTeamScene(ctx, W, H, RW.t, false); return; }
     if (onShip()) { drawShip(ctx, W, H); return; }
     if (!G.lvl) return;
@@ -9512,9 +9773,9 @@
       if (s.candy) drawCandyStar(s.x, s.y - 60, G.t * 9, 1);
       else if (s.wave) drawSonicWave(s.x, s.y - 50, Math.atan2(s.vy, s.vx), G.t - s.t0, 1);
       else if (s.pet) { const D = PETS[s.pet]; glow(s.x, s.y - 60, 46, D.rgb, 0.75); fx("fx_twinkle", s.x, s.y - 60, 0.45, 1, G.t * 8); }
-      else drawBolt(s.x, s.y - BOLT_Z, s.vx, s.vy, s.elem, s.hk, s.sc);
+      else drawBolt(s.x, s.y - BOLT_Z, s.vx, s.vy, s.elem || (s.frost ? "ice" : null), s.hk, s.sc);   // (the ice queen's frost bolts on Núi Tuyết: icicles)
     }
-    for (const sh of G.pshots) { if (sh.candy) drawCandyStar(sh.x, sh.y - 60, G.t * 9, 1); else if (sh.wave) drawSonicWave(sh.x, sh.y - 50, Math.atan2(sh.vy, sh.vx), G.t - sh.t0, 1); else drawBolt(sh.x, sh.y - BOLT_Z, sh.vx, sh.vy, sh.elem, sh.hk, sh.sc); }
+    for (const sh of G.pshots) { if (sh.candy) drawCandyStar(sh.x, sh.y - 60, G.t * 9, 1); else if (sh.wave) drawSonicWave(sh.x, sh.y - 50, Math.atan2(sh.vy, sh.vx), G.t - sh.t0, 1); else drawBolt(sh.x, sh.y - BOLT_Z, sh.vx, sh.vy, sh.elem || (Q && sh.hk === Q.hero && frostOn(Q.outfit) ? "ice" : null), sh.hk, sh.sc); }
     drawAfxAir();   // (the friends' skills and hits)
     drawQuakesAir(); drawMeteors(); drawCreepAir(L, R, T, B);
     drawBlizzard(L, R, T, B);
@@ -9651,6 +9912,7 @@
     if (NET.role) leaveCoop();
     setTitleStory();
     if ($("hud").dataset.ship) shipUiOff();
+    G.travel = null;
     G.mode = "title"; G.pmode = null; G.say = null; $("quiz").hidden = true; closeStory(); renderHeroes();
     $("titleScreen").hidden = false; $("hud").hidden = true; $("controls").hidden = true; $("bossbar").hidden = true; $("winScreen").hidden = true;
     SH.open = false; $("shop").hidden = true; $("photo").hidden = true; G.cine = null; G.rescue = null; $("skipFilm").hidden = true;
@@ -9663,8 +9925,10 @@
   // is Màn 1)
   function startGame(i, at) {
     i = clamp(Math.floor(i) || 0, 0, LEVELS.length - 1);
-    if (at !== "shop") at = null;
-    const lvl = at ? 0 : i; i = at ? 1 : i;   // (lvl: the level G.level shows; i: how far along she is, for the head start)
+    if (at !== "shop" || !LEVELS[i].shop) at = null;
+    // (lvl: the level G.level shows; i: how far along she is, for the head start. A start at a shop (at "shop") stands in the arena of
+    // the level whose shop it is, after its boss: Màn 2's pirate shop in Màn 1's (i 0), Màn 3's snow shop in Màn 2's (i 1))
+    const lvl = i; if (at) i = Math.min(lvl + 1, LEVELS.length - 1);
     initAudio();
     // (a start past Màn 2 brings what the maps before it gave: LATER_STARS stars a map, as a girl who played them would have)
     Object.assign(G, { stars: !at && i >= 2 ? LATER_STARS * i : 0, hearts: 5, energy: 0, kills: 0, won: false, fade: 1, fadeDir: -1 });
@@ -9678,6 +9942,7 @@
     // (together each friend is there once for the team (Dad: two Simmys, two Kairons when they started at a later map): the host's girl
     // takes Simmy and Sammy, the guest's Kairon and Phong (pickerAlly); each girl's own pet is hers alone)
     P.pets = i > 0 ? Object.keys(PETS).filter((k) => PETS[k].owner === hero || (isAlly(k) && PETS[k].lv < i && pickerAlly(k))) : [];
+    G.travel = null;
     G.sksp = ["", "", "", ""]; G.cine = null; G.rescue = null; G.shopPhase = 0; G.say = null; G.pmode = null;
     if ($("hud").dataset.ship) shipUiOff();   // (a new game from the ship)
     for (const k of Object.keys(PETS)) if (isAlly(k) && PETS[k].lv < i) G.sksp[ALLY_LETTER[k]] = SKSP_L[ALLY_LETTER[k]];
@@ -9687,7 +9952,8 @@
     SH.open = false;
     // (starting straight at a later level: Simmy already wears the outfit she put on at the last shop)
     // (the last shop before her map: past the island she keeps her pirate clothes, as she does going on through the gates)
-    { const sh = !at && i > 0 ? LEVELS.slice(0, i).map((l) => l.shop).filter(Boolean).pop() : null, so = sh ? OUTFITS4.find((o) => o.char === "simmy" && o.theme === sh) : null; SIMMY.outfit = so ? outKey(so) : "base"; }
+    // (a shop with no Simmy outfit (the snow one) leaves her in the last one she had; at a shop: the shops before it)
+    { const so = LEVELS.slice(0, at ? lvl : i).map((l) => l.shop && OUTFITS4.find((o) => o.char === "simmy" && o.theme === l.shop)).filter(Boolean).pop(); SIMMY.outfit = so ? outKey(so) : "base"; }
     $("hud").hidden = false; $("controls").hidden = false; $("skipFilm").hidden = true;
     if (at) startM2(at);   // (beta: Màn 2 = the shop, the runway, the photo, the island)
     else if (i === 0) startOpening();   // Màn 1 opens with the film (skippable)
@@ -9696,27 +9962,29 @@
       if (i === 1) G.say = { seq: SAYS.level2Start, t: NET.role === "guest" ? -2.2 : -0.8 };   // (the island as from the photo: Simmy's line 13)
     }
   }
-  // Màn 2 from the home screen: the team as in the candy boss's arena after he has fallen, straight into the clothes shop with M2_STARS
-  // stars to shop with: enough for any one outfit (the dearest is 110) (in co-op the host's pool is the one that counts and the guest
+  // Màn 2 from the home screen: the team as in the candy boss's arena after he has fallen, straight into the clothes shop with the
+  // theme's stars to shop with: enough for any one outfit (the dearest pirate one is 110) (in co-op the host's pool is the one that counts and the guest
   // mirrors it). G.m2 tells a guest's syncShop (no boss fell on her page) to follow the host's shop phases, and the `start` event to repeat
   // this choice. (The parked ship's "ship" start went straight onto the dock film; startGame no longer passes it.)
-  const M2_STARS = 120;
+  // (SHOP_THEMES.pirate.stars, 120.) Màn 3 from the home screen likewise: Màn 2's arena after the captain, the snow shop with its
+  // own stars (140: the ice queen is 130).
   function startM2(at) {
     G.m2 = at; G.mons = [];
-    if (at === "shop") G.stars = M2_STARS;
+    const sh = (G.lvl && G.lvl.shop) || "pirate";
+    if (at === "shop") G.stars = shopTheme(sh).stars;
     const A = G.arena;
     if (A) { P.x = A.x + (NET.role === "guest" ? 110 : 0); P.y = A.y + 150; P.prog = 0; makePetEnts(); G.camX = clamp(P.x - VW / 2, 0, WORLD - VW); G.camY = clamp(P.y - VH / 2, 0, WORLD - VH); }
-    if (at === "ship") startShip(); else openShop(LEVELS[0].shop || "pirate", NET.role === "guest");
+    if (at === "ship") startShip(); else openShop(sh, NET.role === "guest");
   }
   // beta: pick where to start from the home screen (kept in localStorage `sksp-start`); in co-op the host's choice goes to both pages
   // (Màn 1; "Màn 2: Đảo Cướp Biển" = the clothes shop, then the island). The ship is parked: a "ship" saved by the old "Màn 2: Trên tàu"
   // button (or anything else unknown) starts at Màn 1
-  // ("Màn 3: Núi Tuyết" / "Màn 4: Núi Dung Nham" / "Màn 5: Lâu Đài" start straight on that map with what the maps before it gave: their friends and letters,
-  // LATER_STARS a map, her level)
-  // a friend from the maps before a later start: with this page's girl? (alone: all of them; together: Simmy and Sammy with the host's,
-  // Kairon and Phong with the guest's, so the team has each once and both girls have friends beside them)
   const pickerAlly = (k) => !NET.role || (ALLY_LETTER[k] % 2 === 0) === (NET.role === "host");
-  const STARTS = { man1: "selMan1", man2: "selMan2", man3: "selMan3", man4: "selMan4", man5: "selMan5" }, START_LV = { man3: 2, man4: levelIdx("lava"), man5: levelIdx("castle") }, LATER_STARS = 100;
+  // ("Màn 3: Núi Tuyết" starts at its snow shop and "Màn 4: Núi Dung Nham" at its lava shop (START_SHOP: in the arena of the map before),
+  // then the runway, the photo and the map; "Màn 5: Lâu Đài" starts straight on that map. Each with what the maps before it gave: their
+  // friends and letters, her level; Màn 5 LATER_STARS a map, a shop start its theme's stars. START_LV: the map whose story the home screen tells)
+  const STARTS = { man1: "selMan1", man2: "selMan2", man3: "selMan3", man4: "selMan4", man5: "selMan5" }, START_LV = { man3: levelIdx("snow"), man4: levelIdx("lava"), man5: levelIdx("castle") }, LATER_STARS = 100;
+  const START_SHOP = { man2: 0, man3: LEVELS.findIndex((l) => l.shop === "snow"), man4: LEVELS.findIndex((l) => l.shop === "lava") };
   let startAt = "man1";
   function readStart() {
     startAt = "man1";
@@ -9726,8 +9994,8 @@
   function renderStartSel() { for (const [k, id] of Object.entries(STARTS)) $(id).setAttribute("aria-pressed", k === startAt); setTitleStory(); }
   for (const [k, id] of Object.entries(STARTS)) $(id).addEventListener("click", () => { startAt = k; try { localStorage.setItem("sksp-start", k); } catch (e) {} renderStartSel(); });
   readStart();
-  const startChosen = () => startGame(START_LV[startAt] || 0, startAt === "man2" ? "shop" : null);
-  $("startBtn").addEventListener("click", startChosen);
+  const startChosen = () => (START_SHOP[startAt] >= 0 ? startGame(START_SHOP[startAt], "shop") : startGame(START_LV[startAt] || 0, null));
+  $("startBtn").addEventListener("click", () => { requestGameFullscreen(); startChosen(); });
 
   // ---------------------------------------------------------------- the clothes shop
   // Before the island (Màn 2 starts here, after Simmy's walk from the candy boss): a shop for the next land's theme. A big turntable character, a grid of outfit cards
@@ -9735,14 +10003,33 @@
   // Outfit ids are `<char>.<outfit>` (frames are `<char>.<outfit>.<pose><i>`). simmy.pirate is free: she puts it on herself when the shop closes.
   // pirate1..10 as drawn (tools/g4_outfits_local.py OUTFITS): 4 mermaid, 5 explorer (map, compass), 6 sea princess, 7 candy, 8 crowned captain, 9 snowy captain, 10 rainbow
   const OUTFIT_NAMES = ["Thủy thủ", "Cướp biển", "Thuyền trưởng", "Tiên cá", "Nhà thám hiểm", "Công chúa biển", "Cướp biển kẹo ngọt", "Thuyền trưởng hoàng gia", "Thuyền trưởng băng giá", "Cướp biển cầu vồng"];
+  const SNOW_NAMES = ["Áo phao", "Công chúa tuyết", "Trượt tuyết", "Gấu Bắc Cực", "Chim cánh cụt", "Tuần lộc", "Người tuyết", "Trượt băng", "Nhà leo núi", "Áo len mùa đông", "Nữ Hoàng Băng Giá", "Công Chúa Mùa Đông"];
+  const SNOW_PRICES = [20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 130, 120];
+  // the lava shop (start of Màn 4, Núi Dung Nham): ten fire / volcano outfits per sister (tools/g4_outfits_local.py OUTFITS lava*, LAVA_NAMES):
+  // [Mochi's name, Matcha's name]; 20, 30 … 110 stars like the pirate ones
+  const LAVA_NAMES = [["Rồng Lửa Con", "Rồng Lửa"], ["Phượng Hoàng"], ["Tiên Lửa"], ["Núi Lửa Dễ Thương"], ["Lính Cứu Hoả"], ["Kỵ Sĩ Lửa"], ["Công Chúa Hồng Ngọc"],
+    ["Pháp Sư Lửa Nhí", "Pháp Sư Lửa"], ["Cáo Lửa"], ["Nhà Thám Hiểm Núi Lửa"]];
   const OUTFITS4 = [
     // ten pirate outfits per sister (Dad: at least 10 each), dearer and dearer: 20, 30 … 110 stars
     ...OUTFIT_NAMES.flatMap((name, i) => ["g", "s"].map((char) => ({ id: `${char}.pirate${i + 1}`, char, theme: "pirate", name, price: 20 + 10 * i }))),
     { id: "simmy.pirate", char: "simmy", theme: "pirate", name: "Mèo Simmy cướp biển", price: 0 },   // auto: no card, she changes herself
+    // the snow shop (start of Màn 3, Núi Tuyết): twelve warm outfits per sister, as tools/g4_outfits_local.py drew them: snow1..10 20, 30 … 110
+    // stars like the pirate ones, then the folk princess (snow12, Anna-like) 120 and the ice queen (snow11, Elsa-like: her bolts freeze on
+    // Núi Tuyết and her ultimate is a blizzard, see frostOn / blizOf) the dearest, 130. Both girls have both. (Simmy keeps her pirate clothes.)
+    ...SNOW_NAMES.flatMap((name, i) => ["g", "s"].map((char) => ({ id: `${char}.snow${i + 1}`, char, theme: "snow", name, price: SNOW_PRICES[i] }))),
+    // (only the ones packed are on sale: lava6..10 show up by themselves once their art is cut and packed, tools/g4_shop_outfits.py)
+    ...LAVA_NAMES.flatMap((nm, i) => ["g", "s"].map((char, k) => ({ id: `${char}.lava${i + 1}`, char, theme: "lava", name: nm[k] || nm[0], price: 20 + 10 * i }))),
   ];
+  // walk: Simmy's lines (together, alone) on the walk from the boss to this shop; stars: what the home screen's start at this shop gives
+  // (enough for its dearest outfit); card: the next map's story card when the team arrives there after the photo (the snow shop: the card
+  // tells the mountain's goal; after the pirate shop Simmy says line 13 instead); snow / embers: snowflakes falling, embers rising in the
+  // fitting corner (there is no painted snowy or fiery shop picture: the pirate shop's fitting corner is used for all three)
   const SHOP_THEMES = {
-    pirate: { line: "Đảo cướp biển! Cả đội phải mặc đồ cướp biển nhé!", bg: ["#0f7a8c", "#1a4770", "#0e1230"], floor: ["#e7be80", "#9c6c32"] },
+    pirate: { line: "Đảo cướp biển! Cả đội phải mặc đồ cướp biển nhé!", bg: ["#0f7a8c", "#1a4770", "#0e1230"], floor: ["#e7be80", "#9c6c32"], walk: ["afterCandyBoss", "afterCandyBossSolo"], stars: 120 },
+    snow: { line: "Núi Tuyết lạnh lắm! Cả đội mặc đồ ấm nhé!", bg: ["#8cc8ec", "#3f6fa6", "#14223f"], floor: ["#eef6fc", "#9fbfdc"], walk: ["afterCaptain", "afterCaptainSolo"], stars: 140, card: true, snow: true },
+    lava: { line: "Núi Dung Nham nóng lắm! Cả đội mặc đồ núi lửa nhé!", bg: ["#ffae5a", "#b8401c", "#2a0d08"], floor: ["#5a4640", "#2a1c18"], walk: ["afterYeti", "afterYetiSolo"], stars: 120, card: true, embers: true },
   };
+  const shopTheme = (k) => SHOP_THEMES[k] || SHOP_THEMES.pirate;
   const SIMMY = { outfit: "base" };   // what Simmy wears; the ally Task 8 adds draws herself with this
   const SH = { open: false, theme: "pirate", cards: [], sel: 0, view: 0, prev: 0, turnT: 0, t: 0, start: "base", tint: null };
   const RW = { t: 0 }, PH = { t: 0 };
@@ -9762,9 +10049,9 @@
   }
   const isOwned = (o) => o.id === "base" || o.price === 0 || ownedIds(o.char).includes(o.id);
   function shopCards() {
-    // only the outfits that are drawn (packed) are on sale; while none of this theme is drawn yet, all of them are shown as stand-ins
-    const all = OUTFITS4.filter((o) => o.char === hero && o.theme === SH.theme && o.price > 0), drawn = all.filter((o) => hasOutfit(o.char, outKey(o)));
-    return [{ id: "base", char: hero, theme: "", name: "Đồ của bé", price: 0 }, ...(drawn.length ? drawn : all)];
+    // only the outfits that are drawn (packed) are on sale: one whose art is not in yet (lava6..10 for now) is simply not listed
+    const drawn = OUTFITS4.filter((o) => o.char === hero && o.theme === SH.theme && o.price > 0 && hasOutfit(o.char, outKey(o)));
+    return [{ id: "base", char: hero, theme: "", name: "Đồ của bé", price: 0 }, ...drawn];
   }
 
   function buyOutfit(id) {
@@ -9893,7 +10180,8 @@
     // (the cards are pictures drawn once: drawn again when every outfit's sheets are decoded)
     { const gs = SH.cards.map((c) => hero + "." + cardOutfit(c)); if (!gs.every((g) => groupSheets(g).every((S) => S.img))) atlasLoad(gs).then(() => { if (SH.open) shopRefresh(); }); }
     play("unlock");
-    { const n = LEVELS[1] ? LEVELS[1].name.split(": ") : ["Màn 2", "Đảo Cướp Biển"]; showBanner(n[1], n[0]); }   // (Màn 2 starts in the shop)
+    // (the next map starts in its shop: Màn 2 in the pirate shop, Màn 3 in the snow shop)
+    { const L = LEVELS[nextLevelAfter(G.level)] || LEVELS[1], n = L ? L.name.split(": ") : ["Màn 2", "Đảo Cướp Biển"]; showBanner(n[1], n[0]); }
   }
   function shopTurn(d) {
     if (!SH.open) return;
@@ -9982,6 +10270,9 @@
     // turning: the old side narrows to nothing, the new one opens up
     let sx = 1, view = SH.view;
     if (SH.turnT > 0) { const p = SH.turnT; if (p > 0.5) { view = SH.prev; sx = (p - 0.5) * 2; } else sx = (0.5 - p) * 2; }
+    // the snow shop: there is no painted snowy fitting corner yet, so snow falls softly over the painted one (behind her)
+    if (th.snow) shopSnow(g, W, H, SH.t);
+    if (th.embers) shopEmbers(g, W, H, SH.t);
     const vw = SHOP_VIEWS[view], bob = Math.sin(SH.t * 2.2) * ht * 0.006;
     g.save(); g.translate(cx, 0); g.scale(Math.max(0.03, sx), 1);
     const have = drawHeroAt(g, hero, oc, { face: vw.face, flip: vw.flip }, 0, gy + bob, ht, true);
@@ -9992,6 +10283,30 @@
         g.globalAlpha = Math.min(1, SH.sparkT * 1.6); g.fillStyle = i % 2 ? "#ffd34d" : "#fff"; g.beginPath(); g.arc(x, y, ht * 0.012 * (1 + (i % 3)), 0, TAU); g.fill(); }
       g.globalAlpha = 1;
     }
+  }
+  // soft snowflakes drifting down over a W x H picture at time t (all from the clock: nothing kept); a frosty veil along the top
+  function shopSnow(g, W, H, t) {
+    const vg = g.createLinearGradient(0, 0, 0, H * 0.35); vg.addColorStop(0, "rgba(225,242,255,.35)"); vg.addColorStop(1, "rgba(225,242,255,0)");
+    g.fillStyle = vg; g.fillRect(0, 0, W, H * 0.35);
+    g.fillStyle = "#fff";
+    for (let i = 0; i < 46; i++) {
+      const sp = 0.05 + ((i * 0.381966) % 1) * 0.07, r = H * (0.003 + ((i * 0.618034) % 1) * 0.006);
+      const y = (((i * 0.754877) + t * sp) % 1.1 - 0.05) * H, x = ((i * 0.569840) % 1) * W + Math.sin(t * 0.9 + i) * W * 0.02;
+      g.globalAlpha = 0.55 + 0.35 * ((i * 0.3) % 1); g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill();
+    }
+    g.globalAlpha = 1;
+  }
+  // warm embers rising and glowing over a W x H picture at time t (from the clock); a hot glow along the bottom
+  function shopEmbers(g, W, H, t) {
+    const vg = g.createLinearGradient(0, H, 0, H * 0.6); vg.addColorStop(0, "rgba(255,120,40,.35)"); vg.addColorStop(1, "rgba(255,120,40,0)");
+    g.fillStyle = vg; g.fillRect(0, H * 0.6, W, H * 0.4);
+    for (let i = 0; i < 36; i++) {
+      const sp = 0.06 + ((i * 0.381966) % 1) * 0.08, r = H * (0.003 + ((i * 0.618034) % 1) * 0.005);
+      const y = (1.05 - (((i * 0.754877) + t * sp) % 1.1)) * H, x = ((i * 0.569840) % 1) * W + Math.sin(t * 1.3 + i) * W * 0.02;
+      g.globalAlpha = 0.5 + 0.4 * Math.abs(Math.sin(t * 3 + i)); g.fillStyle = i % 3 ? "#ffb347" : "#ff6a2a";
+      g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill();
+    }
+    g.globalAlpha = 1;
   }
   function drawShopSimmy() {
     const c = $("shopSimmy"), g = c.getContext("2d");
@@ -10028,8 +10343,8 @@
   // paused through) a walk / open / close event follows it here. (Only once the boss is down on her page, so a phase left over from the
   // last game never opens a shop.)
   function syncShop() {
-    if (NET.role !== "guest") return;
-    if (!G.lvl || !G.lvl.shop) return;   // only Màn 1 leads to the ship and the shop (the island never does)
+    if (NET.role !== "guest" || G.travel) return;
+    if (!G.lvl || !G.lvl.shop) return;   // only a level with a shop leads to one (Màn 1: the pirate shop, Màn 2: the snow shop)
     const w = NET.pp && NET.pp.w, ph = w && w.sh;
     if (!ph) return;
     const inGame = G.mode === "play" || G.mode === "pause" || onShip(), dead = G.m2 || (G.boss && !G.boss.alive);
@@ -10065,6 +10380,129 @@
     else if (op === "close") closeShop(true);
   }
 
+  // A journey is host-owned. Its complete state also rides in presence, so a lost
+  // event, a slow photo, or a resumed iPad joins the current shot immediately.
+  const TRAVEL_END = 9, TRAVEL_BOARD = 3, TRAVEL_ARRIVE = 6.5;
+  // Coordinates are fractions of the trimmed painted vehicle frame. Adjust here
+  // after cutting a new painting; image aspect ratio is always preserved.
+  const TRAVEL_LAYOUT = {
+    candy:{seatY:.65,frontY:.48,left:.25,right:.75}, pirate:{seatY:.78,frontY:.70,left:.30,right:.80},
+    snow:{seatY:.65,frontY:.52,left:.25,right:.75}, lava:{seatY:.65,frontY:.40,left:.25,right:.75},
+    castle:{seatY:.66,frontY:.52,left:.25,right:.72}
+  };
+  let travelSerial = 0;
+  const travelPhase = () => !G.travel ? null : G.travel.t < TRAVEL_BOARD ? "boarding" : G.travel.t < TRAVEL_ARRIVE ? "journey" : "arrival";
+  function travelMembers() {
+    if (G.travel) return G.travel.members;
+    const members = girlsIn().map(char => ({char, outfit: char === hero ? P.outfit : Q.outfit || "base", name: HEROES[char].name}));
+    const owned = new Set([...(P.pets || []), ...(NET.role && Q ? Q.pets || [] : [])]);
+    for (const char of ["simmy", "kairon", "sammy", "phong", "dog", "cat"]) if (owned.has(char)) members.push({char, outfit: isAlly(char) ? allyOutfit(char) : "base", name: PETS[char].name});
+    return members;
+  }
+  function startTravel(to, remote) {
+    if (!LEVELS[to] || (NET.role === "guest" && !remote)) return;
+    const members = remote ? remote.members : travelMembers();
+    G.petTheme = LV_ART[to];
+    G.travel = {to, t: remote ? clamp(num(remote.t), 0, TRAVEL_END) : 0, id: remote ? remote.id : ++travelSerial, members};
+    G.cine = null; G.mode = "travel"; G.pmode = null; SH.open = false; closeStory(); P.vx = P.vy = 0; IN.ultPressed = false;
+    for (const id of ["shop", "photo", "pauseScreen", "hud", "controls", "bossbar", "quiz"]) $(id).hidden = true;
+    $("skipFilm").hidden = false;
+    scene("travel_" + LV_ART[to]); atlasLoad([LV_ART[to], "common"]);
+    if (to === 1) scene("travel_dock");
+    $("banner").classList.remove("show");
+    NET.sendT = 0;
+  }
+  function finishTravel(to) {
+    const from = G.level, picked = G.m2; G.travel = null; G.mode = "play"; G.cine = null;
+    $("skipFilm").hidden = true; $("photo").hidden = true;
+    G.hearts = 5;
+    if (to !== from) buildLevel(to);
+    G.shopPhase = 0; G.shopDone = true;
+    for (const id of ["hud", "controls"]) $(id).hidden = false;
+    renderHearts(); updateHud(); updateSksp(); questTxt = null; updateQuest();
+    if (to === 1) G.say = {seq:SAYS.level2Start,t:NET.role === "guest" ? -2.2 : -.8};
+    else if (to > 1 && !picked) arrive(to);
+    else if (to === 0) showBanner("Rừng Kẹo Ngọt", "Cùng đi cứu Mèo Simmy!");
+    NET.sendT = 0;
+  }
+  function syncTravel() {
+    if (NET.role !== "guest") return;
+    const w = NET.pp && NET.pp.w; if (!w) return;
+    const tr = w.tr;
+    if (tr && Number.isInteger(tr.to) && LEVELS[tr.to] && Array.isArray(tr.members)) {
+      if (!G.travel || G.travel.id !== tr.id || G.travel.to !== tr.to) startTravel(tr.to, tr);
+      else G.travel.t = clamp(num(tr.t), 0, TRAVEL_END);
+    } else if (G.travel && num(w.lv) >= G.travel.to) {
+      // A suspended page may miss both arrival and a whole later map.
+      finishTravel(clamp(Math.floor(num(w.lv)),0,LEVELS.length-1)); NET.applied = null;
+    } else if (!tr && num(w.lv) > G.level && ["photo", "runway", "shop"].includes(G.mode)) {
+      finishTravel(clamp(num(w.lv),0,LEVELS.length-1)); NET.applied = null;
+    }
+  }
+  function travelTick(dt) {
+    if (NET.role) netFrame(dt);
+    if (NET.role === "guest") { syncTravel(); return; }
+    const tr = G.travel; if (!tr) return;
+    tr.t += dt;
+    if (tr.t >= TRAVEL_END || API.autopilot) finishTravel(tr.to);
+  }
+  function skipTravel() {
+    if (!G.travel) return;
+    if (NET.role === "guest") { netEmit("travel", {skip: G.travel.id}); return; }
+    finishTravel(G.travel.to);
+  }
+  function drawTravel(g, W, H) {
+    const tr = G.travel; if (!tr) return;
+    const t = tr.t, theme = LV_ART[tr.to], bg = scene("travel_" + theme) || scene(tr.to === 1 ? "island" : "meadow");
+    // The new painted dock has a full-width pier below y=.78, feet at y=.86.
+    // It contains no ship: the same painted vehicle is used at dock and at sea.
+    const atDock = tr.to === 1 && (t < TRAVEL_BOARD || t >= TRAVEL_ARRIVE), dock = atDock && scene("travel_dock");
+    g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1;
+    g.fillStyle = "#182239"; g.fillRect(0,0,W,H);
+    const ride = clamp((t - TRAVEL_BOARD) / (TRAVEL_ARRIVE - TRAVEL_BOARD),0,1);
+    const dockMap = dock ? cover(g,dock,W,H,.5,.6) : null;
+    if (!dock && bg) { g.save(); g.translate(-W*.25*ride,0); cover(g,bg,W * 1.25,H,.5,.6); g.restore(); }
+    if (API.drawn) API.drawn.push(["travelBackdrop", dock ? "travel_dock" : "travel_" + theme, travelPhase()]);
+    const vehicle = FR["travel_"+theme], layout = TRAVEL_LAYOUT[theme];
+    const vw = Math.min(W * .94, H * 1.3), vh = vw * (vehicle ? vehicle.h / vehicle.w : .6), vx = (W-vw)/2;
+    const bob = t >= TRAVEL_BOARD && t < TRAVEL_ARRIVE ? Math.sin(t*6)*H*.004 : 0;
+    const vy = H*(dock ? .68 : .75)-vh*layout.seatY+bob, seatY = vy+vh*layout.seatY, groundY = dockMap ? dockMap(.5,.86)[1] : H*.82;
+    const paintVehicle = () => { if(vehicle) g.drawImage(vehicle.img,vehicle.sx,vehicle.sy,vehicle.w,vehicle.h,vx,vy,vw,vh); };
+    paintVehicle();
+    if(API.drawn) API.drawn.push(["travelVehicleBack"]);
+    const people = tr.members, n = people.length;
+    people.forEach((m,i) => {
+      const seatX = vx+vw*(layout.left+(layout.right-layout.left)*(i+.5)/Math.max(1,n));
+      const board = clamp((t-i*.16)/1.8,0,1), leave = clamp((t-TRAVEL_ARRIVE-i*.1)/1.7,0,1);
+      let x = leave > 0 ? lerp(seatX,W*.12+W*.76*(i+.5)/n,leave) : lerp(-vw*.12-i*20,seatX,board);
+      const th = Math.min(H*.28,vw*.23,vw*(layout.right-layout.left)/Math.max(1,n)*2.3);
+      const pet = m.char === "dog" || m.char === "cat";
+      // Small riders sit higher so the front wall cannot cover their torso.
+      const memberSeatY = pet ? vy+vh*(layout.frontY+.02) : Math.min(seatY,vy+vh*layout.frontY+th*(ART_H[m.char]||400)/400*.30);
+      let y = leave > 0 ? lerp(memberSeatY,groundY,leave)-Math.sin(leave*Math.PI)*H*.025 : lerp(groundY,memberSeatY,board)-Math.sin(board*Math.PI)*H*.04;
+      const opts={face:2,flip:false,moving:board<1||leave>0,dist:t*280};
+      if (m.char === "dog" || m.char === "cat") {
+        drawPetAt(g, PET_ART[m.char], opts.moving ? "w" + Math.floor(t * 6) % 4 : "sit", x, y, th, false);
+      } else drawHeroAt(g,m.char,m.outfit,opts,x,y,th*(ART_H[m.char]||400)/400,false);
+      if(API.drawn) API.drawn.push(["travelMember",m.char,travelPhase(),x,y]);
+    });
+    // Only the painted front wall occludes feet; the back rail stays behind faces.
+    if (t < TRAVEL_ARRIVE && vehicle) {
+      g.save(); g.beginPath(); g.rect(vx,vy+vh*layout.frontY,vw,vh*(1-layout.frontY)); g.clip();
+      paintVehicle(); g.restore();
+      if(API.drawn) API.drawn.push(["travelVehicleFront",vy+vh*layout.frontY]);
+    }
+    if (tr.to === 1) {
+      const fade = Math.max(0,1-Math.abs(t-TRAVEL_BOARD)/.3,1-Math.abs(t-TRAVEL_ARRIVE)/.3);
+      if (fade) { g.fillStyle=`rgba(12,18,35,${fade})`; g.fillRect(0,0,W,H); }
+    }
+    g.fillStyle="rgba(12,18,35,.72)";g.fillRect(0,0,W,H*.16);
+    g.fillStyle="#fff5df";g.textAlign="center";g.font=`800 ${Math.round(Math.min(W*.045,H*.046))}px Grandstander, system-ui`;
+    g.fillText(LEVELS[tr.to].name,W/2,H*.065);
+    g.font=`600 ${Math.round(Math.min(W*.035,H*.032))}px system-ui`;
+    g.fillText(travelPhase()==="boarding"?(tr.to===1?"Cả đội lên tàu nào!":"Cả đội lên xe nào!"):travelPhase()==="journey"?"Cùng nhau lên đường!":(tr.to===1?"Cập bến rồi! Cả đội lên đảo thôi!":"Đến nơi rồi! Cả đội xuống thôi!"),W/2,H*.12);
+  }
+
   // ---- closing: Simmy changes, the team walks the runway, a photo is taken, then the island
   function closeShop(fromNet) {
     if (!SH.open && !(fromNet && (G.mode === "play" || G.mode === "pause" || onShip()))) return;
@@ -10086,9 +10524,7 @@
   const girlsName = () => girlsIn().map((c) => HEROES[c].name).join(" và ");
   const finLine = () => ((G.lvl && G.lvl.end) || "Cảm ơn {girls} đã cứu cả nhóm SKSP!").replace("{girls}", girlsName());
   function teamMembers() {
-    const all = teamAll(), other = hero === "g" ? "s" : "g";
-    if (NET.role && Q && Q.hero === other) return all;
-    return all.filter((m) => m.char === hero || m.char === "simmy").sort((a, b) => (a.char === "simmy") - (b.char === "simmy"));   // (the girl on the left, Simmy on the right)
+    return travelMembers().filter(m => m.char !== "dog" && m.char !== "cat");
   }
   function teamAll() {
     const other = hero === "g" ? "s" : "g";
@@ -10099,23 +10535,34 @@
     const sim = { char: "simmy", outfit: SIMMY.outfit, name: "Mèo Simmy" };
     return hero === "g" ? [mine, sim, sis] : [sis, sim, mine];
   }
-  // Coca (Mochi's dog) and Cafe (Matcha's cat) come along in their sailor outfits (atlas4 `<name>_sail_w0..w3 / sit / joy`, facing right):
-  // of each girl who is in the team: her pet, if she has it (a sister on the other page: from her presence)
+  // Coca belongs to Mochi, Cafe to Matcha. Photo, journey and world use the same costume.
+  // The six painted poses are <name>_<theme>_{w0..3,sit,joy}; pirate uses the existing "sail" sheets.
   const PET_ART = { dog: "coca", cat: "cafe" };
-  // the art name of a pet who wears its sailor outfit in the world now: on the island (Màn 2, LEVELS[1]) both do; else null
-  // the sailor frames are painted smaller than the plain pet they replace (and each pose differs): on the island each one is scaled so
-  // it stands as tall as the plain side-view pet (`pet_<kind>_d2_w0`), the pet keeps its size from Màn 1 (the atlas scale is left alone)
+  // Normalize every pose against the plain side-view pet, so a new painting cannot change its size.
   function sailFit(kind, fn) {
     const f = FR[fn], r = FR[`pet_${kind}_d2_w0`];
     return f && r ? r.h * r.s / (f.h * f.s) : 1;
   }
-  const islandSail = (kind) => (G.level === 1 && PET_ART[kind] && FR[PET_ART[kind] + "_sail_sit"] ? PET_ART[kind] : null);
+  // Keep a complete costume together. Missing or still-decoding art uses the plain pet.
+  const PET_POSES = ["w0", "w1", "w2", "w3", "sit", "joy"];
+  function petOutfitPrefix(kind) {
+    const art = PET_ART[kind], theme = G.petTheme || LV_ART[G.level] || "candy";
+    if (!art) return null;
+    const prefix = art + "_" + (theme === "pirate" ? "sail" : theme);
+    return PET_POSES.map(pose => FR[prefix + "_" + pose]).map(f => !!f && frameReady(f)).every(Boolean) ? prefix : null;
+  }
+  function petPoseFrame(kind, pose) {
+    const prefix = petOutfitPrefix(kind);
+    if (prefix) return prefix + "_" + (PET_POSES.includes(pose) ? pose : "sit");
+    const pre = `pet_${kind}_d2_w`, n = dirN(pre), wi = /^w[0-3]$/.test(pose) ? Number(pose[1]) : 0;
+    return pre + (n ? wi % n : 0);
+  }
   function teamPets() {
     const out = [];
     for (const m of teamMembers()) {
       if (m.char === "simmy") continue;
       const kind = Object.keys(PET_ART).find((k) => PETS[k] && PETS[k].owner === m.char);
-      if (!kind || !FR[PET_ART[kind] + "_sail_sit"]) continue;
+      if (!kind) continue;
       const has = m.char === hero ? P.pets.includes(kind) : !!(NET.role && Q && (Q.pets || []).includes(kind));
       if (has) out.push({ kind, char: m.char, art: PET_ART[kind] });
     }
@@ -10124,8 +10571,9 @@
   // a pet's frame at its feet (x, gy); th = a grown-up's height (400 units) on this screen, so the pet is as big as in the world (Coca ~110, Cafe ~95)
   // (faceL: facing left: the pets are painted facing right only and are mirrored for left, as in the world)
   function drawPetAt(g, art, pose, x, gy, th, faceL) {
-    const f = FR[art + "_sail_" + pose]; if (!f) return false;
-    const k = f.s * th / 400;
+    const kind = Object.keys(PET_ART).find(k => PET_ART[k] === art), fn = petPoseFrame(kind, pose), f = FR[fn]; if (!f) return false;
+    const k = f.s * sailFit(kind, fn) * th / 400;
+    if (API.drawn) API.drawn.push(["petPose", kind, fn, f.h * k]);
     if (faceL) { g.save(); g.translate(x, 0); g.scale(-1, 1); g.drawImage(f.img, f.sx, f.sy, f.w, f.h, -f.ax * k, gy - f.ay * k, f.w * k, f.h * k); g.restore(); }
     else g.drawImage(f.img, f.sx, f.sy, f.w, f.h, x - f.ax * k, gy - f.ay * k, f.w * k, f.h * k);
     return true;
@@ -10137,10 +10585,10 @@
     // the painted show stage (its three spotlit spots at 80 % of the picture; the floor end of it kept in view on a wide screen)
     const bg = scene("stage");
     g.fillStyle = th.bg[2]; g.fillRect(0, 0, W, H);   // (only until the picture is in)
-    const team = teamMembers(), fx = team.length > 2 ? [0.27, 0.5, 0.73] : [0.36, 0.64], ht = H * 0.55, gy = bg ? cover(g, bg, W, H, 0.5, 0.8)(0, STAGE_FEET)[1] : H * 0.86;
+    const team = teamMembers(), fx = team.length === 2 ? [.36,.64] : team.map((_,i) => .12 + .76 * (i + .5) / team.length), ht = Math.min(H * 0.55, W / Math.max(2, team.length) * 1.35), gy = bg ? cover(g, bg, W, H, 0.5, 0.8)(0, STAGE_FEET)[1] : H * 0.86;
     const pets = teamPets(), poff = Math.min(ht * 0.3, W * 0.11);
     team.forEach((m, i) => {
-      const s = final ? 0 : i * 0.95, p = final ? 1 : Math.max(0, Math.min(1, (t - s) / 2.3)), e = 1 - (1 - p) * (1 - p);
+      const s = final ? 0 : i * Math.min(.95, 2 / Math.max(1, team.length - 1)), p = final ? 1 : Math.max(0, Math.min(1, (t - s) / 2.3)), e = 1 - (1 - p) * (1 - p);
       if (!final && t < s) return;
       const x = (-0.18 + (fx[i] + 0.18) * e) * W, walking = p < 1, cheer = p >= 1;
       const lg = g.createRadialGradient(x, gy - ht * 0.4, 10, x, gy - ht * 0.4, ht * 0.85); lg.addColorStop(0, "rgba(255,244,200,.45)"); lg.addColorStop(1, "rgba(255,244,200,0)");
@@ -10149,7 +10597,7 @@
       const hop = cheer ? Math.abs(Math.sin((final ? 0.4 : t - s) * 5)) * ht * 0.03 : 0;
       const o = { face: 2, flip: false, moving: walking, dist: (t - s) * 250, winT: cheer ? 1 : 0 };
       const hm = ht * (ART_H[m.char] || 400) / 400;   // (ht = a grown-up's height: Simmy 400, Matcha 330, Mochi 275, as in the world)
-      if (m.char === "simmy") drawSimmyAt(g, x, gy - hop, hm, t, m.outfit, o); else drawHeroAt(g, m.char, m.outfit, o, x, gy - hop, hm, false);
+      if (isAlly(m.char)) drawHeroAt(g, m.char, m.outfit, o, x, gy - hop, hm, false); else drawHeroAt(g, m.char, m.outfit, o, x, gy - hop, hm, false);
       g.fillStyle = "#fff6e5"; g.font = `800 ${Math.round(H * 0.05)}px Grandstander, system-ui, sans-serif`; g.textAlign = "center"; g.fillText(m.name, x, gy + H * 0.075);
       // her pet: walks in beside her (a little in front, on her right), hops for joy when she arrives, then sits in her spotlight
       const pt = pets.find((q) => q.char === m.char);
@@ -10173,6 +10621,7 @@
     if (RW.t >= RW_END) takePhoto();
   }
   function takePhoto() {
+    G.petTheme = LV_ART[nextLevelAfter(G.level)] || G.petTheme;
     G.mode = "photo"; PH.t = 0;
     try {
       const c = document.createElement("canvas"); c.width = 1280; c.height = 720;
@@ -10184,15 +10633,18 @@
   function endPhoto() {
     if (G.mode !== "photo") return;
     $("photo").hidden = true;
-    toLevel2();   // on to the island (a guest: her page builds it when the host's world is there)
+    if (NET.role !== "guest") startTravel(nextLevelAfter(G.level));
+    else syncTravel();   // on to the island (a guest: her page builds it when the host's world is there)
   }
   $("photoGo").addEventListener("click", endPhoto);
 
   // The team has its photo: on to the island (Màn 2, LEVELS[1]) in the outfits chosen in the shop (they are kept per sister; Simmy wears
   // simmy.pirate). The host (or a solo player) builds the level; a guest only goes back to her page and the host's world carries her into the
   // same level (applySnapshot sees the new `lv` and fades into it), so both pages enter it together. (Its banner showed at the shop.)
+  // (The snow shop leads on to Màn 3: there its story card shows on arrival, as through a magic gate, unless the game was started at the
+  // shop from the home screen (G.m2), whose title already told it.)
   function startLevel2() {
-    const next = G.level + 1;
+    const next = nextLevelAfter(G.level);
     if (!LEVELS[next]) return showTrialEnd();
     G.mode = "play"; G.shopPhase = "closed";
     for (const id of ["hud", "controls"]) $(id).hidden = false;
@@ -10200,7 +10652,9 @@
     if (NET.role === "guest") return;   // (her page builds the level when the host's world says so: see applySnapshot)
     G.hearts = 5;
     G.fade = 1; G.fadeDir = -1;
+    const card = shopTheme(SH.theme).card && !G.m2;
     buildLevel(next); updateHud(); updateSksp(); questTxt = null; updateQuest();
+    if (card) arrive(next);
   }
   // the "Còn tiếp…" screen at the end of the last level so far, shared with winGame
   function showTrialEnd() {
@@ -10424,7 +10878,7 @@
   // on to the island (Màn 2, LEVELS[1]), where Simmy says line 13 (a guest a little later: her page builds the level when the host's world says so)
   function toLevel2() {
     startLevel2();
-    if (G.mode === "play") G.say = { seq: SAYS.level2Start, t: NET.role === "guest" ? -2.2 : -0.8 };
+    if (G.mode === "play" && !shopTheme(SH.theme).card) G.say = { seq: SAYS.level2Start, t: NET.role === "guest" ? -2.2 : -0.8 };   // (after the snow shop: Màn 3's story card instead)
   }
   // the HUD on the ship: no hearts / energy / level map, the star counter stays; the controls only while they play; skip only in the films
   function shipUi() {
@@ -10986,7 +11440,7 @@
   const SPET = {};   // per girl: { art, x, y, vx, vy, face, flip, moving, dist, still, joyT }
   function shipPetArt(k) {
     const kind = Object.keys(PET_ART).find((q) => PETS[q] && PETS[q].owner === k);
-    if (!kind || !FR[PET_ART[kind] + "_sail_sit"]) return null;
+    if (!kind) return null;
     const has = k === hero ? P.pets.includes(kind) : !!(NET.role && Q && Q.ship && Q.hero === k && (Q.pets || []).includes(kind));
     return has ? PET_ART[kind] : null;
   }
@@ -11598,8 +12052,8 @@
   }
   // a pet standing at (x, y) on the deck, lift = its hop (a share of a grown-up's height), facing left when flip (mirrored: an animal may be)
   function drawShipPet(g, cam, k, art, pose, x, y, lift, flip) {
-    const f = FR[art + "_sail_" + pose]; if (!f) return;
-    const th = 400 * ISO_K * cam.s, kk = f.s * th / 400, sx = cam.ox + x * cam.s, gy = cam.oy + y * cam.s;
+    const kind = Object.keys(PET_ART).find(q => PET_ART[q] === art), fn = petPoseFrame(kind, pose), f = FR[fn]; if (!f) return;
+    const th = 400 * ISO_K * cam.s, kk = f.s * sailFit(kind, fn) * th / 400, sx = cam.ox + x * cam.s, gy = cam.oy + y * cam.s;
     g.fillStyle = "rgba(0,0,0,.22)"; g.beginPath(); g.ellipse(sx, gy, th * 0.09 * (1 - lift * 2), th * 0.022, 0, 0, TAU); g.fill();
     g.save(); g.translate(sx, gy - lift * th); if (flip) g.scale(-1, 1);
     g.drawImage(f.img, f.sx, f.sy, f.w, f.h, -f.ax * kk, -f.ay * kk, f.w * kk, f.h * kk); g.restore();
@@ -12182,7 +12636,7 @@
     G.shopPhase = "walk";   // (the host's world carries it to the guest)
     G.bcut = null; G.rescue = null; G.ult = null; G.combo = null; IN.ultPressed = false;
     const D = dockWay(), mine = PETE.find((e) => e.kind === "simmy"), theirs = QPETE.find((e) => e.kind === "simmy");
-    const W = NET.role && Q ? SAYS.afterCandyBoss : SAYS.afterCandyBossSolo, mul = talkMul(), talk = seqTime(W, mul);   // (fixed for the whole film)
+    const ws = shopTheme(G.lvl && G.lvl.shop).walk, W = SAYS[NET.role && Q ? ws[0] : ws[1]], mul = talkMul(), talk = seqTime(W, mul);   // (fixed for the whole film; the lines of the shop it leads to)
     const c = G.cine = { ph: "walkin", t: 0, D, hold: false, W, mul, talk, end: WK_END + talk };
     // her place in the line behind Simmy (the two sisters side by side), then on toward the dock
     const off = hero === "g" ? [-200, 90] : [-340, 20];
@@ -12278,20 +12732,20 @@
   }
 
   // ---------------------------------------------------------------- the opening film (Màn 1)
-  // SKSP are making a vlog on a meadow; Phù thủy Hắc Ám opens a grey portal and sucks the four of them in; Mochi and Matcha jump in after them.
+  // SKSP have found the route to the witch's castle to recover the stolen portal crystal. She ambushes and separates them; the girls follow.
   // It is a stage of its own (drawn straight to the canvas like the runway), ~17 s, skippable; the world waits and the game starts where it ends.
   // G.cine = { ph: "opening", t, lock: true }; null when there is no film.
   const OP_END = 17.0, OP_FEET = 0.72;
   // who says what, when: [speaker, from, to, lines, who says it while the speaker has no art yet]
   const OP_SAY = [
-    ["simmy", 0.9, 3.5, ["Chào cả nhà! Đây là kênh", "vlog SKSP của tụi mình!"]],
-    ["kairon", 3.5, 6.0, ["Hôm nay tụi mình đi", "dã ngoại ở đồng cỏ nè!"], "sammy"],
-    ["witch", 6.9, 9.4, ["Hi hi hi! Vui quá nhỉ?", "Ta ghét màu sắc lắm!"]],
-    ["sammy", 9.5, 10.9, ["Á! Gió gì lạ thế?"], "simmy"],
-    ["phong", 10.4, 11.9, ["Cứu với! Tụi mình", "bị hút đi mất!"], "simmy"],
-    ["witch", 11.9, 14.0, ["Ta sẽ biến cả thế giới", "thành màu xám xịt!"]],
+    ["simmy", 0.9, 3.5, ["Tìm ra đường tới", "lâu đài rồi cả nhà ơi!"]],
+    ["kairon", 3.5, 6.0, ["Đi lấy lại pha lê thôi!", "Cô ta đã cướp nó!"], "sammy"],
+    ["witch", 6.9, 9.4, ["Dám tới lấy pha lê của ta?", "Đừng hòng!"]],
+    ["sammy", 9.5, 10.9, ["Cẩn thận! Cổng bẫy!"], "simmy"],
+    ["phong", 10.4, 11.9, ["Nắm tay nhau!", "Đừng để bị tách ra!"], "simmy"],
+    ["witch", 11.9, 14.0, ["Mỗi đứa một nơi!", "Xem còn ai cản được ta!"]],
     ["mochi", 12.6, 13.8, ["Simmy! Các bạn ơi!"]],
-    ["matcha", 13.8, 15.0, ["Đuổi theo cổng phép nào!"]],
+    ["matcha", 13.8, 15.0, ["Cổng chưa đóng!", "Mình đi cứu các bạn!"]],
   ];
   // the four of SKSP on the meadow. Only a member whose frames are in the atlas is shown (no drawn-by-code stand-ins):
   // Kairon and Phong Cận are in once their frames are packed (`kairon.base.*` / `phong.base.*`, tools/g4_pack.py; a lone `<art>_a` / `<art>_stand` also counts).
@@ -12330,9 +12784,11 @@
     $("skipFilm").hidden = false;
     G.fade = 0; G.fadeDir = 0;
   }
-  function endCine() {
+  function endCine(skipTravelFilm = false) {
     if (!G.cine) return;
+    const opening = G.cine.ph === "opening";
     G.cine = null; $("skipFilm").hidden = true; IN.ultPressed = false;
+    if (opening && !skipTravelFilm && !API.autopilot && NET.role !== "guest") { startTravel(0); return; }
     if (G.mode === "play") {
       $("hud").hidden = false; $("controls").hidden = false;
       G.fade = 1; G.fadeDir = -1;   // out of the white flash into the candy forest
@@ -12340,7 +12796,7 @@
     }
   }
   // (on the ship: the host / a solo girl skips the dock and the boarding film together; a guest skips to the end of the film and waits there)
-  function skipCine() { if (onShip()) { if (G.mode === "ship" && (SHIP.ph === "dock" || SHIP.ph === "board")) { if (NET.role === "guest") SHIP.t = Math.max(SHIP.t, SHIP.ph === "dock" ? dockEnd() : boardT().end); else shipPhase("fish"); } return; } if (G.cine) { if (G.cine.ph === "walkin") endWalkIn(); else endCine(); } }
+  function skipCine() { if (G.travel) return skipTravel(); if (onShip()) { if (G.mode === "ship" && (SHIP.ph === "dock" || SHIP.ph === "board")) { if (NET.role === "guest") SHIP.t = Math.max(SHIP.t, SHIP.ph === "dock" ? dockEnd() : boardT().end); else shipPhase("fish"); } return; } if (G.cine) { if (G.cine.ph === "walkin") endWalkIn(); else endCine(true); } }
   $("skipFilm").addEventListener("click", skipCine);
   function updateCine(dt) {
     if (G.cine.ph === "walkin") return updateWalkIn(dt);
@@ -12434,7 +12890,7 @@
     // Mochi and Matcha run in and jump after them
     const girls = [["g", "mochi", 0.42, 12.2, 14.6], ["s", "matcha", 0.31, 12.7, 15.0]];   // (on the blanket, clear of the basket at its left end)
     for (const [ch, k, fx, tin, tj] of girls) {
-      if (t < tin) continue;
+      if (t < tin || !girlsIn().includes(ch)) continue;
       const e = 1 - Math.pow(1 - clamp((t - tin) / 1.2, 0, 1), 2), x1 = (-0.15 + (fx + 0.15) * e) * W;
       const [x, y, sc, sp, gone] = t >= tj ? pull(fx * W, gy, tj, true) : [x1, gy, 1, 0, false];
       if (gone) continue;
@@ -12511,7 +12967,7 @@
       }
       renderCoop();
     }, () => { if (NET.state === "ok") { NET.state = "none"; NET.room = null; renderCoop(); } });
-    for (const t of ["start", "hits", "ult", "shoo", "portal", "hurt", "pick", "gain", "shots", "xp", "pet", "combo", "outfit", "shop", "ship", "ally"]) room.on(t, onNet, () => {});
+    for (const t of ["start", "hits", "ult", "shoo", "portal", "hurt", "pick", "gain", "shots", "xp", "pet", "combo", "outfit", "shop", "ship", "ally", "travel"]) room.on(t, onNet, () => {});
     renderCoop();
   }
 
@@ -12659,7 +13115,7 @@
       NET.pp = p ? p.presence : null;
       setCo({ role: "play", with: msg.peer, hero });
       $("coopScreen").hidden = true;
-      startGame(clamp(Math.floor(num(d.lv)), 0, LEVELS.length - 1), num(d.lv) === 0 && d.at === "shop" ? d.at : null);   // (an old host's "ship": Màn 1)
+      startGame(clamp(Math.floor(num(d.lv)), 0, LEVELS.length - 1), d.at === "shop" ? d.at : null);   // (a start at a shop: Màn 2's or Màn 3's, startGame checks the level has one; an old host's "ship": Màn 1)
       return;
     }
     if (msg.peer !== NET.partner || !NET.role || G.mode === "title") return;
@@ -12668,10 +13124,11 @@
       NET.qof = { k, id, t: performance.now() / 1000 }; if (Q && Q.hero === k) { Q.outfit = id; Q.of = hasOutfit(k, id) ? id : "base"; }
       return;
     }
+    if (msg.topic === "travel") { if (NET.role === "host" && G.travel && d.skip === G.travel.id) skipTravel(); return; }
     if (msg.topic === "shop") return onShopMsg(d);
     if (msg.topic === "ally") {   // her page about this page's friends / girl: a hit the host saw, Kairon's aura (a heart, the friends healed / up)
       if (d.to !== NET.me || G.mode !== "play") return;
-      if (d.t === "hurt") { const p = PETE[clamp(Math.floor(num(d.i)), 0, 7)]; if (p && isCls(p)) allyDamage(p, clamp(Math.round(num(d.n)) || 1, 1, 4), num(d.fx), num(d.fy)); }
+      if (d.t === "hurt") { if (NET.role !== "guest") return; const p = PETE[clamp(Math.floor(num(d.i)), 0, 7)]; if (p && isCls(p)) allyDamage(p, clamp(Math.round(num(d.n)) || 1, 1, 4), num(d.fx), num(d.fy), typeof d.bf === "boolean" ? d.bf : bossFight()); }
       else if (d.t === "heal") { if (!P.dead && G.hearts < 5) { G.hearts++; renderHearts(); SFX.heal(); if (G.parts.length < 420) burst(P.x, P.y - 140, 14, ["#fff4c2", "#ff9ab8", "#ffd34d"], 260, 0.6); } }
       else if (d.t === "aura") auraOn(num(d.x), num(d.y));
       return;
@@ -12710,9 +13167,10 @@
         for (const h of Array.isArray(d.h) ? d.h.slice(0, 120) : []) {
           if (!Array.isArray(h)) continue;
           const el = ELS[num(h[1])] || null, id = num(h[0]);
-          if (id === -1) { if (G.boss && G.boss.alive) { damageBoss(1, G.boss.x, G.boss.y - 220); applyElem(G.boss, el, "q"); } continue; }
+          const frost = num(h[5]) === 1 && !!Q && frostOn(Q.outfit);   // (her ice-queen bolt: only as her page's outfit says)
+          if (id === -1) { if (G.boss && G.boss.alive) { damageBoss(1, G.boss.x, G.boss.y - 220); applyElem(G.boss, el, "q"); if (frost) applyFrost(G.boss); } continue; }
           const m = G.mons.find((m) => m.id === id && m.alive);
-          if (m) { damageMon(m, clamp(Math.floor(num(h[2])) || 1, 1, 400), Q ? Q.x : m.x, Q ? Q.y : m.y, false, "q", clamp(num(h[3]) || 60, 0, 600)); applyElem(m, el, "q"); if (num(h[4]) > 0 && m.alive) m.slow = Math.max(m.slow || 0, clamp(num(h[4]) / 10, 0, 5)); }
+          if (m) { damageMon(m, clamp(Math.floor(num(h[2])) || 1, 1, 400), Q ? Q.x : m.x, Q ? Q.y : m.y, false, "q", clamp(num(h[3]) || 60, 0, 600)); applyElem(m, el, "q"); if (num(h[4]) > 0 && m.alive) m.slow = Math.max(m.slow || 0, clamp(num(h[4]) / 10, 0, 5)); if (frost) applyFrost(m); }
         }
       } else if (msg.topic === "ult") {
         ultBlast(num(d.cx), num(d.cy), clamp(num(d.hw), 0, 2200), clamp(num(d.hh), 0, 1400), "q"); SFX.boom(); ultShake();   // (her show is played from her clock: UFX.q)
@@ -12761,11 +13219,11 @@
   function girlState() {
     const bits = (P.dead ? 1 : 0) | (P.inv > 0 ? 2 : 0) | (P.slowT > 0 ? 4 : 0) | (P.castT > 0.1 ? 8 : 0) | (P.winT ? 16 : 0) | (P.flip ? 32 : 0) | (G.mode === "pause" ? 64 : 0) | (G.story ? 128 : 0) | (SH.open ? 256 : 0) | (SH.open && SH.done ? 512 : 0);   // (64: this page is paused; 128: it shows a story card; 256: its shop is open, 512: its girl is ready there)
     return [P.x | 0, P.y | 0, P.face, (G.mode === "play" && P.fn) || "", bits, ELS.indexOf(P.elem), G.ult ? Math.round(G.ult.t * 10) : 0, hero, G.hearts, 0, P.vx | 0, P.vy | 0, P.pets.join(","), P.lv,
-      PETE.map((p) => [p.x | 0, p.y | 0, p.face + (p.flip ? 8 : 0) + (p.faintT > 0 ? 16 : 0), ...(isCls(p) ? [Math.round(100 * p.hp / p.max), p.faintT > 0 ? Math.round(100 * clamp(Math.max(p.rev / ALLY_REVIVE_T, 1 - p.faintT / (p.fmax || ALLY_FAINT_T)), 0, 1)) : 0, ...(G.esc && G.esc.k === p.kind ? [G.esc.ph, Math.round(G.esc.t * 10), G.esc.say, G.esc.sayN] : [])] : [])]), P.dead ? Math.round((1 - clamp(G.reviveT / FAINT_T, 0, 1)) * 100) : 0, P.helped ? 1 : 0, P.elem ? Math.ceil(P.elemT * 10) : 0, P.outfit || "base", onShip() && SHIP.ph !== "dock" ? 1 : 0, rodSlot(), onShip() && NET.role === "guest" && SHIPX.mine.length ? SHIPX.mine : 0];   // [18] = outfit id (`of`); older copies send 18 slots; [19] = on the ship's deck (x, y are deck px then); [20] = her fishing rod (rodSlot) or 0; [21] = a guest's last landed fish on the ship ([[id, kind], ...]) or 0
+      PETE.map((p) => [p.x | 0, p.y | 0, p.face + (p.flip ? 8 : 0) + (p.faintT > 0 ? 16 : 0), ...(isCls(p) ? [Math.round(100 * p.hp / p.max), p.faintT > 0 ? Math.round(100 * clamp(Math.max(p.rev / (p.revMax || ALLY_REVIVE_T), 1 - p.faintT / (p.fmax || ALLY_FAINT_T)), 0, 1)) : 0, ...(G.esc && G.esc.k === p.kind ? [G.esc.ph, Math.round(G.esc.t * 10), G.esc.say, G.esc.sayN] : [])] : [])]), P.dead ? Math.round((1 - clamp(G.reviveT / FAINT_T, 0, 1)) * 100) : 0, P.helped ? 1 : 0, P.elem ? Math.ceil(P.elemT * 10) : 0, P.outfit || "base", onShip() && SHIP.ph !== "dock" ? 1 : 0, rodSlot(), onShip() && NET.role === "guest" && SHIPX.mine.length ? SHIPX.mine : 0];   // [18] = outfit id (`of`); older copies send 18 slots; [19] = on the ship's deck (x, y are deck px then); [20] = her fishing rod (rodSlot) or 0; [21] = a guest's last landed fish on the ship ([[id, kind], ...]) or 0
   }
   function worldState() {
     const B = G.boss, near = Q ? (o) => d2(o.x, o.y, Q.x, Q.y) < 1900 * 1900 : () => true;
-    const sb = (o) => (o.slow > 0 ? 4 : 0) | (o.burn > 0 ? 8 : 0) | (o.poison > 0 ? 16 : 0) | (o.frz > 0 ? 32 : 0);
+    const sb = (o) => (o.slow > 0 ? 4 : 0) | (o.burn > 0 ? 8 : 0) | (o.poison > 0 ? 16 : 0) | (o.frz > 0 ? 32 : 0) | (o.crust > 0 || o.chill > 0 ? 4096 : 0);   // (4096: the ice queen's frost)
     const bitsOf = (a) => a.map((o) => (o.got || o.open ? 1 : 0)).join("");
     return {
       lv: G.level,
@@ -12793,6 +13251,7 @@
       ss: G.stash ? G.stash.st : -1,   // the escort's stash: 0 waiting, 1 its ambush, 2 beaten, 3 open
       sp: onShip() ? shipState() : 0,   // the ship (host-owned), compact: see shipState
       sc: G.story ? 1 : 0,   // (the host's page shows a story card: the guest's world waits too)
+      tr: G.travel || 0,
       sh: G.shopPhase || 0, po: G.portal && G.portal.open ? 1 : 0, ao: G.arena && G.arena.open ? 1 : 0, al: G.arenaLock ? 1 : 0, st: G.stars, k: G.kills, lk: G.lvKills, won: G.won ? 1 : 0, cp: G.camps.map((c) => c.st * 1000 + Math.max(0, c.left)),
     };
   }
@@ -12843,16 +13302,19 @@
     const w = NET.pp && NET.pp.w;
     if (!w || typeof w !== "object" || w === NET.applied) return;
     NET.applied = w;
+    if (w.tr || G.travel) { syncTravel(); return; }
     const lv = clamp(Math.floor(num(w.lv)), 0, LEVELS.length - 1);
     if (lv !== G.level) {
       if (!NET.lvBusy) {
         NET.lvBusy = true; P.winT = 1.6; P.vx = P.vy = 0; SFX.portal();
         setTimeout(() => fadeTo(() => {
-          const now = NET.pp && NET.pp.w ? clamp(Math.floor(num(NET.pp.w.lv)), 0, LEVELS.length - 1) : lv, prev = G.level;
+          const now = NET.pp && NET.pp.w ? clamp(Math.floor(num(NET.pp.w.lv)), 0, LEVELS.length - 1) : lv, prev = G.level, picked = G.m2;
           G.hearts = 5;   // (a fresh set of hearts for the new level, as on the host's page)
           buildLevel(now); NET.lvBusy = false; NET.applied = null; updateHud();
-          // (through the magic gate (the next map, not after a shop): its story card, as on the host's page; else its name)
-          if (now === nextLevelAfter(prev) && LEVELS[prev] && !LEVELS[prev].shop) arrive(now);
+          // (through the magic gate (the next map, not after a shop), or after a shop whose map shows its card (the snow shop, unless
+          // started there from the home screen): its story card, as on the host's page; else its name)
+          const sh = LEVELS[prev] && LEVELS[prev].shop;
+          if (now === nextLevelAfter(prev) && LEVELS[prev] && (!sh || (shopTheme(sh).card && !picked))) arrive(now);
           else showBanner(LEVELS[now].name.split(": ")[1], LEVELS[now].name.split(": ")[0]);
         }), 900);
       }
@@ -12876,7 +13338,7 @@
       m.tt = now; m.tx = x; m.ty = y; m.face = clamp(fc & 7, 0, 4); m.flip = fc >= 8;
       m.st = MST[num(a[5])] || "walk"; m.t = num(a[8]) / 10; m.hp = num(a[6]); m.max = num(a[9]) || m.max;
       m.hurt = bits & 1 ? 0.1 : 0; if (bits & 2) m.flash = 0.12;
-      m.slow = bits & 4 ? 1 : 0; m.burn = bits & 8 ? 1 : 0; m.poison = bits & 16 ? 1 : 0; m.summoned = !!(bits & 64); m.sk = !!(bits & 256);
+      m.slow = bits & 4 ? 1 : 0; m.burn = bits & 8 ? 1 : 0; m.poison = bits & 16 ? 1 : 0; m.summoned = !!(bits & 64); m.sk = !!(bits & 256); m.crust = bits & 4096 ? 1 : 0;
       if (a.length > 10 && a[10] !== null) m.fa = num(a[10]) / 100;
       if (bits & 512) { if (!m.guard) { m.guard = G.cages.find((c) => c.big) || true; m.gd = GUARDS[G.level]; m.r = GUARD.R; } m.skk = MKINDS[num(a[11])] || null; }   // (a cage guardian: drawn big, named)
       if (bits & 1024) {   // (a champion: its affix, drawn big with its name; its shield in %, its break shown here too)
@@ -12913,7 +13375,7 @@
       B.tt = now; B.tx = x; B.ty = y; B.dir = dir < 0 ? -1 : 1; B.st = st; B.t = t10 / 10; B.hp = hp; B.dropY = dropY; B.ix = ix; B.iy = iy;
       B.jz = jz; if (bmax > 0) B.max = bmax; B.move = BMOVES[mv]; B.ax = ax / 100; B.ay = ay / 100;
       if (bits & 1) B.flash = 0.12; B.hurtPose = bits & 2 ? 0.1 : 0;
-      B.slow = bits & 4 ? 1 : 0; B.burn = bits & 8 ? 1 : 0; B.poison = bits & 16 ? 1 : 0;
+      B.slow = bits & 4 ? 1 : 0; B.burn = bits & 8 ? 1 : 0; B.poison = bits & 16 ? 1 : 0; B.chill = bits & 4096 ? 1 : 0;
       if (B.frz && !(bits & 32)) iceShatter(B.x, B.y - 220, 300); B.frz = B.frzMax = bits & 32 ? 1 : 0;
       if (!alive && B.alive) { B.alive = false; B.die = 0; SFX.boom(); G.shake = 26; burst(B.x, B.y - 200, 60, ["#ffd34d", "#ff8a3d", "#fff4c2", "#ff9ad5"], 700, 1.4); }
       updateBossBar();
@@ -13141,6 +13603,7 @@
     btn("Mở phòng", p2pHost); btn("Vào phòng", () => { NET.stage = "join"; NET.err = ""; renderCoop(); }, true);
   }
   $("coopBtn").addEventListener("click", () => {
+    requestGameFullscreen();
     initAudio();
     $("titleScreen").hidden = true; $("coopScreen").hidden = false; renderCoop();
   });
@@ -13156,6 +13619,7 @@
     if (!ready) return;
     atlasSweep(now / 1000);
     try {
+      if (NET.role === "guest") syncTravel();
       if (G.mode === "play" && !API.hold) update(dt);
       else if (G.mode === "pause") syncShop();
       else if (G.mode === "title" && G.lvl) {
@@ -13166,6 +13630,7 @@
         updateParts(dt);
       }
       else if (G.mode === "shop") shopTick(dt);
+      else if (G.mode === "travel") travelTick(dt);
       else if (G.mode === "runway") runwayTick(dt);
       else if (G.mode === "finale") finaleTick(dt);
       else if (G.mode === "ship") { if (!API.hold) shipTick(dt); }
@@ -13194,15 +13659,18 @@
   }
   // test hooks for automated checks. __sksp.autopilot = true makes this girl walk the path on her own.
   const API = window.__sksp = {
+    startTravel, travelMembers, travelPhase, syncTravel, TRAVEL_END, TRAVEL_LAYOUT, drawTravel,
+    petOutfitPrefix, petPoseFrame, takePhoto, drawPetAt, teamPets,
     G, P, IN, joy, keys, NET, FR, LEVELS, MON, HEROES, PETS, TIERS, startGame, sendStart, buildLevel, toTitle, snowSlow, nextLevelAfter, levelIdx,
     autopilot: false,
     trial: false,   // the game has its real end now (Màn 5's finale and the end screen); sim.js / coop.js print WIN (tests read this)
-    FB, FB_SAY, FB_MOVES, FB_GEO, LTS, fbIn, fbHurts, fbDodge, fbTalk, fbLts, fbThrone, fbMove, fbDark, bossOpen: (B) => bossOpen(B || G.boss), bossR: (B) => bossR(B || G.boss), updateBossBar,
+    FB, FB_SAY, FB_MOVES, FB_GEO, LTS, fbArtFlip, fbIn, fbHurts, fbDodge, fbTalk, fbLts, fbThrone, fbMove, fbDark, bossOpen: (B) => bossOpen(B || G.boss), bossR: (B) => bossR(B || G.boss), updateBossBar,
     fin: () => ({ t: FIN.t, fw: FIN.fw.length, cf: FIN.cf.length }), FIN_END, FIN_SKIP, showEnd, hexMove, hexDodge, HOVER, HEX: { ORB_R, ORB_V, ORB_V2, ORB_VW, ORB_TURN, TELE_R, CIR_R, RING_R, RING_CR, HEX_LIFT },
     getQ: () => Q,
     setHero: (k) => { hero = k === "s" ? "s" : "g"; loadOutfit(); loadPets(); renderHeroes(); },
     setOutfit, hasOutfit, CHAR_H, ART_H, CHAR_K, HERO_R, view: () => ({ VW, VH }), girlSpot, drawTeamScene, drawOpening,
-    OUTFITS4, openShop, buyOutfit, wearOutfit, closeShop, shop: shopInfo, simmy: SIMMY,
+    OUTFITS4, openShop, buyOutfit, wearOutfit, closeShop, shop: shopInfo, simmy: SIMMY, frostOn, applyFrost, FROST_T, FROST_BOSS, SHOP_THEMES,
+    BLIZ_TITLE, ultLightFor, blizArt, blizSeen: () => BLIZ_SEEN,
     skipCine, startOpening, startAllyRescue, updateSksp, lightLetter, endLevel, startDockWalk, dockWay, opCast, drawFilmActor, WK_END, readStart,
     talkMul, lineTime, SAYS, sayAt, seqTime, said: null, saidAt: null, summonBats,   // (said: an array -> talkBubble records each drawn bubble's text; saidAt: an array -> the walk-in's bubbles as [text, x, y, camX, camY, VW, VH])
     ship: () => SHIP, ISO, ISO_K, startShip, shipAct, shipSolo, stationAt, buttonAction, shipCam, boardCam, shipBars, ctrlZones, deckFix, inPoly, navNext, floatAt, aquaBlock, boardAt, boardT, edgeCall, petJoy, shipFrameName, sim: SIM, drawn: null,
