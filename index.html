@@ -405,7 +405,7 @@
   let META = null, ready = false;
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261029.0845", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261029.1104", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -3704,8 +3704,8 @@
   const HIT_AT = 0.4, ALLY_FAINT_T = 12, ALLY_REVIVE_T = 1.5, ALLY_INV = 1.0, ALLY_REGEN_WAIT = 6, ALLY_REGEN = 0.03, ALLY_Z = 120;
   const ALLY_MON_K = [0.6, 0.8, 1.2, 1.4, 1.5], ALLY_BOSS_K = 0.6;
   // in a boss fight (Dad: the girls carry the boss fights) the friends take ALLY_BOSSFIGHT_K x the damage and lie fainted ALLY_BOSSFIGHT_K x
-  // as long to recover: 48 s alone or 6 s with a girl beside them. Kairon's aura still revives at once.
-  const ALLY_BOSSFIGHT_K = 4;
+  // as long to recover: 24 s alone or 1.5 s with a girl beside them. Kairon's aura still revives at once.
+  const ALLY_BOSSFIGHT_K = 2;
   const bossFight = () => !!(G.boss && G.boss.alive);
   const allyFaintT = (inBoss = bossFight()) => ALLY_FAINT_T * (inBoss ? ALLY_BOSSFIGHT_K : 1);
   const AURA_R = 520, AURA_CD = 12, LEAP_T0 = 0.15, LEAP_T1 = 0.7, LEAP_H = 280;
@@ -3774,7 +3774,7 @@
     if (p.hp <= 0.001) allyFaint(p, inBoss);
   }
   function allyFaint(p, inBoss = bossFight()) {
-    p.revMax = ALLY_REVIVE_T * (!escOf(p) && inBoss ? ALLY_BOSSFIGHT_K : 1);
+    p.revMax = ALLY_REVIVE_T;
     p.hp = 0; p.faintT = p.fmax = escOf(p) ? 1e9 : allyFaintT(inBoss); p.rev = 0; p.act = null; p.chase = null; p.z = 0; p.moving = false;   // (in her escort she gets up only with a girl beside her)
     play("hurt"); if (G.parts.length < 420) burst(p.x, p.y - 80, 14, ["#fff4c2", "#ffd34d", "#b9a4ff"], 260, 0.6);
     allyLog(p.kind, "faint"); TALLY.allyFaint[p.kind] = (TALLY.allyFaint[p.kind] || 0) + 1;
