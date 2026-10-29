@@ -231,22 +231,12 @@
   .screen { overflow-y: auto; touch-action: pan-y; }
   #shopCards { touch-action: pan-y; }
   #joy:not(.on) { left: calc(env(safe-area-inset-left, 0px) + 16 * var(--u)) !important; top: auto !important; bottom: calc(env(safe-area-inset-bottom, 0px) + 6 * var(--u)); }
-  @media (orientation: portrait) {
-    :root { --u: min(1vh, 1vw); }
-    .hud { gap: calc(1 * var(--u)); font-size: calc(2.4 * var(--u)); }
-    .hud > .col { min-width: 0; }
-    .hud > .col:nth-child(2) { max-width: 33%; }
-    .quest { text-align: center; }
-    #mini { width: 5.5em; height: 5.5em; }
-    #bossbar { top: calc(env(safe-area-inset-top, 0px) + 24 * var(--u)); width: 64vw; }
-    #quiz { top: calc(env(safe-area-inset-top, 0px) + 1.2 * var(--u)); max-width: 90vw; box-sizing: border-box; }
-    #shop { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 38fr) minmax(0, 62fr); padding-top: max(calc(2 * var(--u)), env(safe-area-inset-top, 0px)); padding-bottom: max(calc(2 * var(--u)), env(safe-area-inset-bottom, 0px)); }
-    #shopSide { min-width: 0; }
-    #shopCards { grid-auto-rows: calc(23 * var(--u)); }
-    .iconbtn { min-width: 44px; min-height: 44px; }
-  }
+  #rotate { position: fixed; inset: 0; z-index: 100; display: none; place-items: center; text-align: center; background: var(--night); font-family: var(--display); font-weight: 800; font-size: 6vw; padding: 10vw; }
+  @media (orientation: portrait) { #rotate { display: grid; } }
   @media (prefers-reduced-motion: reduce) { #bUlt:not(.off)::before, .bar.full .fill { animation: none; } #bUlt:not(.off)::before { opacity: 1; } }
 </style>
+
+<div id="rotate" role="alert">Xoay ngang iPad để chơi nhé</div>
 
 <canvas id="game" aria-label="Màn chơi phiêu lưu"></canvas>
 <canvas id="dialogue" aria-hidden="true"></canvas>
@@ -385,7 +375,7 @@
     const rect = cv.getBoundingClientRect && cv.getBoundingClientRect();
     const w = rect && rect.width || window.innerWidth, h = rect && rect.height || window.innerHeight;
     // Portrait shows a narrower world at the same character scale, without a square letterbox.
-    VW = w < h ? VH * w / h : Math.round(clamp(VH * w / h, VH, VH * 2.4));
+    VW = Math.round(clamp(VH * w / h, VH, VH * 2.4));
     SCALE = Math.min(h / VH, w / VW);
     cv.width = Math.round(w * DPR); cv.height = Math.round(h * DPR);
     dialogueCv.width = cv.width; dialogueCv.height = cv.height;
@@ -415,7 +405,7 @@
   let META = null, ready = false;
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261029.0839", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261029.0845", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
