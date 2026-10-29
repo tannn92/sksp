@@ -415,7 +415,7 @@
   let META = null, ready = false;
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261029.0822", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261029.0839", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -4714,12 +4714,11 @@
   // squares, each with an answer. When time is up, bombs / spikes / swords / fireballs (by level) rain on the wrong
   // squares: a girl or a friend standing there faints at once. Then he drops back in and the fight goes on.
   const QZ_UP = 1.0, QZ_DROP = 1.5, QZ_HIT = 0.7, QZ_DOWN = 1.1, QZ_NEXT = 1.2, QZ_HOV = 280, QPH = ["up", "ask", "drop", "down", "next", "wait"];
-  const carryShare = () => (hero === "g" && !NET.role ? 0.4 : 0.8);
+  const carryShare = () => (hero === "g" || NET.role ? 0.1 : 0.8);
   function makeSum(cfg) {
     let a, b, r, carry = false;
     const R = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1));
-    // 80% of all questions carry / borrow (7 + 8, 13 − 9), on every level (Dad, 2026-10-27); the rest stay within the level's limit.
-    // Mochi playing alone: 40% (Dad: "Khi Mochi chơi solo thì giảm tỉ lệ câu hỏi có nhớ xuống 40%"); together the host asks for both: 80%
+    // Mochi solo or either co-op host: 10% carry/borrow. Matcha solo: 80%.
     carry = Math.random() < carryShare();
     if (carry || cfg.lim > 10) {
       // within 20: with carrying / borrowing, or (on the 20 levels) without (12 + 6, 17 − 4)
