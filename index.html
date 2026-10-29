@@ -415,7 +415,7 @@
   let META = null, ready = false;
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261028.1933", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261029.0822", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -824,7 +824,7 @@
     // columns at the girls (the lava hazards, G.lavas: see lavaMove); his second form adds the eruption. Phong Cận hangs in a cage of black
     // iron (lava_cage). Dark rock ground with glowing seams (gr.seam), lava pools and a lava sea at the edge of the world (the pond / sea
     // colours). After Màn 3 (Núi Tuyết, id "snow"); his gate leads into Màn 5 (Lâu Đài Phù Thủy Hắc Ám, id "castle").
-    { id: "lava", name: "Màn 4: Núi Dung Nham", seed: 4409, path: "river", arena: true,
+    { id: "lava", name: "Màn 4: Núi Dung Nham", seed: 4409, path: "river", arena: true, shop: "castle",
       intro: "Sammy nói đúng: Phong Cận bị treo trong lồng sắt ở Núi Dung Nham! Cẩn thận đá nóng, đánh bại <b>Quỷ Dung Nham</b> và cứu anh Phong nhé.",
       end: "Quỷ Dung Nham đã bị đánh bại và Phong Cận đã được cứu! Cả nhóm SKSP đã đoàn tụ. Sắp tới: Lâu Đài Phù Thủy Hắc Ám!",
       handoff: "handoffCastle",
@@ -3184,6 +3184,8 @@
       ["simmy", ["Hoan hô! Sammy được cứu rồi!", "Giờ tới Núi Dung Nham cứu Phong!"]],
       ["simmy", ["Núi lửa nóng lắm!", "Em đi thay", "đồ núi lửa nhé!"]],
     ],
+    afterLava: [["simmy", ["Cả nhóm đã đoàn tụ rồi!", "Hai em chọn áo choàng phép thuật,", "mình cùng tới lâu đài nhé!"]]],
+    afterLavaSolo: [["simmy", ["Cả nhóm đã đoàn tụ rồi!", "Em chọn áo choàng phép thuật,", "mình cùng tới lâu đài nhé!"]]],
     // on the ship: the sailor clothes (the boarding film), why they fish, why they cook, the island in sight and the pirate clothes for it
     // (together "Hai em", alone "Em"); then the island's first line
     boardChange: [["simmy", ["Lên tàu thì phải mặc", "đồ thủy thủ! Thay đồ nào!"]]],
@@ -9992,10 +9994,10 @@
   // button (or anything else unknown) starts at Màn 1
   const pickerAlly = (k) => !NET.role || (ALLY_LETTER[k] % 2 === 0) === (NET.role === "host");
   // ("Màn 3: Núi Tuyết" starts at its snow shop and "Màn 4: Núi Dung Nham" at its lava shop (START_SHOP: in the arena of the map before),
-  // then the runway, the photo and the map; "Màn 5: Lâu Đài" starts straight on that map. Each with what the maps before it gave: their
+  // then the runway, the photo and the map; "Màn 5: Lâu Đài" likewise starts at the castle shop. Each with what the maps before it gave: their
   // friends and letters, her level; Màn 5 LATER_STARS a map, a shop start its theme's stars. START_LV: the map whose story the home screen tells)
   const STARTS = { man1: "selMan1", man2: "selMan2", man3: "selMan3", man4: "selMan4", man5: "selMan5" }, START_LV = { man3: levelIdx("snow"), man4: levelIdx("lava"), man5: levelIdx("castle") }, LATER_STARS = 100;
-  const START_SHOP = { man2: 0, man3: LEVELS.findIndex((l) => l.shop === "snow"), man4: LEVELS.findIndex((l) => l.shop === "lava") };
+  const START_SHOP = { man2: 0, man3: LEVELS.findIndex((l) => l.shop === "snow"), man4: LEVELS.findIndex((l) => l.shop === "lava"), man5: LEVELS.findIndex((l) => l.shop === "castle") };
   let startAt = "man1";
   function readStart() {
     startAt = "man1";
@@ -10015,21 +10017,21 @@
   // pirate1..10 as drawn (tools/g4_outfits_local.py OUTFITS): 4 mermaid, 5 explorer (map, compass), 6 sea princess, 7 candy, 8 crowned captain, 9 snowy captain, 10 rainbow
   const OUTFIT_NAMES = ["Thủy thủ", "Cướp biển", "Thuyền trưởng", "Tiên cá", "Nhà thám hiểm", "Công chúa biển", "Cướp biển kẹo ngọt", "Thuyền trưởng hoàng gia", "Thuyền trưởng băng giá", "Cướp biển cầu vồng"];
   const SNOW_NAMES = ["Áo phao", "Công chúa tuyết", "Trượt tuyết", "Gấu Bắc Cực", "Chim cánh cụt", "Tuần lộc", "Người tuyết", "Trượt băng", "Nhà leo núi", "Áo len mùa đông", "Nữ Hoàng Băng Giá", "Công Chúa Mùa Đông"];
-  const SNOW_PRICES = [20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 130, 120];
   // the lava shop (start of Màn 4, Núi Dung Nham): ten fire / volcano outfits per sister (tools/g4_outfits_local.py OUTFITS lava*, LAVA_NAMES):
-  // [Mochi's name, Matcha's name]; 20, 30 … 110 stars like the pirate ones
+  // [Mochi's name, Matcha's name]; every purchasable outfit costs 10 stars.
   const LAVA_NAMES = [["Rồng Lửa Con", "Rồng Lửa"], ["Phượng Hoàng"], ["Tiên Lửa"], ["Núi Lửa Dễ Thương"], ["Lính Cứu Hoả"], ["Kỵ Sĩ Lửa"], ["Công Chúa Hồng Ngọc"],
     ["Pháp Sư Lửa Nhí", "Pháp Sư Lửa"], ["Cáo Lửa"], ["Nhà Thám Hiểm Núi Lửa"]];
+  const CASTLE_NAMES = ["Phù thủy Trăng Sao", "Phù thủy Rừng Phép", "Phù thủy Pha Lê", "Phù thủy Phượng Hoàng", "Phù thủy Rồng Nhỏ"];
   const OUTFITS4 = [
-    // ten pirate outfits per sister (Dad: at least 10 each), dearer and dearer: 20, 30 … 110 stars
-    ...OUTFIT_NAMES.flatMap((name, i) => ["g", "s"].map((char) => ({ id: `${char}.pirate${i + 1}`, char, theme: "pirate", name, price: 20 + 10 * i }))),
+    // All map wardrobes use the same affordable 10-star price.
+    ...OUTFIT_NAMES.flatMap((name, i) => ["g", "s"].map((char) => ({ id: `${char}.pirate${i + 1}`, char, theme: "pirate", name, price: 10 }))),
     { id: "simmy.pirate", char: "simmy", theme: "pirate", name: "Mèo Simmy cướp biển", price: 0 },   // auto: no card, she changes herself
-    // the snow shop (start of Màn 3, Núi Tuyết): twelve warm outfits per sister, as tools/g4_outfits_local.py drew them: snow1..10 20, 30 … 110
-    // stars like the pirate ones, then the folk princess (snow12, Anna-like) 120 and the ice queen (snow11, Elsa-like: her bolts freeze on
-    // Núi Tuyết and her ultimate is a blizzard, see frostOn / blizOf) the dearest, 130. Both girls have both. (Simmy keeps her pirate clothes.)
-    ...SNOW_NAMES.flatMap((name, i) => ["g", "s"].map((char) => ({ id: `${char}.snow${i + 1}`, char, theme: "snow", name, price: SNOW_PRICES[i] }))),
-    // (only the ones packed are on sale: lava6..10 show up by themselves once their art is cut and packed, tools/g4_shop_outfits.py)
-    ...LAVA_NAMES.flatMap((nm, i) => ["g", "s"].map((char, k) => ({ id: `${char}.lava${i + 1}`, char, theme: "lava", name: nm[k] || nm[0], price: 20 + 10 * i }))),
+    // Snow includes Anna and Elsa; Elsa retains her freezing spells.
+    ...SNOW_NAMES.flatMap((name, i) => ["g", "s"].map((char) => ({ id: `${char}.snow${i + 1}`, char, theme: "snow", name, price: 10 }))),
+    // Five inexpensive witch outfits per girl, before the final castle journey.
+    ...CASTLE_NAMES.flatMap((name, i) => ["g", "s"].map((char) => ({ id: `${char}.castle${i + 1}`, char, theme: "castle", name, price: 10 }))),
+    // Only packed lava outfits are on sale; newly accepted art appears after cutting and packing.
+    ...LAVA_NAMES.flatMap((nm, i) => ["g", "s"].map((char, k) => ({ id: `${char}.lava${i + 1}`, char, theme: "lava", name: nm[k] || nm[0], price: 10 }))),
   ];
   // walk: Simmy's lines (together, alone) on the walk from the boss to this shop; stars: what the home screen's start at this shop gives
   // (enough for its dearest outfit); card: the next map's story card when the team arrives there after the photo (the snow shop: the card
@@ -10039,6 +10041,7 @@
     pirate: { line: "Đảo cướp biển! Cả đội phải mặc đồ cướp biển nhé!", bg: ["#0f7a8c", "#1a4770", "#0e1230"], floor: ["#e7be80", "#9c6c32"], walk: ["afterCandyBoss", "afterCandyBossSolo"], stars: 120 },
     snow: { line: "Núi Tuyết lạnh lắm! Cả đội mặc đồ ấm nhé!", bg: ["#8cc8ec", "#3f6fa6", "#14223f"], floor: ["#eef6fc", "#9fbfdc"], walk: ["afterCaptain", "afterCaptainSolo"], stars: 140, card: true, snow: true },
     lava: { line: "Núi Dung Nham nóng lắm! Cả đội mặc đồ núi lửa nhé!", bg: ["#ffae5a", "#b8401c", "#2a0d08"], floor: ["#5a4640", "#2a1c18"], walk: ["afterYeti", "afterYetiSolo"], stars: 120, card: true, embers: true },
+    castle: { line: "Sắp tới Lâu Đài! Cả đội chọn áo choàng phép thuật nhé!", bg: ["#ad8cdb", "#57438c", "#201735"], floor: ["#9e90b6", "#514568"], walk: ["afterLava", "afterLavaSolo"], stars: 75, card: true },
   };
   const shopTheme = (k) => SHOP_THEMES[k] || SHOP_THEMES.pirate;
   const SIMMY = { outfit: "base" };   // what Simmy wears; the ally Task 8 adds draws herself with this
