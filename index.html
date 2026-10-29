@@ -405,7 +405,7 @@
   let META = null, ready = false;
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261029.1104", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261029.1549", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -1763,8 +1763,8 @@
     // from the wand tip, unless the target is behind her (then from her body, as the wand points the other way)
     const fa = [Math.PI / 2, Math.PI / 4, 0, -Math.PI / 4, -Math.PI / 2][clamp(P.face, 0, 4)], fxv = Math.cos(fa) * (P.flip ? -1 : 1), fyv = Math.sin(fa);
     const ahead = Math.cos(a0) * fxv + Math.sin(a0) * fyv > 0.2;
-    const castShown = isCastPose(P.fn);
-    const [wx, wy] = ahead && castShown ? wandTip(hero, P.face, P.flip, P.fn) : [Math.cos(a0) * 46, Math.sin(a0) * 30];
+    const shotPose = P.fireFn || P.fn, castShown = isCastPose(shotPose);
+    const [wx, wy] = ahead && castShown ? wandTip(hero, P.face, P.flip, shotPose) : [Math.cos(a0) * 46, Math.sin(a0) * 30];
     const x = P.x + wx, y = P.y + wy, dist = Math.hypot(tx - x, ty - y);
     // aimed from where it starts: the wand tip is up to 200 off her feet, and a bolt aimed from her feet flies past on a parallel line
     const a = Math.atan2(ty - y, tx - x) + (slot ? slot * fanStep(dist, S.r + (t === G.boss ? 120 : t.r), slots) : 0);
@@ -8148,7 +8148,9 @@
     if (o.ult) return pick("ult");
     if (o.winT) return pick("cheer");
     if (o.dead) return pick("faint");
-    const face = o.face | 0, side = face >= 1 && face <= 3, cast = o.castT > 0, mv = !!o.moving, dist = o.dist || 0;
+    // Repeated cast silhouettes have no stepping legs. Preserve the walk cycle
+    // while firing on the move; standing still keeps the raised-wand pose.
+    const face = o.face | 0, side = face >= 1 && face <= 3, cast = o.castT > 0 && (!o.moving || o.aim), mv = !!o.moving, dist = o.dist || 0;
     if (side) {
       const step = mv ? SIDE_STEPS[Math.floor(dist / SIDE_CYCLE * 4) % 4] : 1;   // standing: the feet-together frame
       return pick((cast ? (o.flip ? "cl" : "cr") : o.flip ? "wl" : "wr") + step);
@@ -8564,7 +8566,9 @@
   }
   function drawHero() {
     if (G.mode === "title") return;
-    const fn = P.fn = heroFrame4({ char: hero, outfit: P.outfit, face: P.face, flip: P.flip, moving: P.moving, dist: P.dist, castT: P.castT, dead: P.dead, winT: P.winT, ult: !!G.ult });
+    const poseState = { char: hero, outfit: P.outfit, face: P.face, flip: P.flip, moving: P.moving, dist: P.dist, castT: P.castT, dead: P.dead, winT: P.winT, ult: !!G.ult };
+    P.fireFn = heroFrame4({ ...poseState, aim: true }); // Keep projectile origins independent of the walking picture.
+    const fn = P.fn = heroFrame4(poseState);
     const blink = P.inv > 0 && !P.dead && !G.ult && !G.rescue && Math.floor(G.t * 16) % 2 === 0;   // (no blinking in a rescue film: nothing can hurt her then)
     const aura = P.elem && !G.ult && !P.dead;
     if (aura) drawAura(P.elem, P.x, P.y, P.elemT, 1);
