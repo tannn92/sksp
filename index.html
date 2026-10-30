@@ -66,7 +66,7 @@
   .sksp span { opacity: .28; filter: grayscale(1); transition: opacity .3s, color .3s; color: var(--cream); letter-spacing: .08em; }
   .sksp span.on { opacity: 1; filter: none; color: var(--gold); text-shadow: 0 0 10px rgba(246,196,83,.9); animation: letterPop .7s ease-out; }
   @keyframes letterPop { 0% { transform: scale(2.4); } 55% { transform: scale(.9); } 100% { transform: scale(1); } }
-  #skipFilm { position: fixed; right: calc(env(safe-area-inset-right, 0px) + 2.4 * var(--u)); bottom: calc(env(safe-area-inset-bottom, 0px) + 2.4 * var(--u)); z-index: 6; border: 0; border-radius: 999px; padding: .5em 1.1em; font: 800 calc(2.2 * var(--u)) var(--display); color: var(--cream); background: rgba(18,14,38,.6); box-shadow: inset 0 0 0 1px rgba(255,255,255,.25); }
+  #skipFilm { position: fixed; left: 50%; transform: translateX(-50%); min-width: 130px; min-height: 48px; touch-action: manipulation; bottom: calc(env(safe-area-inset-bottom, 0px) + 2.4 * var(--u)); z-index: 6; border: 0; border-radius: 999px; padding: .5em 1.1em; font: 800 calc(2.2 * var(--u)) var(--display); color: var(--cream); background: rgba(18,14,38,.6); box-shadow: inset 0 0 0 1px rgba(255,255,255,.25); }
   .lvl { font-family: var(--display); font-weight: 800; font-size: .8em; color: var(--cream); text-shadow: 0 2px 6px rgba(0,0,0,.7); padding-top: .4em; text-align: center; }
   .right { display: flex; gap: .5em; pointer-events: auto; }
   .iconbtn { width: 2.1em; height: 2.1em; border-radius: 50%; border: 0; background: rgba(18,14,38,.6); color: var(--cream); font-size: 1em; box-shadow: inset 0 0 0 1px rgba(255,255,255,.14); display: grid; place-items: center; padding: 0; touch-action: manipulation; }
@@ -271,8 +271,8 @@
 </div>
 
 <div id="banner"></div>
-<button id="skipFilm" hidden>Bỏ qua ⏭</button>
-<div id="storyCard" hidden role="dialog" aria-live="polite" aria-label="Câu chuyện màn mới"><div class="sbox"><div id="storyTitle"></div><p id="storyText"></p><button class="btn" id="storyGo">Đi thôi!</button><div class="sbar"><div id="storyBar"></div></div></div></div>
+<button id="skipFilm" hidden aria-label="Đọc đoạn tiếp theo">Tiếp ▸</button>
+<div id="storyCard" hidden role="dialog" aria-live="polite" aria-label="Câu chuyện màn mới"><div class="sbox"><div id="storyTitle"></div><p id="storyText"></p><button class="btn" id="storyGo">Tiếp ▸</button><div class="sbar" hidden><div id="storyBar"></div></div></div></div>
 <div id="quiz" hidden><div><div id="quizQ"></div><div id="quizH">Chạy tới ô có đáp án đúng!</div></div><div id="quizRing"><span id="quizS"></span></div></div>
 
 <div class="screen" id="titleScreen">
@@ -405,7 +405,7 @@
   let META = null, ready = false;
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261030.1043", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261030.2010", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -3246,6 +3246,47 @@
     }
     return null;
   }
+  // Reading belongs to the player. Each timeline stops inside its current line;
+  // acknowledging it releases only that window, preserving intervening animation.
+  let dialoguePending = null, dialogueTapAt = -Infinity;
+  const dialogueManual = () => !API.autopilot && !API.autoDialogue;
+  function dialogueWindows(seq, offset = 0, mul) {
+    let t = offset;
+    return seq.map(l => { const a = t; t += lineTime(l[1].join(" "), mul); return [a, t]; });
+  }
+  function dialogueClock(o, dt, windows, kind) {
+    if (!dialogueManual()) return o.t + dt;
+    if (o.readKind !== kind) { o.readKind = kind; delete o.readLine; delete o.readTo; }
+    const shared = kind !== "finale" && NET.role === "guest" && NET.pp && NET.pp.w && NET.pp.w.dl;
+    if (shared && shared[0] === G.level + ":" + kind && shared[1] >= 0 && shared[1] < windows.length && (o.readLine === undefined || shared[1] > o.readLine)) {
+      o.readLine = shared[1]; o.readTo = windows[shared[1]][1];
+    }
+    let t = o.t + dt;
+    if (o.readTo !== undefined) { t = Math.max(t, o.readTo); delete o.readTo; }
+    for (let i = 0; i < windows.length; i++) {
+      const [a, b] = windows[i], readyAt = a + Math.min(.25, (b - a) / 3), stop = b - Math.min(.3, (b - a) / 3);
+      if (o.t < b && t >= readyAt) {
+        // A released line stays released while its clock crosses the boundary.
+        if (o.readLine !== undefined && i <= o.readLine) continue;
+        t = Math.min(t, stop);
+        dialoguePending = { o, i, end: b, kind: G.level + ":" + kind, key: G.level + ":" + kind + ":" + i };
+        break;
+      }
+    }
+    return t;
+  }
+  function nextDialogue(key, remote = false) {
+    const d = dialoguePending, now = performance.now();
+    if (!d || (key && key !== d.key) || (!remote && now - dialogueTapAt < 400)) return;
+    if (!remote) dialogueTapAt = now;
+    const localFinale = d.o === FIN;
+    if (localFinale && remote) return;
+    if (NET.role === "guest" && !remote && !localFinale) { netEmit("dialogue", { key: d.key }); return; }
+    d.o.readLine = d.i; d.o.readTo = d.end;
+    if (!localFinale) G.dialogueRead = [d.kind, d.i];
+    dialoguePending = null; $("skipFilm").hidden = true;
+    if (NET.role === "host" && !localFinale) netEmit("dialogue", { key: d.key });
+  }
   // where a girl's bubble goes: the girl by that name (this page's or the partner's); when she is not playing, the girl who is
   function girlSpot(name) {
     const hk = name === "mochi" ? "g" : "s";
@@ -3264,7 +3305,7 @@
     P.vx = P.vy = 0;
   }
   function updateRescue(dt) {
-    const r = G.rescue, D = PETS[r.kind], t0 = r.t; r.t += dt;
+    const r = G.rescue, D = PETS[r.kind], t0 = r.t; r.t = dialogueClock(r, dt, dialogueWindows(r.seq || rsSeq(r.kind), RS_THANK, r.mul), "rescue:" + r.kind);
     const at = (x) => t0 < x && r.t >= x;
     P.inv = Math.max(P.inv, 1.5); P.moving = false; P.vx = P.vy = 0;
     if (at(0.25)) {
@@ -4458,7 +4499,7 @@
   function updateBossCut(dt) {
     const c = G.bcut, B = G.boss; if (!c) return;
     if (!B) { G.bcut = null; return; }
-    const t0 = c.t; c.t += bossTalkOn(c) ? dt / talkMul() : dt;   // (his film waits while he speaks, for Mochi)
+    const t0 = c.t; c.t = dialogueClock(c, bossTalkOn(c) ? dt / talkMul() : dt, c.ph === "intro" ? [[BI_SAY, BI_END - .3]] : [[BD_SAY, BD_FALL]], "boss:" + c.ph);   // (his film waits while he speaks, for Mochi)
     const at = (x) => t0 < x && c.t >= x;
     P.inv = Math.max(P.inv, 1.5); P.moving = false; P.vx = P.vy = 0;
     if (c.ph === "intro") {
@@ -4610,9 +4651,14 @@
     }
     $("bfill").style.width = (100 * k) + "%"; $("bossbar").classList.toggle("p2", B.phase >= 2);
   }
+  function bossSceneClock(B, dt) {
+    if (B.alive && B.st === "morph" && G.lvl.boss.morph) return dialogueClock(B, dt, [[.15, mT(B) - .1]], "morph:" + (B.fs || 0));
+    if (B.alive && B.fs && B.st === "fly") return dialogueClock(B, dt, [[.2, FB.DESC - .3]], "descent");
+    return B.t + dt;
+  }
   function updateBoss(dt) {
     const B = G.boss; if (!B) return;
-    B.t += dt; B.flash -= dt; B.hurtPose -= dt; B.iT -= dt; B.morphFlash = (B.morphFlash || 0) - dt;
+    B.t = bossSceneClock(B, dt); B.flash -= dt; B.hurtPose -= dt; B.iT -= dt; B.morphFlash = (B.morphFlash || 0) - dt;
     if (!B.alive) { B.die += dt; if (!G.bcut && B.die > BD_END && G.mode === "play" && !G.won && !G.portal && !handOn()) endLevel(); return; }   // (after the hand-off talk)
     // (fast: his second form's bigger moves; k: how much faster than before his moves come)
     const T = targetFor(B.x, B.y), dx = T.x - B.x, dy = T.y - B.y, d = Math.hypot(dx, dy) || 1, fast = B.phase === 2, k = bossTempo(B), A = G.arena;
@@ -4665,7 +4711,7 @@
   // (the final battle's two changes are longer films: FB.M2 / FB.M3, the painting swapped at FB.M2S / FB.M3S)
   const mT = (B) => (B && B.fs === 3 ? FB.M2 : B && B.fs === 4 ? FB.M3 : MORPH_T), mSwap = (B) => (B && B.fs === 3 ? FB.M2S : B && B.fs === 4 ? FB.M3S : MORPH_SWAP);
   function startMorph(B) {
-    B.st = "morph"; B.t = 0; B.vx = B.vy = 0; B.hurtPose = 0; B.move = null; B.mfx = {};
+    B.st = "morph"; B.t = 0; B.vx = B.vy = 0; B.hurtPose = 0; B.move = null; B.mfx = {}; B.mfxClock = 0;
     // nothing of his first form can hurt any more: its warnings and shots go (the film's flash covers it)
     G.quakes = G.quakes.filter((q) => q.done); G.foes = []; G.waters = []; G.lavas = []; clearCps(); G.hexes = [];
     G.shake = Math.min(Math.max(G.shake, 8), 10);
@@ -4679,6 +4725,7 @@
   }
   // the film's look and sound (both pages): rumbling (at most 10 px), roars, magic gathering, a flash and rings bursting as he changes
   function morphFx(B, t0, t1) {
+    t0 = Math.min(t0, B.mfxClock === undefined ? t0 : B.mfxClock); B.mfxClock = t1;
     // (each moment once per film: a guest page's clock is set from the host's now and then and may step back a little)
     const fired = B.mfx || (B.mfx = {}), at = (x) => t1 >= x && t0 < x + 0.3 && !fired[x] && (fired[x] = true), cols = bossLook().cols;
     const rgb = bossLook().rgb;
@@ -7411,7 +7458,7 @@
   // A short victory film over the castle: the whole team walks in and cheers together on the screen (Mèo Simmy and Sammy Đào on the left,
   // the girls who played in the middle (both together, else the one alone in the very middle: Dad saw Matcha in Mochi's solo film) with
   // their pets in front, Kairon and Phong Cận on the right), fireworks and confetti (code), a big "CHIẾN THẮNG!" and the thank-you line
-  // (the level's `end`, naming the girls who played). After FIN_END s (or a tap once FIN_SKIP s have gone) the end screen: "Hết", the
+  // (the level's `end`, naming the girls who played). Next acknowledges the thank-you before the end screen: "Hết", the
   // thank-you and a button back to the title. Each co-op page plays it for itself (the host's world says `won`).
   // Everyone walks in facing the way they walk (the left half from the left, facing right; the right half from the right, facing left;
   // never moonwalking), then turns to the camera to cheer; the pets (painted facing right only, so mirrored for left as in the world: no
@@ -7431,7 +7478,7 @@
   function startFinale() {
     if (G.mode === "finale" || (G.won && G.mode === "win")) return;
     G.won = true; P.winT = 99; P.vx = P.vy = 0; IN.ultPressed = false; G.ult = null;
-    G.mode = "finale"; FIN.t = 0; FIN.fw = []; FIN.cf = []; FIN.nextFw = 0.5;
+    G.mode = "finale"; delete FIN.readLine; delete FIN.readTo; FIN.t = 0; FIN.fw = []; FIN.cf = []; FIN.nextFw = 0.5;
     closeStory(); for (const id of ["controls", "bossbar", "quiz", "pauseScreen", "hud"]) $(id).hidden = true;
     for (let i = 0; i < 70; i++) FIN.cf.push(confetto(true));
     SFX.win();
@@ -7440,7 +7487,7 @@
     return { x: Math.random(), y: any ? -Math.random() * 1.2 : -0.05 - Math.random() * 0.1, vy: rnd(0.12, 0.22), vx: rnd(-0.03, 0.03), rot: rnd(0, 6), vr: rnd(-6, 6), w: rnd(0.006, 0.011), col: ["#ffd34d", "#ff9ad5", "#b9a4ff", "#7cf2c6", "#ff8a3d", "#9fe3ff", "#ffffff"][Math.floor(Math.random() * 7)] };
   }
   function finaleTick(dt) {
-    FIN.t += dt; G.t += dt; G.frame++; updateParts(dt);
+    FIN.t = dialogueClock(FIN, dt, [[FIN_LINE, FIN_END - .2]], "finale"); G.t += dt; G.frame++; updateParts(dt);
     if (FIN.t >= FIN.nextFw && FIN.t < FIN_END - 1) {
       // a rocket goes up from below and bursts in the sky (x, y: shares of the screen)
       FIN.fw.push({ x: rnd(0.12, 0.88), y: rnd(0.1, 0.42), t: 0, up: rnd(0.45, 0.65), col: FW_COLS[Math.floor(Math.random() * FW_COLS.length)], n: 26 + Math.floor(Math.random() * 12), a0: Math.random() * TAU, sp: rnd(0.16, 0.24) });
@@ -7544,7 +7591,7 @@
     $("winScreen").hidden = false; $("controls").hidden = true; $("bossbar").hidden = true; $("hud").hidden = true;
   }
   $("endHomeBtn").addEventListener("click", () => { $("winScreen").hidden = true; $("endHomeBtn").hidden = true; toTitle(); });
-  cv.addEventListener("pointerdown", () => { if (G.mode === "finale" && FIN.t > FIN_SKIP) showEnd(); });
+  cv.addEventListener("pointerdown", () => { if (!dialogueManual() && G.mode === "finale" && FIN.t > FIN_SKIP) showEnd(); });
 
   // ---------------------------------------------------------------- ultimate
   const ULT_PACE = 0.62;   // the ultimate's show runs slower than real time so it can be enjoyed
@@ -7844,7 +7891,7 @@
   function play(n) { const t = performance.now(); if (t - (sfxT[n] || 0) < (n === "zap" ? 110 : 55)) return; sfxT[n] = t; SFX[n] && SFX[n](); }
   function update(dt) {
     G.t += dt; G.frame++;
-    if (G.say && ((G.say.t += dt) > seqTime(G.say.seq) + 0.5 || G.cine || G.rescue || G.bcut)) G.say = null;   // (a film takes over the screen: its own lines)
+    if (G.say && ((G.say.t = dialogueClock(G.say, dt, dialogueWindows(G.say.seq), "say:" + G.say.seq[0][1].join(" "))) > seqTime(G.say.seq) + 0.5 || G.cine || G.rescue || G.bcut)) G.say = null;   // (a film takes over the screen: its own lines)
     if (G.fadeDir) {
       G.fade = clamp(G.fade + G.fadeDir * dt / 0.45, 0, 1);
       if (G.fadeDir > 0 && G.fade >= 1) { const f = G.onFade; G.onFade = null; G.fadeDir = -1; f && f(); }
@@ -7990,9 +8037,9 @@
   }
   function fadeTo(fn) { G.onFade = fn; G.fadeDir = 1; }
   // ---- arriving in a new map through the magic gate: a short story card tells its goal (the level's intro: the title screen's words, its
-  // markup stripped, set as plain text). It closes after STORY_T s or at a tap / Enter / Space; meanwhile the world waits, on both co-op
+  // markup stripped, set as plain text). Next closes it; automated tests use STORY_T. The world waits on both co-op
   // pages while either still shows it (the guest's girl says so in her presence, bit 128; the host's world in w.sc), at most STORY_WAIT s
-  // for the other page (a link that died). A level without an intro just gets its name in the banner.
+  // in automated tests; real play uses the network disconnect handling. A level without an intro gets its name in the banner.
   const STORY_T = 4, STORY_WAIT = 8;
   const storyPlain = (h) => String(h || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
   function arrive(i) {
@@ -8003,19 +8050,19 @@
     $("storyBar").style.width = "100%"; $("storyCard").hidden = false;
   }
   function closeStory() { if (!G.story) return; G.story = null; $("storyCard").hidden = true; }
-  $("storyCard").addEventListener("click", closeStory);
+
   $("storyGo").addEventListener("click", closeStory);
   // true while the world waits for a story card (this page's, or the partner's)
   function storyHold(dt) {
     if (G.story) {
       G.story.t += dt; $("storyBar").style.width = (100 * clamp(1 - G.story.t / STORY_T, 0, 1)).toFixed(1) + "%";
-      if (G.story.t < STORY_T) return true;
+      if (dialogueManual() || G.story.t < STORY_T) return true;
       closeStory();
     }
     const w = NET.pp && NET.pp.w;
     const other = (NET.role === "host" && Q && Q.story) || (NET.role === "guest" && w && w.sc === 1 && num(w.lv) === G.level);
     G.storyWait = other ? (G.storyWait || 0) + dt : 0;
-    return !!other && G.storyWait < STORY_WAIT;
+    return !!other && (dialogueManual() || G.storyWait < STORY_WAIT);
   }
 
 
@@ -9932,6 +9979,7 @@
   // until the island. The parked ship's old "ship" shortcut is not taken any more: such a start (an old saved choice, an old host page)
   // is Màn 1)
   function startGame(i, at) {
+    G.dialogueRead = null; dialoguePending = null;
     i = clamp(Math.floor(i) || 0, 0, LEVELS.length - 1);
     if (at !== "shop" || !LEVELS[i].shop) at = null;
     // (lvl: the level G.level shows; i: how far along she is, for the head start. A start at a shop (at "shop") stands in the arena of
@@ -10453,9 +10501,9 @@
   }
   function travelTick(dt) {
     if (NET.role) netFrame(dt);
-    if (NET.role === "guest") { syncTravel(); return; }
+    if (NET.role === "guest") { syncTravel(); if (G.travel) dialogueClock(G.travel, 0, [[0,3],[3,6],[6,9],[9,12],[12,15],[15,18]], "travel:" + G.travel.id); return; }
     const tr = G.travel; if (!tr) return;
-    tr.t += dt;
+    tr.t = dialogueClock(tr, dt, [[0,3],[3,6],[6,9],[9,12],[12,15],[15,18]], "travel:" + tr.id);
     if (tr.t >= TRAVEL_END || API.autopilot) finishTravel(tr.to);
   }
   function skipTravel() {
@@ -12707,7 +12755,7 @@
     const c = G.cine;
     if (NET.role === "guest") { applySnapshot(); syncShop(); if (G.cine !== c) return; if (c.hold && hostOnShip()) { startShip(); return; } }   // (the host on the ship: her held film goes there too)
     else if (c.hold) { walkToShop(); return; }   // (a guest whose partner left while she waited)
-    if (!c.hold) c.t = Math.min(c.end, c.t + dt);
+    if (!c.hold) c.t = Math.min(c.end, dialogueClock(c, dt, dialogueWindows(c.W || SAYS.afterCandyBoss, 0, c.mul), "walkin"));
     const t = c.t, S = c.talk;
     G.ult = null;   // (no blinking: nothing can hurt her while the world waits)
     // (while they talk she stands where she is, by Simmy; then the walk)
@@ -12748,7 +12796,7 @@
     const hy = hudMidY(8), top = Math.max(cy - hh + h + 34 + 150 * WT / zm, hy === null ? -Infinity : hy + h + 34);
     return [clamp(x, cx - hw + w / 2 + 24 / zm, cx + hw - w / 2 - 24 / zm), clamp(y, top, Math.max(top, cy + hh - 24 / zm))];
   }
-  // the end of the film (or a tap on skip): the host / a solo girl opens the shop; a guest waits for the host's shop (syncShop opens hers)
+  // the end of the film: the host / a solo girl opens the shop; a guest waits for the host's shop (syncShop opens hers)
   function endWalkIn() {
     const c = G.cine; if (!c || c.ph !== "walkin") return;
     P.vx = P.vy = 0; P.moving = false;
@@ -12775,7 +12823,7 @@
 
   // ---------------------------------------------------------------- the opening film (Màn 1)
   // A camping trip goes wrong: the witch owns the meadow and scatters the campers.
-  // It is a stage of its own (drawn straight to the canvas like the runway), paced for reading and skippable; the world waits and the game starts where it ends.
+  // It is a stage of its own (drawn straight to the canvas like the runway), paced by the Next button; the world waits and the game starts where it ends.
   // G.cine = { ph: "opening", t, lock: true }; null when there is no film.
   const OP_CONTEXT = 12, OP_END = 17.0, OP_FEET = 0.72;
   const OP_INTRO = [
@@ -12788,7 +12836,7 @@
     ["simmy", 0.9, 3.5, ["Lều dựng xong rồi!", "Chờ hai bé về là ăn nhé!"]],
     ["kairon", 3.5, 6.0, ["Bật nhạc lên nào!", "Anh chuẩn bị bữa tối!"], "sammy"],
     ["witch", 6.9, 9.4, ["Ai cho các ngươi dựng trại", "trong vườn của ta?"]],
-    ["sammy", 9.5, 10.9, ["Bọn cháu xin lỗi!", "Bọn cháu thu dọn ngay!"], "simmy"],
+    ["sammy", 9.5, 10.4, ["Bọn cháu xin lỗi!", "Bọn cháu thu dọn ngay!"], "simmy"],
     ["phong", 10.4, 11.9, ["Cẩn thận! Cổng phép!", "Nắm tay nhau!"], "simmy"],
     ["witch", 11.9, 12.6, ["Ta sẽ nhốt các ngươi lại!"]],
     ["simmy", 12.6, 13.8, ["Bọn chị bị bắt rồi!", "Cứu với!"]],
@@ -12845,7 +12893,7 @@
     }
   }
   // (on the ship: the host / a solo girl skips the dock and the boarding film together; a guest skips to the end of the film and waits there)
-  function skipCine() { if (G.travel) return skipTravel(); if (onShip()) { if (G.mode === "ship" && (SHIP.ph === "dock" || SHIP.ph === "board")) { if (NET.role === "guest") SHIP.t = Math.max(SHIP.t, SHIP.ph === "dock" ? dockEnd() : boardT().end); else shipPhase("fish"); } return; } if (G.cine) { if (G.cine.ph === "walkin") endWalkIn(); else endCine(true); } }
+  function skipCine() { if (dialogueManual()) return nextDialogue(); if (G.travel) return skipTravel(); if (onShip()) { if (G.mode === "ship" && (SHIP.ph === "dock" || SHIP.ph === "board")) { if (NET.role === "guest") SHIP.t = Math.max(SHIP.t, SHIP.ph === "dock" ? dockEnd() : boardT().end); else shipPhase("fish"); } return; } if (G.cine) { if (G.cine.ph === "walkin") endWalkIn(); else endCine(true); } }
   $("skipFilm").addEventListener("click", skipCine);
   function updateCine(dt) {
     if (G.cine.ph === "walkin") return updateWalkIn(dt);
@@ -12853,7 +12901,7 @@
     // Four-line cards get 10 s (Matcha) / 20 s (Mochi); spoken bubbles get
     // twice their former reading time. Animation and sound share this clock.
     const reading = c.t < OP_CONTEXT ? 2.5 : opTalking(c.t) ? 2 : 0;
-    c.t += reading ? dt / (reading * talkMul()) : dt;
+    c.t = dialogueClock(c, reading ? dt / (reading * talkMul()) : dt, [[0,4],[4,8],[8,12], ...OP_SAY.map(l => [OP_CONTEXT + l[1], OP_CONTEXT + l[2]])], "opening");
     const at = (x) => t0 < x + OP_CONTEXT && c.t >= x + OP_CONTEXT;
     P.inv = Math.max(P.inv, 1.5); P.vx = P.vy = 0; P.moving = false;
     if (API.autopilot) return endCine();
@@ -13035,7 +13083,7 @@
       }
       renderCoop();
     }, () => { if (NET.state === "ok") { NET.state = "none"; NET.room = null; renderCoop(); } });
-    for (const t of ["start", "hits", "ult", "shoo", "portal", "hurt", "pick", "gain", "shots", "xp", "pet", "combo", "outfit", "shop", "ship", "ally", "travel"]) room.on(t, onNet, () => {});
+    for (const t of ["start", "hits", "ult", "shoo", "portal", "hurt", "pick", "gain", "shots", "xp", "pet", "combo", "outfit", "shop", "ship", "ally", "travel", "dialogue"]) room.on(t, onNet, () => {});
     renderCoop();
   }
 
@@ -13192,6 +13240,7 @@
       NET.qof = { k, id, t: performance.now() / 1000 }; if (Q && Q.hero === k) { Q.outfit = id; Q.of = hasOutfit(k, id) ? id : "base"; }
       return;
     }
+    if (msg.topic === "dialogue") { nextDialogue(d.key, true); return; }
     if (msg.topic === "travel") { if (NET.role === "host" && G.travel && d.skip === G.travel.id) skipTravel(); return; }
     if (msg.topic === "shop") return onShopMsg(d);
     if (msg.topic === "ally") {   // her page about this page's friends / girl: a hit the host saw, Kairon's aura (a heart, the friends healed / up)
@@ -13294,7 +13343,7 @@
     const sb = (o) => (o.slow > 0 ? 4 : 0) | (o.burn > 0 ? 8 : 0) | (o.poison > 0 ? 16 : 0) | (o.frz > 0 ? 32 : 0) | (o.crust > 0 || o.chill > 0 ? 4096 : 0);   // (4096: the ice queen's frost)
     const bitsOf = (a) => a.map((o) => (o.got || o.open ? 1 : 0)).join("");
     return {
-      lv: G.level,
+      lv: G.level, dl: G.dialogueRead || null,
       m: G.mons.filter((m) => m.alive).map((m) => [m.id, MKINDS.indexOf(m.kind), m.x | 0, m.y | 0, m.face + (m.flip ? 8 : 0), MST.indexOf(m.st), m.hp,
         (m.hurt > 0 ? 1 : 0) | (m.flash > 0 ? 2 : 0) | sb(m) | (m.summoned ? 64 : 0) | (m.elite ? 128 : 0) | (m.sk ? 256 : 0) | (m.guard ? 512 : 0) | (m.champ ? 1024 : 0) | (m.mini ? 2048 : 0), Math.round(m.t * 10), m.max,
         ...(m.fa !== undefined || m.guard || m.champ ? [m.fa !== undefined ? Math.round(m.fa * 100) : null] : []), ...(m.guard || m.champ ? [m.guard ? MKINDS.indexOf(m.skk || m.kind) : null] : []),
@@ -13433,7 +13482,7 @@
       const B = G.boss, st = BST[si] || "walk";
       if (st === "slam" && B.st !== "slam") { SFX.slam(); G.shake = 24; dust(ix, iy, 26); }
       if (st === "enter" && dropY >= 0 && B.dropY < 0) { SFX.slam(); G.shake = 20; }
-      if (st === "morph" && B.st !== "morph") { B.mfx = {}; G.quakes = G.quakes.filter((q) => q.done); G.foes = []; G.waters = []; G.lavas = []; clearCps(); G.hexes = []; }   // (his change begins: as on the host)
+      if (st === "morph" && B.st !== "morph") { B.mfx = {}; B.mfxClock = 0; G.quakes = G.quakes.filter((q) => q.done); G.foes = []; G.waters = []; G.lavas = []; clearCps(); G.hexes = []; }   // (his change begins: as on the host)
       B.phase = ph === 3 ? 3 : ph === 2 ? 2 : 1;
       if (fs && B.fs !== fs) { if (fs === 2 && B.fs === 1) { const BD = G.lvl.boss; showBanner(BD.name + "!", BD.tip || ""); } if (fs === 1 && !B.fs) showBanner(FB_SAY.lts, FB_SAY.ltsTip); }
       B.fs = fs || 0; B.tired = tired / 10;
@@ -13599,7 +13648,7 @@
     G.mons = G.mons.filter((m) => m.alive || m.die < 0.6);
     const B = G.boss;
     if (B) {
-      B.x += (B.tx - B.x) * k; B.y += (B.ty - B.y) * k; B.t += dt; B.flash -= dt; B.morphFlash = (B.morphFlash || 0) - dt; if (!B.alive) B.die += dt;
+      B.x += (B.tx - B.x) * k; B.y += (B.ty - B.y) * k; B.t = bossSceneClock(B, dt); B.flash -= dt; B.morphFlash = (B.morphFlash || 0) - dt; if (!B.alive) B.die += dt;
       if (B.st === "morph" && B.alive) morphFx(B, B.t - dt, B.t);   // (his change into the second form: the host's film, played along)
     }
     for (const d of G.drops) { d.x += (d.tx - d.x) * k; d.y += (d.ty - d.y) * k; d.life -= dt; }
@@ -13687,6 +13736,7 @@
     if (!ready) return;
     atlasSweep(now / 1000);
     try {
+      if (dialogueManual()) { dialoguePending = null; $("skipFilm").hidden = true; }
       if (NET.role === "guest") syncTravel();
       if (G.mode === "play" && !API.hold) update(dt);
       else if (G.mode === "pause") syncShop();
@@ -13709,6 +13759,7 @@
         if (PH.t > PHOTO_AUTO || hostLv > G.level) endPhoto();
       }
       else if (G.mode === "win") { G.t += dt; G.frame++; updateParts(dt); if (Math.random() < 0.3) burst(G.camX + rnd(0, VW), G.camY + rnd(200, VH * 0.6), 12, ["#ffd34d", "#ff9ad5", "#b9a4ff", "#7cf2c6"], 300, 1); }
+      if (dialogueManual()) $("skipFilm").hidden = !dialoguePending || !!G.story || G.mode === "pause";
       render();
       if (music && AC) music.tick();
     } catch (err) { console.error(err); }
@@ -13730,7 +13781,7 @@
     startTravel, travelMembers, travelPhase, syncTravel, TRAVEL_END, TRAVEL_LAYOUT, drawTravel,
     petOutfitPrefix, petPoseFrame, takePhoto, drawPetAt, teamPets,
     G, P, IN, joy, keys, NET, FR, LEVELS, MON, HEROES, PETS, TIERS, startGame, sendStart, buildLevel, toTitle, snowSlow, nextLevelAfter, levelIdx,
-    autopilot: false,
+    autopilot: false, autoDialogue: false, arrive, nextDialogue,
     trial: false,   // the game has its real end now (Màn 5's finale and the end screen); sim.js / coop.js print WIN (tests read this)
     FB, FB_SAY, FB_MOVES, FB_GEO, LTS, fbArtFlip, fbIn, fbHurts, fbDodge, fbTalk, fbLts, fbThrone, fbMove, fbDark, bossOpen: (B) => bossOpen(B || G.boss), bossR: (B) => bossR(B || G.boss), updateBossBar,
     fin: () => ({ t: FIN.t, fw: FIN.fw.length, cf: FIN.cf.length }), FIN_END, FIN_SKIP, showEnd, hexMove, hexDodge, HOVER, HEX: { ORB_R, ORB_V, ORB_V2, ORB_VW, ORB_TURN, TELE_R, CIR_R, RING_R, RING_CR, HEX_LIFT },
