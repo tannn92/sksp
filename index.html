@@ -405,7 +405,7 @@
   let META = null, ready = false;
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261029.1549", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261030.1037", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -997,7 +997,7 @@
   const G = { mode: "title", level: 0, t: 0, lt: 0, frame: 0, stars: 0, hearts: 5, energy: 0, camX: 0, camY: 0, shake: 0, fade: 0, fadeDir: 0, onFade: null,
     mons: [], parts: [], shots: [], pshots: [], foes: [], afx: [], cps: [], blocks: 0, items: [], drops: [], gems: [], rings: [], quakes: [], chests: [], cages: [], deco: [], lamps: [],
     portal: null, arena: null, boss: null, ult: null, cine: null, rescue: null, sksp: ["", "", "", ""], leaps: 0, qzN: 0, nextId: 1, lvl: null, kills: 0, lvKills: 0, spawnAcc: 0, surgeT: 30, arenaLock: false, won: false, path: null };
-  const P = { x: 0, y: 0, vx: 0, vy: 0, z: 0, face: 0, flip: false, moving: false, dist: 0, inv: 0, hurtT: 0, slowT: 0, castT: 0, shootCd: 0, dead: false, winT: 0,
+  const P = { x: 0, y: 0, vx: 0, vy: 0, z: 0, face: 0, flip: false, moving: false, dist: 0, inv: 0, hurtT: 0, slowT: 0, castT: 0, shootCd: 0, dead: false, tiredT: 0, winT: 0,
     elem: null, elemT: 0, lv: 1, xp: 0, prog: 0, pets: [], outfit: "base" };
   // ---- outfits: the outfit worn is kept per sister in localStorage `sksp-outfit-<char>`; one with no frames falls back to "base"
   // (kept in memory as well: with localStorage blocked, e.g. Safari private mode, a paid outfit can still be worn this session)
@@ -1276,7 +1276,7 @@
   }
   function respawnHero() {
     const p = G.path, i = Math.min(3, p.n - 1), [dx, dy] = pathDir(i);
-    Object.assign(P, { x: p.x[i], y: p.y[i], vx: 0, vy: 0, z: 0, moving: false, inv: 0, hurtT: 0, slowT: 0, castT: 0, shootCd: 0.5, dead: false, winT: 0, prog: i });
+    Object.assign(P, { x: p.x[i], y: p.y[i], vx: 0, vy: 0, z: 0, moving: false, inv: 0, hurtT: 0, slowT: 0, castT: 0, shootCd: 0.5, dead: false, tiredT: 0, winT: 0, prog: i });
     setFace(P, dx, dy);
     renderHearts();
   }
@@ -1592,6 +1592,16 @@
   }
   function heroDown(why) {
     if (P.dead) return;
+    // Matcha only rests briefly, standing up; she never enters the faint/rescue state.
+    if (hero === "s") {
+      if (P.tiredT > 0) return;
+      P.tiredT = 1.4; P.inv = Math.max(P.inv, 1.4); P.hurtT = 0;
+      P.vx = P.vy = 0; P.moving = false; G.hearts = 0; renderHearts();
+      const safe = lavaSafeSpot(P.x, P.y) || hzSafeSpot(P.x, P.y);
+      if (safe) { P.x = safe[0]; P.y = safe[1]; }
+      showBanner("Matcha hơi mệt rồi!", "Nghỉ một chút là khỏe lại nhé");
+      return;
+    }
     P.dead = true; G.hearts = 0; renderHearts(); G.reviveT = FAINT_T; TALLY.faint++; P.vx = P.vy = 0; SFX.hurt();
     // (by lava: carried back to the nearest spot with no lava within LP_CLEAR, where she lies and gets up)
     const safe = lavaSafeSpot(P.x, P.y) || hzSafeSpot(P.x, P.y);   // (or a map's hazards: the same, clear of them by HZ.CLEAR)
@@ -1604,7 +1614,7 @@
   // get back up on the spot with full hearts, and shoo the monsters away
   function reviveHero() {
     for (const e of PETE) { if (!isCls(e)) e.faintT = 0; else if (e.faintT > 0 && !escOf(e)) allyRevive(e); }   // (a friend fainted in her escort waits for a girl beside her)
-    P.dead = false; P.hurtT = 0; P.inv = 2.5; G.hearts = 5; renderHearts(); SFX.heal();
+    P.dead = false; P.tiredT = 0; P.hurtT = 0; P.inv = 2.5; G.hearts = 5; renderHearts(); SFX.heal();
     burst(P.x, P.y - 110, 30, ["#fff4c2", "#ffd34d", ...HD().cols], 380, 0.8);
     G.parts.push({ type: "ring", x: P.x, y: P.y - 40, r: 40, vr: 1400, life: 0.6, max: 0.6, col: "255,236,170" });
     if (NET.role === "guest") netEmit("shoo", { x: P.x | 0, y: P.y | 0 }); else shoo(P.x, P.y);
@@ -1622,6 +1632,7 @@
   }
   function updateHero(dt) {
     P.inv -= dt; P.hurtT -= dt; P.slowT -= dt; P.castT -= dt;
+    if (P.tiredT > 0) { P.moving = false; P.vx = P.vy = 0; if ((P.tiredT = Math.max(0, P.tiredT - dt)) === 0) reviveHero(); return; }
     if (P.dead) { P.moving = false; P.helped = rescuing(); if ((G.reviveT -= dt * (P.helped ? 5 : 1)) <= 0) reviveHero(); return; }
     if (G.ult || P.winT) { P.vx = P.vy = 0; P.moving = false; return; }
     const [ax, ay] = readMove(), sp = 360 * Math.min(P.slowT > 0 ? 0.55 : 1, snowSlow()) * gooSlow();   // (a web, the yeti's blizzard; Màn 1's candy goo)
