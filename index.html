@@ -405,7 +405,7 @@
   let META = null, ready = false;
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261030.1037", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261030.1043", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -1591,22 +1591,13 @@
     if (G.hearts <= 0) heroDown();
   }
   function heroDown(why) {
-    if (P.dead) return;
-    // Matcha only rests briefly, standing up; she never enters the faint/rescue state.
-    if (hero === "s") {
-      if (P.tiredT > 0) return;
-      P.tiredT = 1.4; P.inv = Math.max(P.inv, 1.4); P.hurtT = 0;
-      P.vx = P.vy = 0; P.moving = false; G.hearts = 0; renderHearts();
-      const safe = lavaSafeSpot(P.x, P.y) || hzSafeSpot(P.x, P.y);
-      if (safe) { P.x = safe[0]; P.y = safe[1]; }
-      showBanner("Matcha hơi mệt rồi!", "Nghỉ một chút là khỏe lại nhé");
-      return;
-    }
-    P.dead = true; G.hearts = 0; renderHearts(); G.reviveT = FAINT_T; TALLY.faint++; P.vx = P.vy = 0; SFX.hurt();
-    // (by lava: carried back to the nearest spot with no lava within LP_CLEAR, where she lies and gets up)
-    const safe = lavaSafeSpot(P.x, P.y) || hzSafeSpot(P.x, P.y);   // (or a map's hazards: the same, clear of them by HZ.CLEAR)
-    if (safe) { burst(P.x, P.y - 80, 16, ["#fff4c2", "#ffd34d", "#ff9a5c"], 300, 0.5); P.x = safe[0]; P.y = safe[1]; burst(P.x, P.y - 80, 20, ["#fff4c2", "#ffd34d", "#ffffff"], 300, 0.6); }
-    showBanner(why === "lava" ? "Ối, dung nham nóng quá! Bé bị ngất rồi!" : why === "ice" ? "Ối, băng vỡ! Bé rơi xuống nước lạnh, bị ngất rồi!" : "Bé bị ngất rồi!", Q && NET.role ? "Bạn kia lại gần để cứu nhanh nhé" : "Chờ vòng tròn quay hết là bé tỉnh lại");
+    // The girls only rest briefly. Fainting and rescue belong to NPCs.
+    if (P.tiredT > 0) return;
+    P.dead = false; P.tiredT = 1.4; P.inv = Math.max(P.inv, 1.4); P.hurtT = 0;
+    P.vx = P.vy = 0; P.moving = false; G.hearts = 0; renderHearts();
+    const safe = lavaSafeSpot(P.x, P.y) || hzSafeSpot(P.x, P.y);
+    if (safe) { P.x = safe[0]; P.y = safe[1]; }
+    showBanner((hero === "s" ? "Matcha" : "Mochi") + " hơi mệt rồi!", "Nghỉ một chút là khỏe lại nhé");
   }
   // fainting: she lies dizzy for FAINT_T seconds; the partner standing close by revives her five times faster
   const FAINT_T = 10, RESCUE_R = 280;
