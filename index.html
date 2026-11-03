@@ -405,7 +405,7 @@
   let META = null, ready = false;
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261030.2010", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261103.1137", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -449,6 +449,10 @@
         let im;
         if (canBitmap) { const r = await fetch(S.url); if (!r.ok) throw new Error(r.status + " " + S.url); im = await createImageBitmap(await r.blob()); }
         else im = await loadImg(S.url);
+        if (S.gomRects) {
+          const width=im.naturalWidth || (canBitmap ? im.width : 0), height=im.naturalHeight || (canBitmap ? im.height : 0);
+          if (width && height && S.gomRects.some(f=>f[1]+f[3]>width || f[2]+f[4]>height)) { if(im.close)im.close(); throw Error("Gôm: hình vượt khung"); }
+        }
         S.img = im; S.w = im.width; S.h = im.height; S.used = AT.t;
       } catch (e) { S.fail = AT.t; if (S.need) throw e; }
       finally { S.p = null; }
@@ -476,7 +480,7 @@
   const ATLAS_MB = 220;   // over this many MB decoded, a sheet outside the pinned groups is freed 2 s after its last draw
   function atlasPins() {
     const p = new Set(["common", hero + ".base"]);
-    if (G.mode === "title") { p.add("g.base"); p.add("s.base"); }
+    if (G.mode === "title") { p.add("g.base"); p.add("s.base"); p.add("b.base"); }
     if (G.petTheme) p.add(G.petTheme);
     if (G.petTheme === "pirate") p.add("ship");   // existing sailor pet sheets
     if (SH.open || G.mode === "runway" || G.mode === "photo") {
@@ -528,6 +532,20 @@
       return { M, sheets };
     };
     const [old, art] = await Promise.all([one("atlas.json", true), one("atlas4.json", false)]);
+    for (const of of GOM_OUTFITS) {
+      try {
+        const M = await (await fetch("gom-assets/"+of+"/atlas.json",{cache:"no-cache"})).json();
+        if (M.version !== 1 || !Array.isArray(M.sheets) || !M.sheets.length || M.sheets.some(u=>typeof u!=="string" || !/^[a-zA-Z0-9_-]+\.(webp|png)$/.test(u)) || !M.frames || !M.frames.stand) throw Error("Gôm: atlas không hợp lệ");
+        for(const [pose,f] of Object.entries(M.frames)) if (!/^[a-zA-Z0-9_]+$/.test(pose) || !Array.isArray(f) || f.length!==8 || !f.every(Number.isFinite) || !Number.isInteger(f[0]) || !M.sheets[f[0]] || f[1]<0 || f[2]<0 || f[3]<=0 || f[4]<=0 || f[5]<=0) throw Error("Gôm: frame không hợp lệ");
+        const required=["stand","faint","cheer","ult",...['wr','wl','cr','cl'].flatMap(p=>[0,1,2].map(i=>p+i)),...['wd','wu','cd','cu'].flatMap(p=>[0,1,2,3].map(i=>p+i)),...Array.from({length:9},(_,i)=>['atk'+i+'r','atk'+i+'l']).flat(),...(of==='base'?['sword_fly','slash0','slash1','slash2','ult_swords','ult_land']:[])];
+        if(required.some(p=>!M.frames[p])) throw Error("Gôm: bộ hình chưa đủ");
+        const group="b."+of, base=AT.sheets.length;
+        const sheets=M.sheets.map((url,i)=>({i:base+i,url:"gom-assets/"+of+"/"+url+"?v="+encodeURIComponent(M.hash||BUILD_VER),g:group,img:null,p:null,used:0,fail:-99,w:0,h:0,keep:false,need:false}));
+        for(let i=0;i<sheets.length;i++) sheets[i].gomRects=Object.values(M.frames).filter(f=>f[0]===i);
+        AT.sheets.push(...sheets); AT.groups[group]=sheets.map(S=>S.i);
+        for(const [pose,f] of Object.entries(M.frames)) FR[group+"."+pose]=new AFrame(sheets[f[0]],f,group+"."+pose);
+      } catch(e) { console.warn("Gôm: chưa tải được bộ",of); }
+    }
     META = old.M;
     for (const A of [old, art]) if (A) for (const [n, f] of Object.entries(A.M.frames)) FR[n] = new AFrame(A.sheets[f[0]], f, n);
     // what the home screen and the first moments need, decoded before the game shows (the old atlas must all be in)
@@ -911,6 +929,7 @@
   const ELEM_TIME = 32;   // seconds a spell lasts once picked up
   // playable heroes. Auto-attack: cd (s between volleys), dmg per bolt, range, bolt speed, bounce (hops on to further monsters), hit radius
   const HEROES = {
+    b: { name: "Gôm", rgb: "130,195,255", cols: ["#a9dcff", "#fff4c2", "#ffffff"], cd: 0.34, minCd: 0.12, dmg: 1, range: 680, bolt: 1500, bounce: 0, r: 30 },
     g: { name: "Mochi", rgb: "255,120,200", cols: ["#ffb3e0", "#ff9ad5", "#ffd3f0"], cd: 0.34, minCd: 0.12, dmg: 1, range: 680, bolt: 1500, bounce: 0, r: 30 },
     s: { name: "Matcha", rgb: "140,255,140", cols: ["#b8ffb0", "#f0fff0", "#7be04a"], cd: 0.6, minCd: 0.28, dmg: 2, range: 800, bolt: 1150, bounce: 2, r: 42 },
   };
@@ -955,8 +974,11 @@
   const levelDmg = () => LVL_DMG[clamp(G.level || 0, 0, 4)];
   const petDmg = (lv) => Math.max(1, Math.round(PET_SHARE * friendHp(lv)));
   let hero = "g";
-  try { if (localStorage.getItem("sksp-hero") === "s") hero = "s"; } catch (e) {}
+  try { if (["g","s","b"].includes(localStorage.getItem("sksp-hero"))) hero = localStorage.getItem("sksp-hero"); } catch (e) {}
   const HD = () => HEROES[hero];
+  const heroKey = k => Object.hasOwn(HEROES,k) ? k : "g";
+  const maxHearts = (k = hero) => k === "b" ? 8 : 5;
+  const GOM_OUTFITS = ["base","candy","pirate","snow","lava","castle1","castle2","castle3"];
   // first frame name that exists
   const fr = (...names) => names.find((n) => FR[n]) || names[names.length - 1];
   const WALK_N = { zombie: 10, skeleton: 10, mummy: 10, vampire: 12, witch: 12, spider: 10, ghost: 12, bat: 8 };
@@ -969,7 +991,7 @@
   }
   const CHAR_M = 0.85;      // monsters, pets (and the placeholder hero art) are drawn a little smaller than in the side view
   // the painted heights (art4/chars.json): the packed frames are at this scale (f.h * f.s); the films and the ship's deck draw from it
-  const ART_H = { g: 275, s: 330, simmy: 400, sammy: 400, kairon: 420, phong: 420 };
+  const ART_H = { b: 247.5, g: 275, s: 330, simmy: 400, sammy: 400, kairon: 420, phong: 420 };
   // In battle everyone is CHAR_K of that, one factor for all, so Mochi < Matcha < the grown-ups stays exact (Dad: "to quá" next to
   // Đồng cỏ phép thuật). Measured on game3 at the same iPad view (tests/scale.js): her height / the view's and / a common walker's
   // (zombie there, candy_gummy here) both match game3's within ±5 % for Mochi and Matcha, with the camera's VH below.
@@ -1001,13 +1023,15 @@
     elem: null, elemT: 0, lv: 1, xp: 0, prog: 0, pets: [], outfit: "base" };
   // ---- outfits: the outfit worn is kept per sister in localStorage `sksp-outfit-<char>`; one with no frames falls back to "base"
   // (kept in memory as well: with localStorage blocked, e.g. Safari private mode, a paid outfit can still be worn this session)
-  const MEM = { outfit: {}, owned: { g: new Set(), s: new Set() } };
+  const MEM = { outfit: {}, owned: { b: new Set(), g: new Set(), s: new Set() } };
   function loadOutfit() {
     P.outfit = MEM.outfit[hero] || "base";
     try { const v = localStorage.getItem("sksp-outfit-" + hero); if (v && /^[\w-]{1,24}$/.test(v)) P.outfit = v; } catch (e) {}
+    if (hero === "b" && !GOM_OUTFITS.includes(P.outfit)) P.outfit = "base";
   }
   function setOutfit(o) {
     P.outfit = typeof o === "string" && /^[\w-]{1,24}$/.test(o) ? o : "base";
+    if (hero === "b" && !GOM_OUTFITS.includes(P.outfit)) P.outfit = "base";
     MEM.outfit[hero] = P.outfit;
     try { localStorage.setItem("sksp-outfit-" + hero, P.outfit); } catch (e) {}
   }
@@ -1593,11 +1617,11 @@
   function heroDown(why) {
     // The girls only rest briefly. Fainting and rescue belong to NPCs.
     if (P.tiredT > 0) return;
-    P.dead = false; P.tiredT = 1.4; P.inv = Math.max(P.inv, 1.4); P.hurtT = 0;
+    P.gomPending = null; P.dead = false; P.tiredT = 1.4; P.inv = Math.max(P.inv, 1.4); P.hurtT = 0;
     P.vx = P.vy = 0; P.moving = false; G.hearts = 0; renderHearts();
     const safe = lavaSafeSpot(P.x, P.y) || hzSafeSpot(P.x, P.y);
     if (safe) { P.x = safe[0]; P.y = safe[1]; }
-    showBanner((hero === "s" ? "Matcha" : "Mochi") + " hơi mệt rồi!", "Nghỉ một chút là khỏe lại nhé");
+    showBanner(HD().name + " hơi mệt rồi!", "Nghỉ một chút là khỏe lại nhé");
   }
   // fainting: she lies dizzy for FAINT_T seconds; the partner standing close by revives her five times faster
   const FAINT_T = 10, RESCUE_R = 280;
@@ -1605,7 +1629,7 @@
   // get back up on the spot with full hearts, and shoo the monsters away
   function reviveHero() {
     for (const e of PETE) { if (!isCls(e)) e.faintT = 0; else if (e.faintT > 0 && !escOf(e)) allyRevive(e); }   // (a friend fainted in her escort waits for a girl beside her)
-    P.dead = false; P.tiredT = 0; P.hurtT = 0; P.inv = 2.5; G.hearts = 5; renderHearts(); SFX.heal();
+    P.dead = false; P.tiredT = 0; P.hurtT = 0; P.inv = 2.5; G.hearts = maxHearts(); renderHearts(); SFX.heal();
     burst(P.x, P.y - 110, 30, ["#fff4c2", "#ffd34d", ...HD().cols], 380, 0.8);
     G.parts.push({ type: "ring", x: P.x, y: P.y - 40, r: 40, vr: 1400, life: 0.6, max: 0.6, col: "255,236,170" });
     if (NET.role === "guest") netEmit("shoo", { x: P.x | 0, y: P.y | 0 }); else shoo(P.x, P.y);
@@ -1621,7 +1645,12 @@
     G.foes = G.foes.filter((f) => d2(f.x, f.y, x, y) > 700 * 700);
     for (const o of G.cps) if (d2(o.x, o.y, x, y) < 700 * 700) o.end = Math.min(o.end, o.t);   // (the monsters' warnings near her go too)
   }
+  function gomStep(dt) {
+    if (P.dead || P.tiredT > 0 || G.ult || P.winT) { P.gomPending=null; return; }
+    const pending=P.gomPending; if(pending && (pending.t-=dt)<=0) { P.gomPending=null; pending.strike(); }
+  }
   function updateHero(dt) {
+    gomStep(dt);
     P.inv -= dt; P.hurtT -= dt; P.slowT -= dt; P.castT -= dt;
     if (P.tiredT > 0) { P.moving = false; P.vx = P.vy = 0; if ((P.tiredT = Math.max(0, P.tiredT - dt)) === 0) reviveHero(); return; }
     if (P.dead) { P.moving = false; P.helped = rescuing(); if ((G.reviveT -= dt * (P.helped ? 5 : 1)) <= 0) reviveHero(); return; }
@@ -1662,6 +1691,7 @@
   const MAX_LV = 20;
   const xpNeed = (lv) => Math.round(15 + 12 * Math.pow(lv - 1, 1.4));
   function heroStats(hk, lv, elem) {
+    if (hk === "b") { const S = heroStats("g",lv,elem); return {...S, n:1, dmg:S.dmg * (S.n + 0.5) * 1.3, bounce:0, sc:1, kb:60}; }
     const H = HEROES[hk], gn = Math.min(9, 2 + Math.floor(lv / 2.6));
     return {
       cd: Math.max(H.minCd, H.cd * Math.pow(0.93, lv - 1)) * (elem ? 0.8 : 1),
@@ -1719,6 +1749,7 @@
   // from the middle one) still pass within 0.6 of the hit radius hr
   const fanStep = (dist, hr, slots, wide = 0.16) => Math.min(wide, 0.6 * hr / (Math.max(dist, 1) * Math.max(slots, 1)));
   function autoFire() {
+    if (hero === "b") return gomFire();
     const S = heroStats(hero, P.lv, P.elem), T = nearestFoes(P.x, P.y, S.range, S.n);
     let plan = shareShots(T, S.n, S.dmg);
     // Mochi's gift: half the time one more heart flies out, a little off to the side (when a monster still needs it)
@@ -1735,6 +1766,36 @@
       if (i === 0 && !P.moving) setFace(P, Math.cos(a), Math.sin(a));
     }
     if (gift) fireBolt(gift, Math.random() < 0.5 ? -0.75 : 0.75, 1, S);
+    play("zap");
+  }
+  // Each strike applies once to every enemy in its arc. Finishers take longer;
+  // their damage is scaled by that same duration to preserve sustained DPS.
+  function gomFire() {
+    const S = heroStats("b",P.lv,P.elem), targets = nearestFoes(P.x,P.y,S.range,64), t = targets[0];
+    if (!t) { P.shootCd = 0.08; return; }
+    const a = Math.atan2(aimY(t)-P.y,t.x-P.x), near = Math.hypot(t.x-P.x,t.y-P.y) < 250 + (t === G.boss ? bossR(t) : 0);
+    if (!P.moving) setFace(P,Math.cos(a),Math.sin(a));
+    P.gomStrike = ((P.gomStrike ?? -1) + 1) % 9;
+    const step = P.gomStrike % 3, chain = Math.floor(P.gomStrike / 3), pace = [0.85,0.95,1.2][step];
+    P.shootCd = S.cd * pace; P.castT = P.shootCd; P.gomDuration = P.shootCd;
+    if (near) {
+      const strike = () => {
+      const widths = [[1.1,1.4,0.8],[0.9,1.3,Math.PI],[0.55,1.7,1.2]];
+      for (const m of targets) {
+        if (!m.alive || m === G.boss && !bossOpen(m)) continue;
+        const d = Math.hypot(m.x-P.x,m.y-P.y), ma = Math.atan2(aimY(m)-P.y,m.x-P.x);
+        if (d > 270 + (m === G.boss ? bossR(m) : m.r || 0) || Math.abs(Math.atan2(Math.sin(ma-a),Math.cos(ma-a))) > widths[chain][step]) continue;
+        if (m === G.boss) hitBoss(P.elem,P.x,P.y,false,1.3);
+        else if (!shieldBlocks(m,Math.cos(a),Math.sin(a))) hitMon(m,S.dmg*pace,P.elem,P.x,P.y,S.kb);
+      }
+      G.parts.push({type:"fx",name:"b.base.slash"+chain,x:P.x+Math.cos(a)*120,y:P.y-BOLT_Z+Math.sin(a)*120,sc:1,rot:a,life:0.24,max:0.24});
+      netEmit("gomslash",{x:P.x,y:P.y,a,chain});
+      };
+      if (step === 2) P.gomPending = { t:Math.min(0.12,S.cd*0.5), strike }; else strike();
+    } else {
+      G.shots.push({x:P.x,y:P.y,vx:Math.cos(a)*S.speed,vy:Math.sin(a)*S.speed,life:S.range/S.speed,r:S.r,dmg:S.dmg*pace,bossDmg:1.3,pierce:true,hit:new Set(),elem:P.elem,hk:"b",sc:1,kb:S.kb});
+      netShot(P.x,P.y,a,1);
+    }
     play("zap");
   }
   // where the wand tip is, per facing (0 down .. 4 up, x mirrored when she faces left), relative to her feet;
@@ -1799,7 +1860,7 @@
       }
       const B = G.boss;
       if (bossOpen(B) && s.life > 0 && d2(s.x, s.y, B.x, B.y) < (s.r + bossR(B)) ** 2) {
-        s.life = 0; hitBoss(s.elem, s.x, s.y, s.frost); hitFx(s.x, s.y - BOLT_Z - 60, s.hk);
+        s.life = 0; hitBoss(s.elem, s.x, s.y, s.frost, s.bossDmg || 1); hitFx(s.x, s.y - BOLT_Z - 60, s.hk);
       }
     }
     G.shots = G.shots.filter((s) => s.life > 0);
@@ -1825,9 +1886,9 @@
     if (slow > 0 && m.alive) m.slow = Math.max(m.slow || 0, slow);   // (a friend's frost nova / war cry: slowed, not frozen)
     if (frost) applyFrost(m);
   }
-  function hitBoss(el, x, y, frost) {
-    if (NET.role === "guest") { NET.hq.push([-1, ELS.indexOf(el), 1, 0, 0, frost ? 1 : 0]); G.boss.flash = 0.12; play("hit"); return; }
-    damageBoss(1, x, y); applyElem(G.boss, el, "p"); if (frost) applyFrost(G.boss);
+  function hitBoss(el, x, y, frost, dmg = 1) {
+    if (NET.role === "guest") { NET.hq.push([-1, ELS.indexOf(el), dmg, 0, 0, frost ? 1 : 0]); G.boss.flash = 0.12; play("hit"); return; }
+    damageBoss(dmg, x, y); applyElem(G.boss, el, "p"); if (frost) applyFrost(G.boss);
   }
   // ---- experience and automatic level-ups
   function gainXp(n) {
@@ -1843,6 +1904,7 @@
     if (b.n > a.n) msg = s ? "Thêm một con rắn phép!" : "Thêm một tia trái tim!";
     else if (b.bounce > a.bounce) msg = "Rắn nảy qua thêm quái";
     else if (b.dmg > a.dmg) msg = s ? "Rắn to và mạnh hơn" : "Trái tim mạnh hơn";
+    if (hero === "b") msg = "Kiếm mạnh hơn và nhanh hơn!";
     showBanner("Lên cấp " + lv + "!", msg); SFX.level();
     burst(P.x, P.y - 110, 36, ["#7cf2c6", "#fff4c2", "#ffd34d", ...HD().cols], 460, 0.9);
     G.parts.push({ type: "ring", x: P.x, y: P.y - 40, r: 30, vr: 900, life: 0.7, max: 0.7, col: "124,242,198" });
@@ -2891,7 +2953,7 @@
   // ---------------------------------------------------------------- drops, gems, elements
   function spawnDrop(x, y, type) {
     if (!type) {
-      const w = [["heart", G.hearts < 5 ? 24 : 4], ["energy", 26], ["fire", 17], ["ice", 17], ["poison", 17]];
+      const w = [["heart", G.hearts < maxHearts() ? 24 : 4], ["energy", 26], ["fire", 17], ["ice", 17], ["poison", 17]];
       let r = Math.random() * w.reduce((a, b) => a + b[1], 0); type = "energy";
       for (const [k, v] of w) { if ((r -= v) < 0) { type = k; break; } }
     }
@@ -2942,7 +3004,7 @@
   }
   function pickDrop(d) {
     if (d.type === "heart") {
-      if (G.hearts < 5) { G.hearts++; renderHearts(); floatText(d.x, d.y - 60, "+1 tim"); }
+      if (G.hearts < maxHearts()) { G.hearts++; renderHearts(); floatText(d.x, d.y - 60, "+1 tim"); }
       else addEnergy(10, d.x, d.y - 60);
       SFX.heal(); burst(d.x, d.y - 40, 14, ["#ff6f8f", "#fff"], 260, 0.5);
     } else if (d.type === "energy") {
@@ -3230,7 +3292,7 @@
   };
   // Mochi (5) reads slowly: when she is one of the players (alone, or in co-op) every story line stays twice as long. Both co-op pages agree
   // (each knows both girls). Films timed by their own clock (the opening, the boss's talk) run that clock at 1 / talkMul() while a bubble shows.
-  const talkMul = () => (hero === "g" || (NET.role && Q && Q.hero === "g") ? 2 : 1);
+  const talkMul = () => (hero !== "s" || (NET.role && Q && Q.hero !== "s") ? 2 : 1);
   // (mul: a film that fixed its timing at its start passes the talkMul it started with, so a partner leaving mid-film leaves no gap)
   const lineTime = (text, mul) => clamp(1.6 + text.length * 0.045, 2.2, 4.5) * (mul || talkMul());
   const SAY_FADE = 0.25;
@@ -3336,7 +3398,7 @@
   function rsSeq(kind) {
     // (her thanks name the girls who are playing: alone, only her; Dad saw Matcha in Mochi's solo films)
     const go = escFor(kind) ? [[kind, ESC_SAY.go[kind]]] : [];   // (her own map: her gear is hidden close by, follow and protect her)
-    if (kind === "simmy") return (girlsIn().length > 1 ? SAYS.simmyRescue : SAYS.simmyRescue.map(([k, l]) => [k, l.map((x) => x.replace(HEROES.g.name + " và " + HEROES.s.name, girlsName()))])).concat(go);
+    if (kind === "simmy") return SAYS.simmyRescue.map(([k, l]) => [k, l.map((x) => x.replace(HEROES.g.name + " và " + HEROES.s.name, girlsName()))]).concat(go);
     const D = PETS[kind], th = D.thanks || ["Cảm ơn " + girlsName() + "!", "Từ giờ mình đi cùng các bé!"];
     return (D.reply ? [[kind, th], ["simmy", D.reply]] : [[kind, th]]).concat(go);
   }
@@ -4056,8 +4118,8 @@
   // somebody hurt near Kairon (a girl short of hearts, a friend under 70 %, one fainted)
   function auraNeeded(p) {
     const near = (o) => d2(o.x, o.y, p.x, p.y) < AURA_R * AURA_R;
-    if (!P.dead && G.hearts < 5 && near(P)) return true;
-    if (Q && NET.role && !Q.dead && Q.hearts < 5 && near(Q)) return true;
+    if (!P.dead && G.hearts < maxHearts() && near(P)) return true;
+    if (Q && NET.role && !Q.dead && Q.hearts < maxHearts(Q.hero) && near(Q)) return true;
     for (const e of PETE) if (isCls(e) && near(e) && (e.faintT > 0 || e.hp < e.max * 0.7)) return true;
     if (Q && NET.role) for (const e of QPETE) if (isCls(e) && near(e) && (e.faintT > 0 || (e.hp || 0) < (e.max || 1) * 0.7)) return true;
     return false;
@@ -4239,7 +4301,7 @@
   function holyAura(p, owner) {
     afxAdd(p, "aura", [p.x, p.y]); SFX.heal();
     const near = (o) => d2(o.x, o.y, p.x, p.y) < AURA_R * AURA_R;
-    if (!P.dead && near(P) && G.hearts < 5) { G.hearts = Math.min(5, G.hearts + 1); renderHearts(); if (G.parts.length < 420) burst(P.x, P.y - 140, 14, ["#fff4c2", "#ff9ab8", "#ffd34d"], 260, 0.6); }
+    if (!P.dead && near(P) && G.hearts < maxHearts()) { G.hearts = Math.min(maxHearts(), G.hearts + 1); renderHearts(); if (G.parts.length < 420) burst(P.x, P.y - 140, 14, ["#fff4c2", "#ff9ab8", "#ffd34d"], 260, 0.6); }
     if (Q && NET.role && !Q.dead && near(Q)) netEmit("ally", { to: NET.partner, t: "heal" });
     auraOn(p.x, p.y);
     if (Q && NET.role) netEmit("ally", { to: NET.partner, t: "aura", x: p.x | 0, y: p.y | 0 });
@@ -4753,7 +4815,7 @@
   // squares, each with an answer. When time is up, bombs / spikes / swords / fireballs (by level) rain on the wrong
   // squares: a girl or a friend standing there faints at once. Then he drops back in and the fight goes on.
   const QZ_UP = 1.0, QZ_DROP = 1.5, QZ_HIT = 0.7, QZ_DOWN = 1.1, QZ_NEXT = 1.2, QZ_HOV = 280, QPH = ["up", "ask", "drop", "down", "next", "wait"];
-  const carryShare = () => (hero === "g" || NET.role ? 0.1 : 0.8);
+  const carryShare = () => (hero !== "s" || NET.role ? 0.1 : 0.8);
   function makeSum(cfg) {
     let a, b, r, carry = false;
     const R = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1));
@@ -7703,7 +7765,7 @@
   // (pose: "jump" | "cast" | "win" -> her ult / cast / cheer frame; each is its own drawing, nothing is mirrored).
   // They rise together (CB_RISE) while the rains fall
   function cbPose(C, g, t) {
-    const left = g.hk === "g", flip = !left, ox = C.cx, oy = C.cy - 80;
+    const left = g.hk === girlsIn()[0], flip = !left, ox = C.cx, oy = C.cy - 80;
     const [tx, ty] = cbTip(g.hk, CB_K, flip), sx = ox + (left ? -CB_D : CB_D) - tx, sy = oy + 20 - ty;
     const bob = Math.sin(t * 5 + (left ? 0 : 2)) * 9;
     if (t < CB_MEET) {
@@ -7727,7 +7789,7 @@
     const girls2 = cbGirls(C);
     // both rains, on their clock: aimed at the monsters on the screen and all over it, each landing bursting the ground (no harm)
     const tu = cbRainT(t);
-    ufxStep(UFX.cg, "g", C.cx, C.cy, tu, C.cx, C.cy, true); ufxStep(UFX.cs, "s", C.cx, C.cy, tu, C.cx, C.cy, true);
+    ufxStep(UFX.cg, girlsIn()[0], C.cx, C.cy, tu, C.cx, C.cy, true); ufxStep(UFX.cs, girlsIn()[1] || "s", C.cx, C.cy, tu, C.cx, C.cy, true);
     if (at(CB_MEET)) { SFX.ready && SFX.ready(); SFX.charge(); }
     // they meet: a ring of hearts / stars as each takes her place
     if (at(CB_MEET)) for (const g of girls2) {
@@ -7779,8 +7841,9 @@
       uglow(ox - 620, oy + 40, 900, ULT_RGB.g, 0.3 * dim); uglow(ox + 620, oy + 40, 900, ULT_RGB.s, 0.3 * dim);
     }
     // the rains on the ground: each burst's crater and its shockwave ring (pink / silver-blue)
+    if (girlsIn().includes("b")) { drawUltFx(UFX.cg,ox,oy,UFX.cg.t,ox,oy,0,true); drawUltFx(UFX.cs,ox,oy,UFX.cs.t,ox,oy,0,true); } else {
     ctx.globalCompositeOperation = "source-over"; ufxBurstsG0(UFX.cg, A, UFX.cg.t, UG);
-    ctx.globalCompositeOperation = "source-over"; ufxBurstsS0(UFX.cs, A, UFX.cs.t, US);
+    ctx.globalCompositeOperation = "source-over"; ufxBurstsS0(UFX.cs, A, UFX.cs.t, US); }
     // between them her heart ring and her star ring turning against each other, and their columns of light into the sky
     const ch = ss(CB_MEET - 0.2, CB_MEET + 0.4, t) * (1 - ss(CB_BOOM, CB_BOOM + 0.2, t)), cy0 = oy - CB_RISE * ss(CB_MEET, CB_MEET + 0.7, t);
     if (ch > 0.01) {
@@ -7802,10 +7865,11 @@
       }
     }
     // the bursts over the ground (dust, debris, fire and light), then the falling hearts and meteors: all behind the girls
+    if (girlsIn().includes("b")) { drawUltFx(UFX.cg,ox,oy,UFX.cg.t,ox,oy,1,true); drawUltFx(UFX.cs,ox,oy,UFX.cs.t,ox,oy,1,true); } else {
     ctx.globalCompositeOperation = "source-over"; ufxBurstsG1(UFX.cg, A, -1e6, -1e6, UFX.cg.t, UG);
     ctx.globalCompositeOperation = "source-over"; ufxBurstsS1(UFX.cs, A, -1e6, -1e6, UFX.cs.t, US);
     ufxHeartsFall(UFX.cg, A, UFX.cg.t);
-    ctx.globalCompositeOperation = "lighter"; ufxMeteors(UFX.cs, A, UFX.cs.t, US, 1);
+    ctx.globalCompositeOperation = "lighter"; ufxMeteors(UFX.cs, A, UFX.cs.t, US, 1); }
     // the one huge burst: both lights, pink heart rings and silver-blue star rings racing out over the screen, rings over the
     // ground, a painted quake burst in each colour under them, hearts and stars flying everywhere
     if (q >= 0) {
@@ -8199,7 +8263,8 @@
     if (o.dead) return pick("faint");
     // Repeated cast silhouettes have no stepping legs. Preserve the walk cycle
     // while firing on the move; standing still keeps the raised-wand pose.
-    const face = o.face | 0, side = face >= 1 && face <= 3, cast = o.castT > 0 && (!o.moving || o.aim), mv = !!o.moving, dist = o.dist || 0;
+    const face = o.face | 0, side = face >= 1 && face <= 3, cast = o.castT > 0 && (c === "b" ? (!o.moving || o.castT > (P.gomDuration || 0.2)*0.45) : (!o.moving || o.aim)), mv = !!o.moving, dist = o.dist || 0;
+    if (c === "b" && cast && side) return pick("atk" + (o.gomStrike ?? P.gomStrike ?? 0) + (o.flip ? "l" : "r"));
     if (side) {
       const step = mv ? SIDE_STEPS[Math.floor(dist / SIDE_CYCLE * 4) % 4] : 1;   // standing: the feet-together frame
       return pick((cast ? (o.flip ? "cl" : "cr") : o.flip ? "wl" : "wr") + step);
@@ -8615,7 +8680,7 @@
   }
   function drawHero() {
     if (G.mode === "title") return;
-    const poseState = { char: hero, outfit: P.outfit, face: P.face, flip: P.flip, moving: P.moving, dist: P.dist, castT: P.castT, dead: P.dead, winT: P.winT, ult: !!G.ult };
+    const poseState = { char: hero, outfit: P.outfit, face: P.face, flip: P.flip, moving: P.moving, dist: P.dist, castT: P.castT, dead: P.dead || hero === "b" && P.tiredT > 0, winT: P.winT, ult: !!G.ult };
     P.fireFn = heroFrame4({ ...poseState, aim: true }); // Keep projectile origins independent of the walking picture.
     const fn = P.fn = heroFrame4(poseState);
     const blink = P.inv > 0 && !P.dead && !G.ult && !G.rescue && Math.floor(G.t * 16) % 2 === 0;   // (no blinking in a rescue film: nothing can hurt her then)
@@ -8637,6 +8702,7 @@
     const kk = f.s * CHAR_K, w = f.w * kk;
     shadow(x, y - 6, w * 0.5, 22, 0.35);
     spr(f, x, y, false, CHAR_K, 1, 0);   // (her faint drawing already lies on the ground: never turned, never mirrored)
+    if (hk === "b") return; // Gôm rests sitting up; no faint/dizzy overlay.
     // dizzy: a spiral turning on each eye
     ctx.save(); ctx.strokeStyle = "#fff"; ctx.lineWidth = 3; ctx.lineCap = "round"; ctx.shadowColor = "rgba(60,0,90,.8)"; ctx.shadowBlur = 5;
     for (const [ex, ey] of HURT_EYES[hk] || HURT_EYES.g) {
@@ -8672,7 +8738,7 @@
     // name tag and hearts
     label(H.name, Q.x, topY, 32, "#fff");
     ctx.save();
-    for (let i = 0; i < 5; i++) { ctx.fillStyle = i < Q.hearts ? "#ff5a7a" : "rgba(0,0,0,.35)"; ctx.beginPath(); ctx.arc(Q.x - 40 + i * 20, topY + 18, 7, 0, TAU); ctx.fill(); }
+    for (let i = 0; i < maxHearts(Q.hero); i++) { ctx.fillStyle = i < Q.hearts ? "#ff5a7a" : "rgba(0,0,0,.35)"; ctx.beginPath(); ctx.arc(Q.x - 40 + i * 20, topY + 18, 7, 0, TAU); ctx.fill(); }
     ctx.restore();
   }
   function drawPet(p) {
@@ -8926,16 +8992,16 @@
   // (15.5 -> 77.5 hearts a second, 0.48 -> 0.24 s from the sky to the ground). Matcha's the same (Dad: "Improve ultimate skill của
   // Matcha, đang bị vấn đề tương tự Mochi"): 24 meteors one every 0.04 falling 0.2 -> 120 one every 0.008 falling 0.1
   // (15.5 -> 77.5 meteors a second, 0.32 -> 0.16 s from the sky to the ground)
-  const UFX_RAIN = { g: { n: 120, gap: 0.008, t0: 0.24, dur: 0.15 }, s: { n: 120, gap: 0.008, t0: 0.3, dur: 0.1 } }, UFX_N = 120;
+  const UFX_RAIN = { b: { n:120,gap:0.008,t0:0.24,dur:0.15 }, g: { n: 120, gap: 0.008, t0: 0.24, dur: 0.15 }, s: { n: 120, gap: 0.008, t0: 0.3, dur: 0.1 } }, UFX_N = 120;
   // each of Mochi's hearts / Matcha's meteors bursts the ground where it lands, like the bosses' quakes (their qk_boom frames,
   // painted once in her colour: pink / silver-blue, ufxBoomArt):
   // a pool of UFX_E bursts per show, each living UB_LIFE of the clock (its burst the first UB_BURST); a heart landing within
   // UB_JOIN of a burst just begun joins it (it grows), and when all are busy the oldest (fading) one is taken over.
   // Each burst hurts the monsters within UB_HIT (and chips the boss a little: ufxImpact)
   const UFX_E = 24, UB_LIFE = 0.36, UB_BURST = 0.2, UB_R = 85, UB_JOIN = 110, UB_HIT = 120;
-  const ULT_TITLE = { g: "Bùng Nổ Trái Tim!", s: "Mưa Sao Băng!" };
-  const ULT_RGB = { g: "255,120,200", s: "150,200,255", c: "210,170,255" };
-  const UPOP = { g: ["#ffb3e0", "#ff7cc8", "#fff0f8"], s: ["#cfe4ff", "#8fc1ff", "#ffffff"] };
+  const ULT_TITLE = { b:"Thiên Kiếm Giáng Thế!", g: "Bùng Nổ Trái Tim!", s: "Mưa Sao Băng!" };
+  const ULT_RGB = { b:"130,195,255", g: "255,120,200", s: "150,200,255", c: "210,170,255" };
+  const UPOP = { b:["#a9dcff","#fff4c2","#ffffff"], g: ["#ffb3e0", "#ff7cc8", "#fff0f8"], s: ["#cfe4ff", "#8fc1ff", "#ffffff"] };
   const METEOR_DX = 620, METEOR_DY = 980, METEOR_ANG = Math.atan2(METEOR_DY, -METEOR_DX);   // (meteors come from the upper right)
   const reducedMotion = () => { try { return !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches); } catch (_) { return false; } };
   // the blast's light shake: <= 10 px, gone in 0.25 s (the game takes 40 px off a second); none with "reduce motion"
@@ -9147,6 +9213,7 @@
   // layer 0: on the ground, under everyone standing; layer 1: in the air, over them. own: this page's girl (the partner's: no dimming)
   function drawUltFx(S, x, y, t, cx, cy, layer, own) {
     if (!S.on) return;
+    if (S.hk === "b") { if (layer === 1) { for(let i=0;i<24;i++) { const q=t-0.2-i*0.045; if(q>0 && q<0.6) spr("b.base.ult_swords",cx+Math.sin(i*2.4)*VW*0.4,cy+Math.cos(i*3.7)*VH*0.35-(1-q/0.6)*700,false,0.8,1,0); } if(t>1.5) spr("b.base.ult_land",x,y,false,2,Math.max(0,1-(t-1.5)),0); } return; }
     const n0 = ufxN, A = ufxArt();
     if (layer === 0) { S.drawn = 0; S.maxW = 0; }
     ufxW = 0; ufxBig = 0; ufxLim = n0 + Math.max(0, ULT_DRAW_CAP - S.drawn);   // (never more than ULT_DRAW_CAP sprites a frame)
@@ -9596,14 +9663,14 @@
   function drawBolt(x, y, vx, vy, elem, hk, sc = 1) {
     sc *= BOLT_VIS;
     // with many bolts in the air their lights would run together into one blaze: each one glows less
-    const sp = Math.hypot(vx, vy) || 1, eb = elem && FR[EBOLT[elem]], ga = clamp(24 / (G.shots.length + G.pshots.length + 1), 0.3, 1);
+    const sp = Math.hypot(vx, vy) || 1, eb = hk !== "b" && elem && FR[EBOLT[elem]], ga = clamp(24 / (G.shots.length + G.pshots.length + 1), 0.3, 1);
     if (eb) {
       const m = EBOLT_M * sc, back = (eb.w * eb.s * 0.5 - 26) * m;
       glow(x, y, 60 * sc, ELEM[elem].rgb, (0.45 + 0.08 * Math.sin(G.t * 20)) * ga);
       fxDir(EBOLT[elem], x - vx / sp * back, y - vy / sp * back, vx, vy, m, 0.6 + 0.4 * ga);
       return;
     }
-    const n = hk === "s" ? "fx_bolt_s" : "fx_bolt_g";
+    const n = hk === "b" ? "b.base.sword_fly" : hk === "s" ? "fx_bolt_s" : "fx_bolt_g";
     if (elem) glow(x, y, 60 * sc, ELEM[elem].rgb, (0.45 + 0.08 * Math.sin(G.t * 20)) * ga);
     glow(x, y, 55 * sc, HEROES[hk].rgb, 0.4 * ga);
     fxDir(n, x - vx / sp * 50 * sc, y - vy / sp * 50 * sc, vx, vy, (hk === "g" ? 0.75 : 0.95) * sc, 1);
@@ -9892,7 +9959,7 @@
 
 
   // ---------------------------------------------------------------- HUD
-  function renderHearts() { $("hearts").innerHTML = Array.from({ length: 5 }, (_, i) => (i < G.hearts ? '<img src="assets/ui_heart.webp" alt="">' : '<img class="lost" src="assets/ui_heart_empty.webp" alt="">')).join(""); }
+  function renderHearts() { $("hearts").innerHTML = Array.from({ length: maxHearts() }, (_, i) => (i < G.hearts ? '<img src="assets/ui_heart.webp" alt="">' : '<img class="lost" src="assets/ui_heart_empty.webp" alt="">')).join(""); }
   function updateHud() {
     $("efill").style.width = G.energy + "%"; $("ebar").classList.toggle("full", G.energy >= 100);
     $("stars").textContent = G.stars;
@@ -9950,13 +10017,14 @@
     const box = $("heroes"); box.innerHTML = "";
     const stand = (k) => FR[heroFrame4({ char: k, outfit: "base", face: 0, moving: false })], CW = 156, CHt = 314;
     // one scale for both cards, the tallest one fitted to the card: Matcha stands taller than Mochi, as in the game
-    const fit = Math.min(...Object.keys(HEROES).map((k) => (CHt - 6) / (stand(k).h * stand(k).s)));
+    const fit = Math.min(...Object.keys(HEROES).filter(k=>stand(k)).map((k) => (CHt - 6) / (stand(k).h * stand(k).s)));
     for (const [k, h] of Object.entries(HEROES)) {
       const b = document.createElement("button"); b.className = "hero"; b.setAttribute("aria-pressed", k === hero);
       const f = stand(k), c = document.createElement("canvas"); c.width = CW; c.height = CHt;
-      const k2 = f.s * fit, g = c.getContext("2d");
-      g.drawImage(f.img, f.sx, f.sy, f.w, f.h, c.width / 2 - f.ax * k2, c.height - f.ay * k2, f.w * k2, f.h * k2);
+      const k2 = f ? f.s * fit : 1, g = c.getContext("2d");
+      if (f) g.drawImage(f.img, f.sx, f.sy, f.w, f.h, c.width / 2 - f.ax * k2, c.height - f.ay * k2, f.w * k2, f.h * k2);
       b.append(c, h.name);
+      if (k === "b" && (!f || !frameReady(f))) { b.disabled = true; b.append(" — chưa tải được hình"); }
       b.addEventListener("click", () => { hero = k; try { localStorage.setItem("sksp-hero", k); } catch (e) {} loadOutfit(); loadPets(); renderHeroes(); });
       box.append(b);
     }
@@ -9979,6 +10047,7 @@
   // until the island. The parked ship's old "ship" shortcut is not taken any more: such a start (an old saved choice, an old host page)
   // is Màn 1)
   function startGame(i, at) {
+    if (!gomAvailable()) return false;
     G.dialogueRead = null; dialoguePending = null;
     i = clamp(Math.floor(i) || 0, 0, LEVELS.length - 1);
     if (at !== "shop" || !LEVELS[i].shop) at = null;
@@ -9987,7 +10056,8 @@
     const lvl = i; if (at) i = Math.min(lvl + 1, LEVELS.length - 1);
     initAudio();
     // (a start past Màn 2 brings what the maps before it gave: LATER_STARS stars a map, as a girl who played them would have)
-    Object.assign(G, { stars: !at && i >= 2 ? LATER_STARS * i : 0, hearts: 5, energy: 0, kills: 0, won: false, fade: 1, fadeDir: -1 });
+    P.gomStrike = -1; P.gomPending = null;
+    Object.assign(G, { stars: !at && i >= 2 ? LATER_STARS * i : 0, hearts: maxHearts(), energy: 0, kills: 0, won: false, fade: 1, fadeDir: -1 });
     tallyReset();
     P.elem = null; P.elemT = 0; P.lv = 1 + i * 4; P.xp = 0; updateElemHud(); updateXpHud();
     // a new adventure from Màn 1 starts in the school uniform for both sisters (what they bought stays theirs)
@@ -10050,7 +10120,8 @@
   function renderStartSel() { for (const [k, id] of Object.entries(STARTS)) $(id).setAttribute("aria-pressed", k === startAt); setTitleStory(); }
   for (const [k, id] of Object.entries(STARTS)) $(id).addEventListener("click", () => { startAt = k; try { localStorage.setItem("sksp-start", k); } catch (e) {} renderStartSel(); });
   readStart();
-  const startChosen = () => (START_SHOP[startAt] >= 0 ? startGame(START_SHOP[startAt], "shop") : startGame(START_LV[startAt] || 0, null));
+  function gomAvailable() { if (hero !== "b" || FR["b.base.stand"] && frameReady(FR["b.base.stand"])) return true; showBanner("Chưa tải được hình Gôm", "Hãy tải lại trang nhé"); return false; }
+  const startChosen = () => gomAvailable() && (START_SHOP[startAt] >= 0 ? startGame(START_SHOP[startAt], "shop") : startGame(START_LV[startAt] || 0, null));
   $("startBtn").addEventListener("click", () => { requestGameFullscreen(); startChosen(); });
 
   // ---------------------------------------------------------------- the clothes shop
@@ -10066,6 +10137,7 @@
     ["Pháp Sư Lửa Nhí", "Pháp Sư Lửa"], ["Cáo Lửa"], ["Nhà Thám Hiểm Núi Lửa"]];
   const CASTLE_NAMES = ["Phù thủy Trăng Sao", "Phù thủy Rừng Phép", "Phù thủy Pha Lê", "Phù thủy Phượng Hoàng", "Phù thủy Rồng Nhỏ"];
   const OUTFITS4 = [
+    ...GOM_OUTFITS.slice(1).map((of,i)=>({id:"b."+of,char:"b",theme:of.startsWith("castle")?"castle":of,name:["Vệ binh Kẹo","Thuyền trưởng","Kỵ sĩ Rồng Băng","Chiến binh Rồng Lửa","Hiệp sĩ Thánh","Kiếm sĩ Mặt Trăng","Kỵ sĩ Rồng Đêm"][i],price:10})),
     // All map wardrobes use the same affordable 10-star price.
     ...OUTFIT_NAMES.flatMap((name, i) => ["g", "s"].map((char) => ({ id: `${char}.pirate${i + 1}`, char, theme: "pirate", name, price: 10 }))),
     { id: "simmy.pirate", char: "simmy", theme: "pirate", name: "Mèo Simmy cướp biển", price: 0 },   // auto: no card, she changes herself
@@ -10107,7 +10179,7 @@
   const isOwned = (o) => o.id === "base" || o.price === 0 || ownedIds(o.char).includes(o.id);
   function shopCards() {
     // only the outfits that are drawn (packed) are on sale: one whose art is not in yet (lava6..10 for now) is simply not listed
-    const drawn = OUTFITS4.filter((o) => o.char === hero && o.theme === SH.theme && o.price > 0 && hasOutfit(o.char, outKey(o)));
+    const drawn = OUTFITS4.filter((o) => o.char === hero && (o.theme === SH.theme || hero === "b" && o.theme === "candy" && SH.theme === "pirate") && o.price > 0 && hasOutfit(o.char, outKey(o)));
     return [{ id: "base", char: hero, theme: "", name: "Đồ của bé", price: 0 }, ...drawn];
   }
 
@@ -10136,7 +10208,7 @@
   const BUY = { id: null, t: 0 };   // the guest's purchase waiting for the host's answer
   // the host's side of a guest's purchase request: enough stars -> pay and say yes; otherwise no (the pool never goes below what it holds)
   function hostBuy(d) {
-    const k = d.char === "s" ? "s" : "g", id = typeof d.id === "string" && /^[\w-]{1,24}$/.test(d.id) ? d.id : "", full = k + "." + id;
+    const k = heroKey(d.char), id = typeof d.id === "string" && /^[\w-]{1,24}$/.test(d.id) ? d.id : "", full = k + "." + id;
     const o = OUTFITS4.find((x) => x.id === full);
     NET.bought = NET.bought || new Set();
     let ok = !!o && o.price > 0 && (NET.bought.has(full) || G.stars >= o.price);
@@ -10273,10 +10345,10 @@
   function shopTeamUi() {
     const el = $("shopTeam");
     if (!NET.role || !Q || !Q.hero || Q.hero === hero) { if (!el.hidden) el.hidden = true; SH.teamKey = null; return; }
-    const pb = partnerBits(), st = { [hero]: !!SH.done, [Q.hero]: !!(pb & 512) }, key = st.g + "," + st.s;
+    const pb = partnerBits(), st = { [hero]: !!SH.done, [Q.hero]: !!(pb & 512) }, key = girlsIn().map(c=>c+":"+st[c]).join(",");
     if (key === SH.teamKey && !el.hidden) return;
     SH.teamKey = key; el.hidden = false;
-    el.innerHTML = ["g", "s"].map((c) => `<span class="rd${st[c] ? " ok" : ""}" data-k="${c}">${HEROES[c].name}${st[c] ? ' <svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg>' : " <i>đang chọn…</i>"}</span>`).join("");
+    el.innerHTML = girlsIn().map((c) => `<span class="rd${st[c] ? " ok" : ""}" data-k="${c}">${HEROES[c].name}${st[c] ? ' <svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg>' : " <i>đang chọn…</i>"}</span>`).join("");
   }
   // the sister's page's girl bits (her presence, slot 4): 256 = her shop is open, 512 = she pressed "Sẵn sàng" there
   function partnerBits() { const gl = NET.pp && NET.pp.gl; return Array.isArray(gl) ? num(gl[4]) : 0; }
@@ -10475,7 +10547,7 @@
   function finishTravel(to) {
     const from = G.level, picked = G.m2; G.travel = null; G.mode = "play"; G.cine = null;
     $("skipFilm").hidden = true; $("photo").hidden = true;
-    G.hearts = 5;
+    G.hearts = maxHearts();
     if (to !== from) buildLevel(to);
     G.shopPhase = 0; G.shopDone = true;
     for (const id of ["hud", "controls"]) $(id).hidden = false;
@@ -10611,19 +10683,20 @@
   // who is in the runway, the photo, the dock and the boarding film: the girls who are playing (one alone; both together) and Simmy;
   // teamAll() is the whole team whoever is playing (the opening film)
   // the girls who are playing: her alone, or both sisters when her sister's page is here (co-op)
-  function girlsIn() { const other = hero === "g" ? "s" : "g"; return NET.role && Q && Q.hero === other ? ["g", "s"] : [hero]; }
+  function girlsIn() { return NET.role && Q && Q.hero && Q.hero !== hero ? Object.keys(HEROES).filter(k=>k===hero || k===Q.hero) : [hero]; }
   const girlsName = () => girlsIn().map((c) => HEROES[c].name).join(" và ");
   const finLine = () => ((G.lvl && G.lvl.end) || "Cảm ơn {girls} đã cứu cả nhóm SKSP!").replace("{girls}", girlsName());
   function teamMembers() {
     return travelMembers().filter(m => m.char !== "dog" && m.char !== "cat");
   }
   function teamAll() {
-    const other = hero === "g" ? "s" : "g";
+    const other = NET.role && Q ? Q.hero : hero === "g" ? "s" : "g";
     let oo = "base";
     if (NET.role && Q && Q.hero === other) oo = Q.outfit || "base";
     else { try { const v = localStorage.getItem("sksp-outfit-" + other); if (v && /^[\w-]{1,24}$/.test(v)) oo = v; } catch (e) {} }
     const mine = { char: hero, outfit: P.outfit, name: HEROES[hero].name }, sis = { char: other, outfit: oo, name: HEROES[other].name };
     const sim = { char: "simmy", outfit: SIMMY.outfit, name: "Mèo Simmy" };
+    if (hero === "b") return NET.role && Q ? [mine,sim,sis] : [mine,sim];
     return hero === "g" ? [mine, sim, sis] : [sis, sim, mine];
   }
   // Coca belongs to Mochi, Cafe to Matcha. Photo, journey and world use the same costume.
@@ -10740,7 +10813,7 @@
     for (const id of ["hud", "controls"]) $(id).hidden = false;
     for (const id of ["shop", "photo", "winScreen", "pauseScreen"]) $(id).hidden = true;
     if (NET.role === "guest") return;   // (her page builds the level when the host's world says so: see applySnapshot)
-    G.hearts = 5;
+    G.hearts = maxHearts();
     G.fade = 1; G.fadeDir = -1;
     const card = shopTheme(SH.theme).card && !G.m2;
     buildLevel(next); updateHud(); updateSksp(); questTxt = null; updateQuest();
@@ -11005,7 +11078,7 @@
   // the fishing spots the whole cast: from her (and her bar, beside her, clear of the joystick) to the farthest float of both spots, which
   // stay clear of the action button (bottom right) — zooming out (down to CAM_MIN) only as far as needed. `box`: frame that instead (films).
   function shipCam(k, W, H, at, box) {
-    k = k === "s" ? "s" : "g"; W = W || cv.width; H = H || cv.height;
+    k = heroKey(k); W = W || cv.width; H = H || cv.height;
     if (!at) at = posOf(k) || [P.x, P.y];
     const m = Math.min(W, H) * 0.02, mt = HUD_TOP, Z = ctrlZones(W, H), sFit = Math.max(W / SIW, H / SIH);
     const done = (s, cx, cy) => {
@@ -11129,7 +11202,7 @@
   // take / put / drop; land (her landed fish into her arms: arg = its kind) / tug (join her sister's too-big fish, this page's girl only);
   // flip / spice / water (cooking). (where: where she stood when she pressed, sent by the guest's page; otherwise where she is now)
   function shipAct(k, action, arg, where) {
-    k = k === "s" ? "s" : "g";
+    k = heroKey(k);
     const at = where || posOf(k), s = at ? stationAt(at[0], at[1], k) : null, c = SHIP.carry[k];
     const done = (pose) => { if (pose && k === hero) SHIPX.pose = { p: pose, t: 0.6 }; return true; };
     if (action === "take") {
@@ -11464,7 +11537,7 @@
   // the guest's "tug" event on the host's page: her presses so far on that fish, joining it, or her fish's first moment
   function hostTug(d) {
     if (!Q || !Q.ship || (SHIP.ph !== "fish" && SHIP.ph !== "cook")) return;
-    const gk = Q.hero, tk = d.tk === "s" ? "s" : "g", id = num(d.id), key = tk + ":" + id;
+    const gk = Q.hero, tk = heroKey(d.tk), id = num(d.id), key = tk + ":" + id;
     let T = SHIP.tug;   // (a tug her event starts counts this event's presses: it starts from her count before it)
     if ((!T || T.end) && tk === gk && tk !== hero && FISH_TIERS.big.includes(d.kind) && !SHIPX.tugDone.has(key)) T = tugNew(tk, id, d.kind, 0);
     SHIPX.tugIn[key] = Math.max(SHIPX.tugIn[key] || 0, Math.max(0, Math.floor(num(d.n))));
@@ -11703,7 +11776,7 @@
     return null;
   }
   function edgeCall(k, cam) {
-    k = k === "s" ? "s" : "g";
+    k = heroKey(k);
     if (soloShip() || (SHIP.ph !== "fish" && SHIP.ph !== "cook")) return null;
     const o = k === "g" ? "s" : "g", op = posOf(o), where = op && sisterNeed(o);
     if (!where) return null;
@@ -12866,7 +12939,7 @@
     return on.map((k, i) => [k, m + (i - (on.length - 1) / 2) * gap]);
   }
   // who speaks a line: its speaker, or the friend standing in for one who is not in the film yet
-  const opSpeaker = (l, cast) => (l[0] === "hero" ? (hero === "g" ? "mochi" : "matcha") : l[0] in OP_CAST && !cast.some((c) => c[0] === l[0]) ? l[4] || "" : l[0]);
+  const opSpeaker = (l, cast) => (l[0] === "hero" ? (hero === "b" ? "gom" : hero === "g" ? "mochi" : "matcha") : l[0] in OP_CAST && !cast.some((c) => c[0] === l[0]) ? l[4] || "" : l[0]);
   // is a bubble up in the opening at t? (the lines drawOpening shows: a speaker who is in the film, or a friend standing in for her)
   function opTalking(t) {
     if (t < OP_CONTEXT) return true;
@@ -12935,7 +13008,7 @@
     if (t < OP_CONTEXT) {
       // Use the painted meadow and cast as the setting; only narration is UI.
       drawOpening(g, W, H, OP_CONTEXT + 0.7);
-      const lines = OP_INTRO[Math.min(2, Math.floor(t / 4))];
+      const lines = OP_INTRO[Math.min(2, Math.floor(t / 4))].map(x=>x.replace("Mochi và Matcha",girlsName()));
       const fs = Math.round(Math.min(H * 0.038, W * 0.033)), lh = fs * 1.55;
       g.save(); g.fillStyle = "rgba(18,14,38,.86)";
       g.fillRect(W * 0.04, H * 0.055, W * 0.92, lh * 5.1);
@@ -13002,7 +13075,7 @@
       spots.witch = [wx, wy - th * 0.55 * ws];
     }
     // Mochi and Matcha run in and jump after them
-    const girls = [["g", "mochi", 0.42, 12.2, 14.6], ["s", "matcha", 0.31, 12.7, 15.0]];   // (on the blanket, clear of the basket at its left end)
+    const girls = girlsIn().map((c,i)=>[c,{g:"mochi",s:"matcha",b:"gom"}[c],0.42-i*0.11,12.2+i*0.5,14.6+i*0.4]);   // (on the blanket, clear of the basket at its left end)
     for (const [ch, k, fx, tin, tj] of girls) {
       if (t < tin || !girlsIn().includes(ch)) continue;
       const e = 1 - Math.pow(1 - clamp((t - tin) / 1.2, 0, 1), 2), x1 = (-0.15 + (fx + 0.15) * e) * W;
@@ -13083,7 +13156,7 @@
       }
       renderCoop();
     }, () => { if (NET.state === "ok") { NET.state = "none"; NET.room = null; renderCoop(); } });
-    for (const t of ["start", "hits", "ult", "shoo", "portal", "hurt", "pick", "gain", "shots", "xp", "pet", "combo", "outfit", "shop", "ship", "ally", "travel", "dialogue"]) room.on(t, onNet, () => {});
+    for (const t of ["start", "hits", "ult", "shoo", "portal", "hurt", "pick", "gain", "shots", "xp", "pet", "combo", "outfit", "shop", "ship", "ally", "travel", "dialogue", "gomslash"]) room.on(t, onNet, () => {});
     renderCoop();
   }
 
@@ -13236,7 +13309,7 @@
     }
     if (msg.peer !== NET.partner || !NET.role || G.mode === "title") return;
     if (msg.topic === "outfit") {   // the partner changed clothes ({char, id})
-      const k = d.char === "s" ? "s" : "g", id = typeof d.id === "string" && /^[\w-]{1,24}$/.test(d.id) ? d.id : "base";
+      const k = heroKey(d.char), id = typeof d.id === "string" && /^[\w-]{1,24}$/.test(d.id) ? d.id : "base";
       NET.qof = { k, id, t: performance.now() / 1000 }; if (Q && Q.hero === k) { Q.outfit = id; Q.of = hasOutfit(k, id) ? id : "base"; }
       return;
     }
@@ -13246,13 +13319,14 @@
     if (msg.topic === "ally") {   // her page about this page's friends / girl: a hit the host saw, Kairon's aura (a heart, the friends healed / up)
       if (d.to !== NET.me || G.mode !== "play") return;
       if (d.t === "hurt") { if (NET.role !== "guest") return; const p = PETE[clamp(Math.floor(num(d.i)), 0, 7)]; if (p && isCls(p)) allyDamage(p, clamp(Math.round(num(d.n)) || 1, 1, 4), num(d.fx), num(d.fy), typeof d.bf === "boolean" ? d.bf : bossFight()); }
-      else if (d.t === "heal") { if (!P.dead && G.hearts < 5) { G.hearts++; renderHearts(); SFX.heal(); if (G.parts.length < 420) burst(P.x, P.y - 140, 14, ["#fff4c2", "#ff9ab8", "#ffd34d"], 260, 0.6); } }
+      else if (d.t === "heal") { if (!P.dead && G.hearts < maxHearts()) { G.hearts++; renderHearts(); SFX.heal(); if (G.parts.length < 420) burst(P.x, P.y - 140, 14, ["#fff4c2", "#ff9ab8", "#ffd34d"], 260, 0.6); } }
       else if (d.t === "aura") auraOn(num(d.x), num(d.y));
       return;
     }
     if (msg.topic === "ship") return onShipMsg(d);
+    if (msg.topic === "gomslash" && Q && Q.hero === "b") { G.parts.push({type:"fx",name:"b.base.slash"+clamp(num(d.chain)|0,0,2),x:num(d.x)+Math.cos(num(d.a))*120,y:num(d.y)-BOLT_Z+Math.sin(num(d.a))*120,sc:1,rot:num(d.a),life:0.24,max:0.24}); return; }
     if (msg.topic === "shots") {   // partner's bolts: only for show, her own page reports what they hit
-      const k = d.k === "s" ? "s" : "g", H = HEROES[k];
+      const k = heroKey(d.k), H = HEROES[k];
       for (const b of Array.isArray(d.s) ? d.s.slice(0, 40) : []) {
         if (!Array.isArray(b) || !Q || G.pshots.length >= 40) break;
         const a = num(b[2]) / 100;
@@ -13285,9 +13359,9 @@
           if (!Array.isArray(h)) continue;
           const el = ELS[num(h[1])] || null, id = num(h[0]);
           const frost = num(h[5]) === 1 && !!Q && frostOn(Q.outfit);   // (her ice-queen bolt: only as her page's outfit says)
-          if (id === -1) { if (G.boss && G.boss.alive) { damageBoss(1, G.boss.x, G.boss.y - 220); applyElem(G.boss, el, "q"); if (frost) applyFrost(G.boss); } continue; }
+          if (id === -1) { if (G.boss && G.boss.alive) { damageBoss(Q && Q.hero === "b" ? clamp(num(h[2]),0,40) : 1, G.boss.x, G.boss.y - 220); applyElem(G.boss, el, "q"); if (frost) applyFrost(G.boss); } continue; }
           const m = G.mons.find((m) => m.id === id && m.alive);
-          if (m) { damageMon(m, clamp(Math.floor(num(h[2])) || 1, 1, 400), Q ? Q.x : m.x, Q ? Q.y : m.y, false, "q", clamp(num(h[3]) || 60, 0, 600)); applyElem(m, el, "q"); if (num(h[4]) > 0 && m.alive) m.slow = Math.max(m.slow || 0, clamp(num(h[4]) / 10, 0, 5)); if (frost) applyFrost(m); }
+          if (m) { damageMon(m, clamp(num(h[2]) || 1, 0.1, 400), Q ? Q.x : m.x, Q ? Q.y : m.y, false, "q", clamp(num(h[3]) || 60, 0, 600)); applyElem(m, el, "q"); if (num(h[4]) > 0 && m.alive) m.slow = Math.max(m.slow || 0, clamp(num(h[4]) / 10, 0, 5)); if (frost) applyFrost(m); }
         }
       } else if (msg.topic === "ult") {
         ultBlast(num(d.cx), num(d.cy), clamp(num(d.hw), 0, 2200), clamp(num(d.hh), 0, 1400), "q"); SFX.boom(); ultShake();   // (her show is played from her clock: UFX.q)
@@ -13386,7 +13460,7 @@
     const b = num(gl[4]), k = Math.min(1, dt * 20);
     Q.x = Math.abs(x - Q.x) > 500 ? x : Q.x + (x - Q.x) * k; Q.y = Math.abs(y - Q.y) > 500 ? y : Q.y + (y - Q.y) * k;
     Q.vx = num(gl[10]); Q.vy = num(gl[11]);
-    Q.face = clamp(Math.floor(num(gl[2])), 0, 4); Q.hero = gl[7] === "s" ? "s" : "g";
+    Q.face = clamp(Math.floor(num(gl[2])), 0, 4); Q.hero = heroKey(gl[7]);
     // (slot 9 of the report is unused: it carried the partner's outfit)
     // her outfit (slot 18, `of`; a copy without it wears "base"); one we have no frames for is shown in base too
     // (Q.outfit = what she announced, Q.of = what we can draw; a fresh "outfit" event wins for a second over a report that was already on its way)
@@ -13394,11 +13468,12 @@
     const qe = NET.qof; if (qe && qe.k === Q.hero && performance.now() / 1000 - qe.t < 1) Q.outfit = qe.id;
     Q.of = hasOutfit(Q.hero, Q.outfit) ? Q.outfit : "base";
     // her frame is `<char>.<outfit>.<pose>`: only the pose is taken from it, so the picture always comes from what we have loaded
+    if (Q.hero === "b" && !GOM_OUTFITS.includes(Q.outfit)) Q.outfit = Q.of = "base";
     const fn = typeof gl[3] === "string" ? gl[3] : "", pz = fn.split(".")[2];
-    Q.fn = outfitFrame(Q.hero, Q.of, pz && /^(w[rldu]|c[rldu])\d$|^(stand|faint|cheer)$/.test(pz) ? pz : "stand");
+    Q.fn = outfitFrame(Q.hero, Q.of, pz && /^(w[rldu]|c[rldu])\d$|^(stand|faint|cheer|atk[0-8][rl])$/.test(pz) ? pz : "stand");
     if (!FR[Q.fn]) Q.fn = "";
     Q.dead = !!(b & 1); Q.inv = !!(b & 2); Q.slow = !!(b & 4); Q.cast = !!(b & 8); Q.win = !!(b & 16); Q.flip = !!(b & 32); Q.paused = !!(b & 64); Q.story = !!(b & 128);
-    Q.elem = ELS[num(gl[5])] || null; Q.hearts = clamp(num(gl[8]), 0, 5);
+    Q.elem = ELS[num(gl[5])] || null; Q.hearts = clamp(num(gl[8]), 0, maxHearts(Q.hero));
     Q.pets = typeof gl[12] === "string" ? gl[12].split(",").filter((k) => PETS[k]) : [];   // their pets (shown following them)
     Q.lv = clamp(Math.floor(num(gl[13])) || 1, 1, MAX_LV);
     Q.ship = num(gl[19]) === 1;
@@ -13426,7 +13501,7 @@
         NET.lvBusy = true; P.winT = 1.6; P.vx = P.vy = 0; SFX.portal();
         setTimeout(() => fadeTo(() => {
           const now = NET.pp && NET.pp.w ? clamp(Math.floor(num(NET.pp.w.lv)), 0, LEVELS.length - 1) : lv, prev = G.level, picked = G.m2;
-          G.hearts = 5;   // (a fresh set of hearts for the new level, as on the host's page)
+          G.hearts = maxHearts();   // (a fresh set of hearts for the new level, as on the host's page)
           buildLevel(now); NET.lvBusy = false; NET.applied = null; updateHud();
           // (through the magic gate (the next map, not after a shop), or after a shop whose map shows its card (the snow shop, unless
           // started there from the home screen): its story card, as on the host's page; else its name)
@@ -13695,7 +13770,7 @@
       : others.length ? "iPad kia đã mở game. Một bé bấm “Mở phòng”, bé còn lại bấm “Vào chơi cùng”."
       : "Chưa thấy iPad nào khác. Hãy mở cùng đường link này trên iPad thứ hai.";
     for (const h of hosts) {
-      const hk = h.presence.co.hero === "s" ? "s" : "g";
+      const hk = heroKey(h.presence.co.hero);
       btn("Vào chơi cùng " + HEROES[hk].name, () => setCo({ role: "join", host: h.peer, hero }));
     }
     btn("Mở phòng", () => setCo({ role: "host", hero }), hosts.length > 0);
@@ -13720,6 +13795,7 @@
     btn("Mở phòng", p2pHost); btn("Vào phòng", () => { NET.stage = "join"; NET.err = ""; renderCoop(); }, true);
   }
   $("coopBtn").addEventListener("click", () => {
+    if (!gomAvailable()) return;
     requestGameFullscreen();
     initAudio();
     $("titleScreen").hidden = true; $("coopScreen").hidden = false; renderCoop();
@@ -13780,13 +13856,14 @@
   const API = window.__sksp = {
     startTravel, travelMembers, travelPhase, syncTravel, TRAVEL_END, TRAVEL_LAYOUT, drawTravel,
     petOutfitPrefix, petPoseFrame, takePhoto, drawPetAt, teamPets,
+    gomFire, gomStep, autoFire, updateShots, reviveHero, maxHearts, girlsIn,
     G, P, IN, joy, keys, NET, FR, LEVELS, MON, HEROES, PETS, TIERS, startGame, sendStart, buildLevel, toTitle, snowSlow, nextLevelAfter, levelIdx,
     autopilot: false, autoDialogue: false, arrive, nextDialogue,
     trial: false,   // the game has its real end now (Màn 5's finale and the end screen); sim.js / coop.js print WIN (tests read this)
     FB, FB_SAY, FB_MOVES, FB_GEO, LTS, fbArtFlip, fbIn, fbHurts, fbDodge, fbTalk, fbLts, fbThrone, fbMove, fbDark, bossOpen: (B) => bossOpen(B || G.boss), bossR: (B) => bossR(B || G.boss), updateBossBar,
     fin: () => ({ t: FIN.t, fw: FIN.fw.length, cf: FIN.cf.length }), FIN_END, FIN_SKIP, showEnd, hexMove, hexDodge, HOVER, HEX: { ORB_R, ORB_V, ORB_V2, ORB_VW, ORB_TURN, TELE_R, CIR_R, RING_R, RING_CR, HEX_LIFT },
     getQ: () => Q,
-    setHero: (k) => { hero = k === "s" ? "s" : "g"; loadOutfit(); loadPets(); renderHeroes(); },
+    setHero: (k) => { hero = heroKey(k); loadOutfit(); loadPets(); renderHeroes(); },
     setOutfit, hasOutfit, CHAR_H, ART_H, CHAR_K, HERO_R, view: () => ({ VW, VH }), girlSpot, drawTeamScene, drawOpening,
     OUTFITS4, openShop, buyOutfit, wearOutfit, closeShop, shop: shopInfo, simmy: SIMMY, frostOn, applyFrost, FROST_T, FROST_BOSS, SHOP_THEMES,
     BLIZ_TITLE, ultLightFor, blizArt, blizSeen: () => BLIZ_SEEN,
