@@ -405,7 +405,7 @@
   let META = null, ready = false;
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261103.1633", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261103.1649", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -10077,12 +10077,12 @@
   function renderHeroes() {
     const box = $("heroes"); box.innerHTML = "";
     const stand = (k) => (k === "b" ? gomSelection("base", renderHeroes).frame : null) || FR[heroFrame4({ char: k, outfit: "base", face: 0, moving: false })], CW = 216, CHt = 314;
-    // Keep the sisters' relative heights; Gôm's separate portrait fills its card below.
+    // Keep the sisters' relative heights; match Gôm's portrait height to Mochi.
     const fit = Math.min(...Object.keys(HEROES).filter(k=>stand(k)).map((k) => (CHt - 6) / (stand(k).h * stand(k).s)));
     for (const [k, h] of Object.entries(HEROES)) {
       const b = document.createElement("button"); b.className = "hero"; b.setAttribute("aria-pressed", k === hero);
       const f = stand(k), c = document.createElement("canvas"); c.width = CW; c.height = CHt;
-      const k2 = f ? (k === "b" ? Math.min((CHt - 6) / f.h, (CW - 4) / f.w) : f.s * fit) : 1, g = c.getContext("2d");
+      const k2 = f ? (k === "b" ? Math.min(stand("g").h * stand("g").s * fit / f.h, (CW - 4) / f.w) : f.s * fit) : 1, g = c.getContext("2d");
       if (f) g.drawImage(f.img, f.sx, f.sy, f.w, f.h, c.width / 2 - f.ax * k2, c.height - f.ay * k2, f.w * k2, f.h * k2);
       b.append(c, h.name);
       if (k === "b" && (!f || !frameReady(f))) { b.disabled = true; b.append(" — chưa tải được hình"); }
