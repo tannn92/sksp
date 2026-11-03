@@ -405,7 +405,7 @@
   let META = null, ready = false;
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261103.1137", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261103.1534", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -537,7 +537,7 @@
         const M = await (await fetch("gom-assets/"+of+"/atlas.json",{cache:"no-cache"})).json();
         if (M.version !== 1 || !Array.isArray(M.sheets) || !M.sheets.length || M.sheets.some(u=>typeof u!=="string" || !/^[a-zA-Z0-9_-]+\.(webp|png)$/.test(u)) || !M.frames || !M.frames.stand) throw Error("Gôm: atlas không hợp lệ");
         for(const [pose,f] of Object.entries(M.frames)) if (!/^[a-zA-Z0-9_]+$/.test(pose) || !Array.isArray(f) || f.length!==8 || !f.every(Number.isFinite) || !Number.isInteger(f[0]) || !M.sheets[f[0]] || f[1]<0 || f[2]<0 || f[3]<=0 || f[4]<=0 || f[5]<=0) throw Error("Gôm: frame không hợp lệ");
-        const required=["stand","faint","cheer","ult",...['wr','wl','cr','cl'].flatMap(p=>[0,1,2].map(i=>p+i)),...['wd','wu','cd','cu'].flatMap(p=>[0,1,2,3].map(i=>p+i)),...Array.from({length:9},(_,i)=>['atk'+i+'r','atk'+i+'l']).flat(),...(of==='base'?['sword_fly','slash0','slash1','slash2','ult_swords','ult_land']:[])];
+        const required=["stand","faint","cheer","ult",...['wr','wl','cr','cl','wdr','wdl'].flatMap(p=>[0,1,2].map(i=>p+i)),...['wd','wu','cd','cu'].flatMap(p=>[0,1,2,3].map(i=>p+i)),...Array.from({length:9},(_,i)=>['atk'+i+'r','atk'+i+'l']).flat(),...(of==='base'?['sword_fly','slash0','slash1','slash2','ult_swords','ult_land']:[])];
         if(required.some(p=>!M.frames[p])) throw Error("Gôm: bộ hình chưa đủ");
         const group="b."+of, base=AT.sheets.length;
         const sheets=M.sheets.map((url,i)=>({i:base+i,url:"gom-assets/"+of+"/"+url+"?v="+encodeURIComponent(M.hash||BUILD_VER),g:group,img:null,p:null,used:0,fail:-99,w:0,h:0,keep:false,need:false}));
@@ -1617,7 +1617,7 @@
   function heroDown(why) {
     // The girls only rest briefly. Fainting and rescue belong to NPCs.
     if (P.tiredT > 0) return;
-    P.gomPending = null; P.dead = false; P.tiredT = 1.4; P.inv = Math.max(P.inv, 1.4); P.hurtT = 0;
+    resetGomCombat();P.gomPending = null; P.dead = false; P.tiredT = 1.4; P.inv = Math.max(P.inv, 1.4); P.hurtT = 0;
     P.vx = P.vy = 0; P.moving = false; G.hearts = 0; renderHearts();
     const safe = lavaSafeSpot(P.x, P.y) || hzSafeSpot(P.x, P.y);
     if (safe) { P.x = safe[0]; P.y = safe[1]; }
@@ -1628,6 +1628,7 @@
   const rescuing = () => !!(Q && NET.role && !Q.dead && d2(Q.x, Q.y, P.x, P.y) < RESCUE_R * RESCUE_R);
   // get back up on the spot with full hearts, and shoo the monsters away
   function reviveHero() {
+    resetGomCombat();P.gomPending=null;
     for (const e of PETE) { if (!isCls(e)) e.faintT = 0; else if (e.faintT > 0 && !escOf(e)) allyRevive(e); }   // (a friend fainted in her escort waits for a girl beside her)
     P.dead = false; P.tiredT = 0; P.hurtT = 0; P.inv = 2.5; G.hearts = maxHearts(); renderHearts(); SFX.heal();
     burst(P.x, P.y - 110, 30, ["#fff4c2", "#ffd34d", ...HD().cols], 380, 0.8);
@@ -1646,6 +1647,7 @@
     for (const o of G.cps) if (d2(o.x, o.y, x, y) < 700 * 700) o.end = Math.min(o.end, o.t);   // (the monsters' warnings near her go too)
   }
   function gomStep(dt) {
+    P.gomThrowCd=Math.max(0,(P.gomThrowCd||0)-dt);
     if (P.dead || P.tiredT > 0 || G.ult || P.winT) { P.gomPending=null; return; }
     const pending=P.gomPending; if(pending && (pending.t-=dt)<=0) { P.gomPending=null; pending.strike(); }
   }
@@ -1768,31 +1770,65 @@
     if (gift) fireBolt(gift, Math.random() < 0.5 ? -0.75 : 0.75, 1, S);
     play("zap");
   }
+  let gomSequence = 0;
+  const gomWaiting = new Set(), gomReceived = new Map();
+  function resetGomCombat() {
+    P.gomThrowCd=0; P.gomHealTimes=[]; gomWaiting.clear();
+  }
+  function gomHeal() {
+    if(hero!=="b" || P.dead || P.tiredT>0 || G.hearts<=0) return;
+    const now=G.t || 0;
+    P.gomHealTimes=(P.gomHealTimes||[]).filter(t=>now-t<1);
+    if(P.gomHealTimes.length>=5 || G.hearts>=8) return;
+    P.gomHealTimes.push(now); G.hearts=Math.min(8,Math.round((G.hearts+0.1)*1e10)/1e10); renderHearts();
+  }
+  function gomMeleeHit(m, strike, hit) {
+    const hp=m.hp, queued=NET.hq.length; hit();
+    if(NET.role==="guest") {
+      if(NET.hq.length>queued) { NET.hq[NET.hq.length-1][6]=strike.id; gomWaiting.add(strike.id); if(gomWaiting.size>128)gomWaiting.delete(gomWaiting.values().next().value); }
+    } else if(m.hp<hp && !strike.healed) { strike.healed=true; gomHeal(); }
+  }
+  function gomReceiveHit(h, hit) {
+    const token=h[6];
+    if(!Number.isSafeInteger(token) || token<=0 || Q?.hero!=="b") return hit();
+    let record=gomReceived.get(token);
+    if(!record) { record={targets:new Set(),healed:false}; gomReceived.set(token,record); if(gomReceived.size>512)gomReceived.delete(gomReceived.keys().next().value); }
+    const id=Number(h[0]); if(record.targets.has(id))return; record.targets.add(id);
+    const m=id===-1?G.boss:G.mons.find(m=>m.id===id), hp=m?.hp;
+    if(!m?.alive || Q.dead || Q.tiredT>0) return;
+    if(id!==-1 && shieldBlocks(m,Math.cos(Math.atan2(m.y-Q.y,m.x-Q.x)),Math.sin(Math.atan2(m.y-Q.y,m.x-Q.x))))return;
+    hit();
+    if(m.hp<hp && !record.healed) { record.healed=true; netEmit("gomheal",{to:NET.partner,id:token}); }
+  }
   // Each strike applies once to every enemy in its arc. Finishers take longer;
   // their damage is scaled by that same duration to preserve sustained DPS.
   function gomFire() {
+    if(P.dead || P.tiredT>0 || G.ult || P.winT)return;
     const S = heroStats("b",P.lv,P.elem), targets = nearestFoes(P.x,P.y,S.range,64), t = targets[0];
     if (!t) { P.shootCd = 0.08; return; }
     const a = Math.atan2(aimY(t)-P.y,t.x-P.x), near = Math.hypot(t.x-P.x,t.y-P.y) < 250 + (t === G.boss ? bossR(t) : 0);
     if (!P.moving) setFace(P,Math.cos(a),Math.sin(a));
+    if(!near && P.gomThrowCd>0)return;
     P.gomStrike = ((P.gomStrike ?? -1) + 1) % 9;
     const step = P.gomStrike % 3, chain = Math.floor(P.gomStrike / 3), pace = [0.85,0.95,1.2][step];
     P.shootCd = S.cd * pace; P.castT = P.shootCd; P.gomDuration = P.shootCd;
     if (near) {
+      const receipt={id:++gomSequence,healed:false};
       const strike = () => {
       const widths = [[1.1,1.4,0.8],[0.9,1.3,Math.PI],[0.55,1.7,1.2]];
       for (const m of targets) {
         if (!m.alive || m === G.boss && !bossOpen(m)) continue;
         const d = Math.hypot(m.x-P.x,m.y-P.y), ma = Math.atan2(aimY(m)-P.y,m.x-P.x);
         if (d > 270 + (m === G.boss ? bossR(m) : m.r || 0) || Math.abs(Math.atan2(Math.sin(ma-a),Math.cos(ma-a))) > widths[chain][step]) continue;
-        if (m === G.boss) hitBoss(P.elem,P.x,P.y,false,1.3);
-        else if (!shieldBlocks(m,Math.cos(a),Math.sin(a))) hitMon(m,S.dmg*pace,P.elem,P.x,P.y,S.kb);
+        if (m === G.boss) gomMeleeHit(m,receipt,()=>hitBoss(P.elem,P.x,P.y,false,1.3));
+        else if (!shieldBlocks(m,Math.cos(a),Math.sin(a))) gomMeleeHit(m,receipt,()=>hitMon(m,S.dmg*pace,P.elem,P.x,P.y,S.kb));
       }
       G.parts.push({type:"fx",name:"b.base.slash"+chain,x:P.x+Math.cos(a)*120,y:P.y-BOLT_Z+Math.sin(a)*120,sc:1,rot:a,life:0.24,max:0.24});
       netEmit("gomslash",{x:P.x,y:P.y,a,chain});
       };
       if (step === 2) P.gomPending = { t:Math.min(0.12,S.cd*0.5), strike }; else strike();
     } else {
+      P.gomThrowCd=1; P.shootCd=0;
       G.shots.push({x:P.x,y:P.y,vx:Math.cos(a)*S.speed,vy:Math.sin(a)*S.speed,life:S.range/S.speed,r:S.r,dmg:S.dmg*pace,bossDmg:1.3,pierce:true,hit:new Set(),elem:P.elem,hk:"b",sc:1,kb:S.kb});
       netShot(P.x,P.y,a,1);
     }
@@ -3004,7 +3040,7 @@
   }
   function pickDrop(d) {
     if (d.type === "heart") {
-      if (G.hearts < maxHearts()) { G.hearts++; renderHearts(); floatText(d.x, d.y - 60, "+1 tim"); }
+      if (G.hearts < maxHearts()) { G.hearts = Math.min(maxHearts(), G.hearts + 1); renderHearts(); floatText(d.x, d.y - 60, "+1 tim"); }
       else addEnergy(10, d.x, d.y - 60);
       SFX.heal(); burst(d.x, d.y - 40, 14, ["#ff6f8f", "#fff"], 260, 0.5);
     } else if (d.type === "energy") {
@@ -8264,6 +8300,7 @@
     // Repeated cast silhouettes have no stepping legs. Preserve the walk cycle
     // while firing on the move; standing still keeps the raised-wand pose.
     const face = o.face | 0, side = face >= 1 && face <= 3, cast = o.castT > 0 && (c === "b" ? (!o.moving || o.castT > (P.gomDuration || 0.2)*0.45) : (!o.moving || o.aim)), mv = !!o.moving, dist = o.dist || 0;
+    if(c==='b'&&face===1&&!cast){const pose='wd'+(o.flip?'l':'r')+(mv?[0,1,2,1][Math.floor(dist/SIDE_CYCLE*4)%4]:1);if(FR[c+'.'+of+'.'+pose])return pick(pose);}
     if (c === "b" && cast && side) return pick("atk" + (o.gomStrike ?? P.gomStrike ?? 0) + (o.flip ? "l" : "r"));
     if (side) {
       const step = mv ? SIDE_STEPS[Math.floor(dist / SIDE_CYCLE * 4) % 4] : 1;   // standing: the feet-together frame
@@ -9959,7 +9996,14 @@
 
 
   // ---------------------------------------------------------------- HUD
-  function renderHearts() { $("hearts").innerHTML = Array.from({ length: maxHearts() }, (_, i) => (i < G.hearts ? '<img src="assets/ui_heart.webp" alt="">' : '<img class="lost" src="assets/ui_heart_empty.webp" alt="">')).join(""); }
+  function renderHearts() {
+    $("hearts").innerHTML=Array.from({length:maxHearts()},(_,i)=>{
+      const fill=clamp(G.hearts-i,0,1);
+      if(fill===1)return '<img src="assets/ui_heart.webp" alt="">';
+      if(fill===0)return '<img class="lost" src="assets/ui_heart_empty.webp" alt="">';
+      return '<span style="position:relative;display:inline-block;width:1.35em;height:1.35em"><img class="lost" src="assets/ui_heart_empty.webp" alt=""><img src="assets/ui_heart.webp" alt="" style="position:absolute;inset:0;clip-path:inset('+Math.round((1-fill)*100)+'% 0 0 0)"></span>';
+    }).join("");
+  }
   function updateHud() {
     $("efill").style.width = G.energy + "%"; $("ebar").classList.toggle("full", G.energy >= 100);
     $("stars").textContent = G.stars;
@@ -10013,15 +10057,32 @@
   $("againBtn").addEventListener("click", () => { $("winScreen").hidden = true; startGame(0); if (NET.role === "host") sendStart(); });
 
   // the home screen: pick a sister, then play alone or together
+  // UI portraits are separate from neutral gameplay frames.
+  const GOM_SELECTION = new Map();
+  function gomSelection(outfit = 'base', ready) {
+    let entry = GOM_SELECTION.get(outfit);
+    if (!entry) {
+      entry = { frame: null, promise: null }; GOM_SELECTION.set(outfit, entry);
+      entry.promise = loadImg('gom-assets/' + outfit + '/selection.webp').then(img => {
+        const stand = FR['b.base.stand'];
+        entry.frame = { img, sx: 0, sy: 0, w: img.width, h: img.height,
+          s: stand ? stand.h * stand.s / img.height : 247.5 / img.height,
+          ax: img.width / 2, ay: img.height };
+        if (ready) ready();
+        return entry.frame;
+      }).catch(() => null);
+    }
+    return entry;
+  }
   function renderHeroes() {
     const box = $("heroes"); box.innerHTML = "";
-    const stand = (k) => FR[heroFrame4({ char: k, outfit: "base", face: 0, moving: false })], CW = 156, CHt = 314;
+    const stand = (k) => (k === "b" ? gomSelection("base", renderHeroes).frame : null) || FR[heroFrame4({ char: k, outfit: "base", face: 0, moving: false })], CW = 156, CHt = 314;
     // one scale for both cards, the tallest one fitted to the card: Matcha stands taller than Mochi, as in the game
     const fit = Math.min(...Object.keys(HEROES).filter(k=>stand(k)).map((k) => (CHt - 6) / (stand(k).h * stand(k).s)));
     for (const [k, h] of Object.entries(HEROES)) {
       const b = document.createElement("button"); b.className = "hero"; b.setAttribute("aria-pressed", k === hero);
       const f = stand(k), c = document.createElement("canvas"); c.width = CW; c.height = CHt;
-      const k2 = f ? f.s * fit : 1, g = c.getContext("2d");
+      const k2 = f ? (k === "b" ? Math.min(f.s * fit, (CW - 4) / f.w) : f.s * fit) : 1, g = c.getContext("2d");
       if (f) g.drawImage(f.img, f.sx, f.sy, f.w, f.h, c.width / 2 - f.ax * k2, c.height - f.ay * k2, f.w * k2, f.h * k2);
       b.append(c, h.name);
       if (k === "b" && (!f || !frameReady(f))) { b.disabled = true; b.append(" — chưa tải được hình"); }
@@ -10056,7 +10117,7 @@
     const lvl = i; if (at) i = Math.min(lvl + 1, LEVELS.length - 1);
     initAudio();
     // (a start past Màn 2 brings what the maps before it gave: LATER_STARS stars a map, as a girl who played them would have)
-    P.gomStrike = -1; P.gomPending = null;
+    resetGomCombat();gomReceived.clear();P.gomStrike = -1; P.gomPending = null;
     Object.assign(G, { stars: !at && i >= 2 ? LATER_STARS * i : 0, hearts: maxHearts(), energy: 0, kills: 0, won: false, fade: 1, fadeDir: -1 });
     tallyReset();
     P.elem = null; P.elemT = 0; P.lv = 1 + i * 4; P.xp = 0; updateElemHud(); updateXpHud();
@@ -10316,6 +10377,13 @@
     if (!SH.open) return;
     SH.prev = SH.view; SH.view = (SH.view + d + 4) % 4; SH.turnT = 1; play("swoosh");
   }
+  function drawSelectionHeroAt(g, char, outfit, o, x, gy, th, tint) {
+    if (char === 'b' && !o.face) {
+      const f = gomSelection(outfit, () => { if (SH.open) shopRefresh(); }).frame;
+      if (f) { const k = th / f.h; g.drawImage(f.img, x - f.ax * k, gy - th, f.w * k, th); return true; }
+    }
+    return drawHeroAt(g, char, outfit, o, x, gy, th, tint);
+  }
   function shopRefresh() {
     const box = $("shopCards"), top = box.scrollTop; box.innerHTML = "";   // (the list scrolls: keep where it was)
     SH.cards.forEach((c, i) => {
@@ -10323,7 +10391,7 @@
       const b = document.createElement("button"); b.className = "scard" + (worn ? " worn" : ""); b.setAttribute("aria-pressed", i === SH.sel ? "true" : "false"); b.setAttribute("aria-label", c.name);
       const cv2 = document.createElement("canvas"); cv2.width = 190; cv2.height = 230;
       const g2 = cv2.getContext("2d"), oc = cardOutfit(c);
-      if (!drawHeroAt(g2, hero, oc, { face: 0 }, 95, 222, 210, true)) badgeQ(g2, 150, 36, 22);
+      if (!drawSelectionHeroAt(g2, hero, oc, { face: 0 }, 95, 222, 210, true)) badgeQ(g2, 150, 36, 22);
       const pr = document.createElement("div"); pr.className = "scprice" + (owned || can ? "" : " no");
       pr.innerHTML = owned ? '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg>' : `<img src="assets/ui_star.webp" alt=""><span>${c.price}</span>`;
       b.append(cv2, pr);
@@ -10404,7 +10472,7 @@
     if (th.embers) shopEmbers(g, W, H, SH.t);
     const vw = SHOP_VIEWS[view], bob = Math.sin(SH.t * 2.2) * ht * 0.006;
     g.save(); g.translate(cx, 0); g.scale(Math.max(0.03, sx), 1);
-    const have = drawHeroAt(g, hero, oc, { face: vw.face, flip: vw.flip }, 0, gy + bob, ht, true);
+    const have = drawSelectionHeroAt(g, hero, oc, { face: vw.face, flip: vw.flip }, 0, gy + bob, ht, true);
     g.restore();
     if (!have) badgeQ(g, cx + ht * 0.2, gy - ht * 0.93, ht * 0.07);
     if (SH.sparkT > 0) {   // sparkles after buying or wearing
@@ -13156,7 +13224,7 @@
       }
       renderCoop();
     }, () => { if (NET.state === "ok") { NET.state = "none"; NET.room = null; renderCoop(); } });
-    for (const t of ["start", "hits", "ult", "shoo", "portal", "hurt", "pick", "gain", "shots", "xp", "pet", "combo", "outfit", "shop", "ship", "ally", "travel", "dialogue", "gomslash"]) room.on(t, onNet, () => {});
+    for (const t of ["start", "hits", "ult", "shoo", "portal", "hurt", "pick", "gain", "shots", "xp", "pet", "combo", "outfit", "shop", "ship", "ally", "travel", "dialogue", "gomslash", "gomheal"]) room.on(t, onNet, () => {});
     renderCoop();
   }
 
@@ -13319,7 +13387,7 @@
     if (msg.topic === "ally") {   // her page about this page's friends / girl: a hit the host saw, Kairon's aura (a heart, the friends healed / up)
       if (d.to !== NET.me || G.mode !== "play") return;
       if (d.t === "hurt") { if (NET.role !== "guest") return; const p = PETE[clamp(Math.floor(num(d.i)), 0, 7)]; if (p && isCls(p)) allyDamage(p, clamp(Math.round(num(d.n)) || 1, 1, 4), num(d.fx), num(d.fy), typeof d.bf === "boolean" ? d.bf : bossFight()); }
-      else if (d.t === "heal") { if (!P.dead && G.hearts < maxHearts()) { G.hearts++; renderHearts(); SFX.heal(); if (G.parts.length < 420) burst(P.x, P.y - 140, 14, ["#fff4c2", "#ff9ab8", "#ffd34d"], 260, 0.6); } }
+      else if (d.t === "heal") { if (!P.dead && G.hearts < maxHearts()) { G.hearts = Math.min(maxHearts(), G.hearts + 1); renderHearts(); SFX.heal(); if (G.parts.length < 420) burst(P.x, P.y - 140, 14, ["#fff4c2", "#ff9ab8", "#ffd34d"], 260, 0.6); } }
       else if (d.t === "aura") auraOn(num(d.x), num(d.y));
       return;
     }
@@ -13353,15 +13421,18 @@
       }
       return;
     }
+    if(msg.topic==="gomheal") { if(NET.role==="guest" && d.to===NET.me && G.mode==="play" && gomWaiting.delete(d.id))gomHeal(); return; }
     if (NET.role === "host") {
       if (msg.topic === "hits") {
         for (const h of Array.isArray(d.h) ? d.h.slice(0, 120) : []) {
           if (!Array.isArray(h)) continue;
+          gomReceiveHit(h,()=>{
           const el = ELS[num(h[1])] || null, id = num(h[0]);
           const frost = num(h[5]) === 1 && !!Q && frostOn(Q.outfit);   // (her ice-queen bolt: only as her page's outfit says)
-          if (id === -1) { if (G.boss && G.boss.alive) { damageBoss(Q && Q.hero === "b" ? clamp(num(h[2]),0,40) : 1, G.boss.x, G.boss.y - 220); applyElem(G.boss, el, "q"); if (frost) applyFrost(G.boss); } continue; }
+          if (id === -1) { if (G.boss && G.boss.alive) { damageBoss(Q && Q.hero === "b" ? clamp(num(h[2]),0,40) : 1, G.boss.x, G.boss.y - 220); applyElem(G.boss, el, "q"); if (frost) applyFrost(G.boss); } return; }
           const m = G.mons.find((m) => m.id === id && m.alive);
           if (m) { damageMon(m, clamp(num(h[2]) || 1, 0.1, 400), Q ? Q.x : m.x, Q ? Q.y : m.y, false, "q", clamp(num(h[3]) || 60, 0, 600)); applyElem(m, el, "q"); if (num(h[4]) > 0 && m.alive) m.slow = Math.max(m.slow || 0, clamp(num(h[4]) / 10, 0, 5)); if (frost) applyFrost(m); }
+          });
         }
       } else if (msg.topic === "ult") {
         ultBlast(num(d.cx), num(d.cy), clamp(num(d.hw), 0, 2200), clamp(num(d.hh), 0, 1400), "q"); SFX.boom(); ultShake();   // (her show is played from her clock: UFX.q)
