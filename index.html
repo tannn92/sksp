@@ -226,7 +226,11 @@
   .help { display: flex; gap: 1.2em; justify-content: center; flex-wrap: wrap; font-size: .82em; color: var(--muted); font-weight: 700; }
   .help span b { color: var(--cream); }
   .row { display: flex; gap: .8em; justify-content: center; flex-wrap: wrap; }
-  #loading { font-weight: 800; color: var(--muted); }
+  #loading { font-weight: 800; color: var(--muted); margin: 1em auto; }
+  #loadingProgress { display: block; width: min(280px, 70vw); height: 14px; margin: .65em auto 0; border: 0; border-radius: 999px; overflow: hidden; background: rgba(255,255,255,.15); accent-color: var(--gold); }
+  #loadingProgress::-webkit-progress-bar { background: rgba(255,255,255,.15); border-radius: 999px; }
+  #loadingProgress::-webkit-progress-value { background: var(--gold); border-radius: 999px; }
+  #loadingProgress::-moz-progress-bar { background: var(--gold); border-radius: 999px; }
   .screen, #storyCard { box-sizing: border-box; padding-top: max(4vh, env(safe-area-inset-top, 0px)); padding-bottom: max(4vh, env(safe-area-inset-bottom, 0px)); }
   .screen { overflow-y: auto; touch-action: pan-y; }
   #shopCards { touch-action: pan-y; }
@@ -281,7 +285,7 @@
     <p id="titleStory"></p>
     <div class="heroes" id="heroes"></div>
     <div class="help"><span>Cần trái: <b>đi khắp nơi</b></span><span>Bé <b>tự bắn</b> quái gần nhất</span><span>Đầy năng lượng: <b>Tuyệt chiêu</b></span></div>
-    <p id="loading">Đang tải hình ảnh…</p>
+    <div id="loading"><span id="loadingText" role="status">Đang tải game… 0%</span><progress id="loadingProgress" max="100" value="0" aria-label="Tiến độ tải game"></progress></div>
     <div class="startsel" id="startSel" role="group" aria-label="Bản thử: chọn màn"><span>Bản thử: chọn màn</span><button id="selMan1">Màn 1</button><button id="selMan2">Màn 2: Đảo Cướp Biển</button><button id="selMan3">Màn 3: Núi Tuyết</button><button id="selMan4">Màn 4: Núi Dung Nham</button><button id="selMan5">Màn 5: Lâu Đài</button></div>
     <div class="row"><button class="btn" id="startBtn" hidden>Chơi một mình</button><button class="btn ghost" id="coopBtn" hidden>Chơi 2 người</button></div>
   </div>
@@ -403,9 +407,28 @@
   // ---------------------------------------------------------------- assets
   const IMG = {}, FR = {};
   let META = null, ready = false;
+  let startupPercent = 0;
+  function showLoadProgress(value, label) {
+    startupPercent = Math.max(startupPercent, Math.min(100, Math.round(value)));
+    const text = $("loadingText"), bar = $("loadingProgress");
+    if (!text || !bar) return; // A fatal loading error has replaced the progress UI.
+    text.textContent = label + " " + startupPercent + "%";
+    bar.value = startupPercent;
+  }
+  async function loadBatch(items, load, from, to, label) {
+    let done = 0;
+    showLoadProgress(from, label);
+    const result = await Promise.all(items.map(async item => {
+      const value = await load(item);
+      showLoadProgress(from + (to - from) * ++done / items.length, label);
+      return value;
+    }));
+    showLoadProgress(to, label);
+    return result;
+  }
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261103.1649", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261103.1739", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -532,6 +555,7 @@
       return { M, sheets };
     };
     const [old, art] = await Promise.all([one("atlas.json", true), one("atlas4.json", false)]);
+    showLoadProgress(5, "Đang đọc danh sách trang phục…");
     for (const of of GOM_OUTFITS) {
       try {
         const M = await (await fetch("gom-assets/"+of+"/atlas.json",{cache:"no-cache"})).json();
@@ -545,13 +569,14 @@
         AT.sheets.push(...sheets); AT.groups[group]=sheets.map(S=>S.i);
         for(const [pose,f] of Object.entries(M.frames)) FR[group+"."+pose]=new AFrame(sheets[f[0]],f,group+"."+pose);
       } catch(e) { console.warn("Gôm: chưa tải được bộ",of); }
+      showLoadProgress(5 + 15 * (GOM_OUTFITS.indexOf(of) + 1) / GOM_OUTFITS.length, "Đang đọc danh sách trang phục…");
     }
     META = old.M;
     for (const A of [old, art]) if (A) for (const [n, f] of Object.entries(A.M.frames)) FR[n] = new AFrame(A.sheets[f[0]], f, n);
     // what the home screen and the first moments need, decoded before the game shows (the old atlas must all be in)
     for (const S of old.sheets) S.need = true;
-    await Promise.all(old.sheets.map((S) => sheetLoad(S)));
-    await Promise.all(AT.sheets.filter((S) => S.keep || atlasPins().has(S.g)).map((S) => sheetLoad(S)));
+    await loadBatch(old.sheets, sheetLoad, 20, 55, "Đang tải hình ảnh…");
+    await loadBatch(AT.sheets.filter(S => S.keep || atlasPins().has(S.g)), sheetLoad, 55, 98, "Đang tải nhân vật và khung cảnh…");
     FR.potion_energy = recolor("potion", "#ffc21a");
     placeholderWorldFrames();
     for (const k of ["meadow", "stage", "shop_room", "dock", "island"]) scene(k);
@@ -687,6 +712,7 @@
     fire() { noise(0.35, 0.12, 900, 0.7); tone("sawtooth", 300, 120, 0.3, 0.04); },
     web() { noise(0.2, 0.1, 3000, 2); },
     swoosh() { noise(0.25, 0.08, 1200, 0.8); },
+    slash() { noise(0.13, 0.22, 2400, 0.65); tone("triangle", 1250, 360, 0.075, 0.09); },
     portal() { [392, 523, 659, 784, 1046].forEach((f, i) => tone("sine", f, f, 0.6, 0.06, i * 0.08)); noise(0.8, 0.05, 5000, 0.5); },
     unlock() { [784, 988, 1175, 1568].forEach((f, i) => tone("triangle", f, f, 0.4, 0.07, i * 0.1)); },
     slam() { tone("sine", 90, 30, 0.8, 0.6); noise(0.6, 0.4, 300, 0.6, 0, "lowpass"); },
@@ -1786,7 +1812,7 @@
     const hp=m.hp, queued=NET.hq.length; hit();
     if(NET.role==="guest") {
       if(NET.hq.length>queued) { NET.hq[NET.hq.length-1][6]=strike.id; gomWaiting.add(strike.id); if(gomWaiting.size>128)gomWaiting.delete(gomWaiting.values().next().value); }
-    } else if(m.hp<hp && !strike.healed) { strike.healed=true; gomHeal(); }
+    } else if(m.hp<hp && !strike.healed) { strike.healed=true; play("slash"); gomHeal(); }
   }
   function gomReceiveHit(h, hit) {
     const token=h[6];
@@ -1798,7 +1824,7 @@
     if(!m?.alive || Q.dead || Q.tiredT>0) return;
     if(id!==-1 && shieldBlocks(m,Math.cos(Math.atan2(m.y-Q.y,m.x-Q.x)),Math.sin(Math.atan2(m.y-Q.y,m.x-Q.x))))return;
     hit();
-    if(m.hp<hp && !record.healed) { record.healed=true; netEmit("gomheal",{to:NET.partner,id:token}); }
+    if(m.hp<hp && !record.healed) { record.healed=true; play("slash"); netEmit("gomheal",{to:NET.partner,id:token}); }
   }
   // Each strike applies once to every enemy in its arc. Finishers take longer;
   // their damage is scaled by that same duration to preserve sustained DPS.
@@ -1832,7 +1858,7 @@
       G.shots.push({x:P.x,y:P.y,vx:Math.cos(a)*S.speed,vy:Math.sin(a)*S.speed,life:S.range/S.speed,r:S.r,dmg:S.dmg*pace,bossDmg:1.3,pierce:true,hit:new Set(),elem:P.elem,hk:"b",sc:1,kb:S.kb});
       netShot(P.x,P.y,a,1);
     }
-    play("zap");
+    play(near ? "swoosh" : "zap");
   }
   // where the wand tip is, per facing (0 down .. 4 up, x mirrored when she faces left), relative to her feet;
   // the bolt flies at BOLT_Z above the ground, so y here is ground-level (tip height - BOLT_Z)
@@ -7949,7 +7975,10 @@
   // ---------------------------------------------------------------- particles
   function hitFx(x, y, hk) { if (G.parts.length < 420) G.parts.push({ type: "fx", name: hk === "s" ? "fx_hit_s" : "fx_hit_g", x, y, sc: 0.5, life: 0.28, max: 0.28, rot: Math.random() * 6 }); }
   function burst(x, y, n, cols, sp, life) {
-    n = Math.min(n, Math.max(0, 480 - G.parts.length));
+    // Multi-target kills share a cosmetic spark budget; skill art and damage are untouched.
+    let sparks = 0;
+    for (const p of G.parts) if (p.type === "dot" && p.life > 0) sparks++;
+    n = Math.min(n, Math.max(0, 120 - sparks), Math.max(0, 480 - G.parts.length));
     for (let i = 0; i < n; i++) {
       const a = Math.random() * TAU, v = sp * (0.3 + Math.random() * 0.7);
       G.parts.push({ type: "dot", x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 60, life: life * rnd(0.6, 1), max: life, r: rnd(3, 8), col: cols[i % cols.length], g: 400 });
@@ -13421,7 +13450,7 @@
       }
       return;
     }
-    if(msg.topic==="gomheal") { if(NET.role==="guest" && d.to===NET.me && G.mode==="play" && gomWaiting.delete(d.id))gomHeal(); return; }
+    if(msg.topic==="gomheal") { if(NET.role==="guest" && d.to===NET.me && G.mode==="play" && gomWaiting.delete(d.id)){play("slash");gomHeal();} return; }
     if (NET.role === "host") {
       if (msg.topic === "hits") {
         for (const h of Array.isArray(d.h) ? d.h.slice(0, 120) : []) {
@@ -13915,11 +13944,14 @@
   requestAnimationFrame(loop);
 
   async function boot() {
+    showLoadProgress(0, "Đang tải game…");
     try { await loadAssets(); }
     catch (e) { $("loading").textContent = "Không tải được hình ảnh. Hãy tải lại trang."; return; }
+    showLoadProgress(99, "Đang chuẩn bị màn chơi…");
     makeProps(); setTitleStory();
     buildLevel(0); G.mode = "title"; ready = true;
     renderHeroes(); updateXpHud();
+    showLoadProgress(100, "Sẵn sàng!");
     $("loading").hidden = true; $("startBtn").hidden = false; $("coopBtn").hidden = false;
     setTimeout(() => { try { ufxArt(); ufxBoomArt("g"); ufxBoomArt("s"); } catch (_) {} }, 300);   // (the ultimates' pictures painted on the title screen, not as one starts)
   }
