@@ -405,7 +405,7 @@
   let META = null, ready = false;
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261103.1534", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261103.1542", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -10063,7 +10063,7 @@
     let entry = GOM_SELECTION.get(outfit);
     if (!entry) {
       entry = { frame: null, promise: null }; GOM_SELECTION.set(outfit, entry);
-      entry.promise = loadImg('gom-assets/' + outfit + '/selection.webp').then(img => {
+      entry.promise = loadImg('gom-assets/' + outfit + '/selection.webp?v=' + encodeURIComponent(BUILD_VER)).then(img => {
         const stand = FR['b.base.stand'];
         entry.frame = { img, sx: 0, sy: 0, w: img.width, h: img.height,
           s: stand ? stand.h * stand.s / img.height : 247.5 / img.height,
