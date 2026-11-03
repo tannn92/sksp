@@ -428,7 +428,7 @@
   }
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261103.1739", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261103.1752", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -712,7 +712,7 @@
     fire() { noise(0.35, 0.12, 900, 0.7); tone("sawtooth", 300, 120, 0.3, 0.04); },
     web() { noise(0.2, 0.1, 3000, 2); },
     swoosh() { noise(0.25, 0.08, 1200, 0.8); },
-    slash() { noise(0.13, 0.22, 2400, 0.65); tone("triangle", 1250, 360, 0.075, 0.09); },
+    slash() { noise(0.20, 0.85, 3200, 0.5); tone("triangle", 1800, 500, 0.12, 0.22); },
     portal() { [392, 523, 659, 784, 1046].forEach((f, i) => tone("sine", f, f, 0.6, 0.06, i * 0.08)); noise(0.8, 0.05, 5000, 0.5); },
     unlock() { [784, 988, 1175, 1568].forEach((f, i) => tone("triangle", f, f, 0.4, 0.07, i * 0.1)); },
     slam() { tone("sine", 90, 30, 0.8, 0.6); noise(0.6, 0.4, 300, 0.6, 0, "lowpass"); },
