@@ -428,7 +428,7 @@
   }
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261103.1849", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261103.2230", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -577,6 +577,7 @@
     for (const S of old.sheets) S.need = true;
     await loadBatch(old.sheets, sheetLoad, 20, 55, "Đang tải hình ảnh…");
     await loadBatch(AT.sheets.filter(S => S.keep || atlasPins().has(S.g)), sheetLoad, 55, 98, "Đang tải nhân vật và khung cảnh…");
+    await loadDragon();
     FR.potion_energy = recolor("potion", "#ffc21a");
     placeholderWorldFrames();
     for (const k of ["meadow", "stage", "shop_room", "dock", "island"]) scene(k);
@@ -737,6 +738,8 @@
     swoosh() { noise(0.25, 0.08, 1200, 0.8); },
     slash() { gomSlashSound(); },
     swordWave() { gomWaveSound(); },
+    dragonCharge() { tone("sine",330,880,.3,.06); },
+    dragonBeam() { tone("sine",880,220,.28,.09); noise(.22,.08,1600,1); },
     portal() { [392, 523, 659, 784, 1046].forEach((f, i) => tone("sine", f, f, 0.6, 0.06, i * 0.08)); noise(0.8, 0.05, 5000, 0.5); },
     unlock() { [784, 988, 1175, 1568].forEach((f, i) => tone("triangle", f, f, 0.4, 0.07, i * 0.1)); },
     slam() { tone("sine", 90, 30, 0.8, 0.6); noise(0.6, 0.4, 300, 0.6, 0, "lowpass"); },
@@ -842,7 +845,7 @@
       end: "Bánh Kem Khổng Lồ đã bị đánh bại và Mèo Simmy đã được cứu! Nhưng Phù thủy Hắc Ám vẫn nhốt Kairon, Sammy và Phong Cận. Đi cứu các bạn thôi!",
       // the boss leaps twice (at 2/3 and 1/3 of his health), each leap asks quiz.n[i] questions in a row
       boss: { art: "candy_boss", name: "Bánh Kem Khổng Lồ", hp: 45, tip: "Bánh kem đập đất nứt, đàn kẹo mút bay tới!", summon: "candy_lolli", style: "furrow", fence: "cd_wafer_fence", quiz: { op: "+", lim: 10, T: 3, n: [2, 2], hz: "qk_bomb" },
-      laugh: "laugh0", ha: "Hô hô! Đố đấy!", say: ["Hô hô! Bánh Kem Khổng Lồ đây!", "Vào rừng kẹo của ta à?", "Ta đè cho bẹp dí bây giờ!"], morph: ["Á à! Dám làm sứt kem của ta!", "Giờ ta giận thật rồi nhé!"], bye: ["Ối ối... kem chảy hết rồi...", "Phù thủy Hắc Ám ơi,", "cứu ta với!"] }, quota: 120, spawn: [0.7, 1.6], camps: 9, pets: ["cat", "dog", "simmy"],
+      laugh: "laugh0", ha: "Hô hô! Đố đấy!", say: ["Hô hô! Bánh Kem Khổng Lồ đây!", "Vào rừng kẹo của ta à?", "Ta đè cho bẹp dí bây giờ!"], morph: ["Á à! Dám làm sứt kem của ta!", "Giờ ta giận thật rồi nhé!"], bye: ["Ối ối... kem chảy hết rồi...", "Phù thủy Hắc Ám ơi,", "cứu ta với!"] }, quota: 120, spawn: [0.7, 1.6], camps: 9, pets: ["cat", "dog", "simmy", "dragon"],
       kinds: [["candy_gummy", 3, 0], ["candy_lolli", 2, 0], ["candy_corn", 2, 0.1], ["candy_cupcake", 2, 0.2]],
       deco: [["cd_lolly_tree", 3], ["cd_gumdrop_bush", 3], ["cd_marsh_bush", 2], ["cd_candy_cane", 2], ["cd_cupcake_shroom", 2], ["cd_cookie_rock", 1], ["cd_choc_rock", 1]], arenaFloor: "arena_candy",
       gr: { base: "#f7d3e2", patch: ["#fde7d0", "#c9efdd", "#f2b9d2", "#fff1b8"], blade: ["#ffffff", "#ff9fc4", "#a8e6cf"], dot: ["#ff6fa8", "#7cf2c6", "#ffe066", "#ffffff", "#b9a4ff", "#ff9a5c"], nDot: 110,
@@ -988,6 +991,7 @@
   // Cafe (Matcha's Scottish Fold cat) runs at a monster near her girl and scratches it.
   // Coca (Mochi's toy poodle) runs at one and bites: it is knocked back and slowed. at: where its cage sits along the path.
   const PETS = {
+    dragon: {name:"Rồng con",owner:"b",at:.44,rgb:"130,220,255",col:"#82dcff",cd:2,range:760,tip:"Rồng bay theo Gôm và phóng tia năng lượng xuyên quái"},
     cat: { name: "Cafe", owner: "s", at: 0.26, rgb: "255,190,120", col: "#ffcf8a", cd: 0.8, range: 600, tip: "Cafe sẽ đi theo và cào quái giúp Matcha" },
     dog: { name: "Coca", owner: "g", at: 0.34, rgb: "200,130,90", col: "#c98a5e", cd: 1.0, range: 600, bite: true, tip: "Coca sẽ lao tới cắn quái, làm chúng lùi lại và chậm đi" },
     // Simmy (the S of SKSP), freed from her cage in Rừng Kẹo Ngọt; she joins whichever sister frees her. The four friends fight as their
@@ -1229,7 +1233,7 @@
     // a cage only when its sister plays (in co-op always, so both pages build the same level)
     const cageSpots = [];   // (every cage's spot, whoever plays: the ambush spots keep clear of them all, the same for both sisters)
     for (const k of L.pets || []) {
-      const side = R() < 0.5 ? -1 : 1, [x, y] = offAt(PETS[k].at * path.len, side, PATH_W / 2 + 70), own = PETS[k].owner === hero || isAlly(k);
+      const side = k === "dragon" ? 1 : R() < 0.5 ? -1 : 1, [x, y] = offAt(PETS[k].at * path.len, side, PATH_W / 2 + 70), own = PETS[k].owner === hero || isAlly(k);
       cageSpots.push({ x, y });
       // a friend's big cage has its guardian (GUARDS): it stands on the path in front of it (home); gd 0 none yet, 1 waiting, 2 awake, 3 beaten
       const [hx, hy] = offAt(PETS[k].at * path.len, side, 40), gd = isAlly(k) && GUARDS[i] ? 0 : undefined;
@@ -1861,6 +1865,7 @@
   }
   function gomReceiveHit(h, hit) {
     const token=h[6];
+    if(typeof token==="string"&&token.startsWith("dragon:"))return dragonReceiveHit(h,hit);
     if(!Number.isSafeInteger(token) || token<=0 || Q?.hero!=="b") return hit();
     let record=gomReceived.get(token);
     if(!record) { record={targets:new Set(),healed:false}; gomReceived.set(token,record); if(gomReceived.size>512)gomReceived.delete(gomReceived.keys().next().value); }
@@ -3625,6 +3630,111 @@
     ctx.restore();
   }
 
+  // Gôm's painted flying companion. Shared by game3/game4; boss damage uses a small adapter below.
+  const DRAGON_POSES = [...Array.from({length:4},(_,i)=>'r'+i),...Array.from({length:4},(_,i)=>'l'+i),'attack_r','attack_l','beam','impact'];
+  let dragonMeta = null, dragonSequence = 0;
+  const dragonReceived = new Map();
+  async function loadDragon() {
+    const root='gom-assets/dragon/', m=await (await fetch(root+'atlas.json',{cache:'no-cache'})).json();
+    if(m.version!==1 || !Array.isArray(m.sheets) || !m.sheets.length || m.sheets.some(s=>!/^dragon_[\w-]+\.webp$/.test(s)) || !m.frames || DRAGON_POSES.some(k=>!m.frames[k])) throw Error('Rồng chưa đủ hình');
+    const images=await Promise.all(m.sheets.map(s=>loadImg(root+s+'?v='+encodeURIComponent(m.hash)))), frames={};
+    for(const k of DRAGON_POSES) {
+      const f=m.frames[k],im=images[f[0]];
+      if(!Array.isArray(f)||f.length!==8||!f.every(Number.isFinite)||!im||!Number.isInteger(f[0])||f[1]<0||f[2]<0||f[3]<=0||f[4]<=0||f[5]<=0||f[1]+f[3]>im.width||f[2]+f[4]>im.height||f[6]<0||f[6]>f[3]||f[7]<0||f[7]>f[4])throw Error('Hình rồng bị lỗi');
+      frames['dragon_'+k]={img:im,sx:f[1],sy:f[2],w:f[3],h:f[4],s:f[5],ax:f[6],ay:f[7]};
+    }
+    for(const k of ['attack_r','attack_l']) {const a=m.mouth?.[k],f=m.frames[k];if(!Array.isArray(a)||a.length!==2||!a.every(Number.isFinite)||a[0]<0||a[0]>f[3]||a[1]<0||a[1]>f[4])throw Error('Miệng rồng bị lỗi');}
+    Object.assign(FR,frames);dragonMeta=m;
+  }
+  function dragonReady() { return !!dragonMeta && DRAGON_POSES.every(k=>FR['dragon_'+k]?.img); }
+  function dragonBlocked(owner) {
+    return !owner || (owner===Q && owner.hearts<=0) || owner.dead || owner.tiredT>0 || owner.winT>0 || owner.win || owner.paused || owner.story || G.mode!=='play' || !!(G.quiz||G.bcut||G.rescue||G.combo||G.ult||G.story||G.cine && (G.cine.lock||G.cine.ph!=='fight'));
+  }
+  function dragonLift(p) {return p.sc ? 0 : 38+Math.sin(G.t*4+(p.i||0))*5;}
+  function dragonMouth(p) {
+    const k='attack_'+(p.flip?'l':'r'),f=FR['dragon_'+k],a=dragonMeta.mouth[k],s=f.s*CHAR_M*(p.sc||1);
+    return {x:p.x+(a[0]-f.ax)*s,y:p.y-dragonLift(p)+(a[1]-f.ay)*s};
+  }
+  function dragonAimY(o) {return o.y-Math.max(55,(o.hgt||0)-20);}
+  function dragonClearPaused() {
+    for(const p of PETE) if(p.kind==='dragon'&&dragonBlocked(P)){p.dragonShot=null;p.cd=Math.max(.35,p.cd||0);}
+    for(const p of QPETE) if(p.kind==='dragon'&&dragonBlocked(Q))p.dragonShot=null;
+  }
+  function dragonStep(p,owner,dt,act) {
+    if(!dragonReady()){p.dragonShot=null;return;}
+    if(dragonBlocked(owner)||!act){p.dragonShot=null;p.dragonAlign=false;p.cd=Math.max(.35,p.cd||0);}
+    const shot=p.dragonShot;
+    if(shot) {
+      p.cd=Math.max(0,(p.cd||0)-dt);
+      const elapsed=G.t-shot.start;
+      if(!shot.fired&&elapsed>=.3){shot.fired=true;const mouth=dragonMouth(p);shot.x=mouth.x;shot.y=mouth.y;dragonFire(p,owner,shot);}
+      if(elapsed>=.58)p.dragonShot=null;
+      return;
+    }
+    const tx=owner.x+(owner.flip?115:-115),ty=owner.y+70,dx=tx-p.x,dy=ty-p.y,d=Math.hypot(dx,dy);
+    if(d>1400){p.x=tx;p.y=ty;}else if(d>2&&!p.dragonAlign){const s=Math.min(1,dt*3.2);p.x+=dx*s;p.y+=dy*s;if(Math.abs(dx)>4)p.flip=dx<0;}
+    p.moving=d>8;p.face=2;p.at=-1;
+    if(!act||dragonBlocked(owner)||(p.cd=(p.cd??.5)-dt)>0)return;
+    const target=nearestFoes(owner.x,owner.y,760,1)[0];
+    if(!target){p.cd=.2;p.dragonAlign=false;return;}
+    p.flip=target.x<p.x;const mouth=dragonMouth(p),a=Math.atan2(dragonAimY(target)-mouth.y,target.x-mouth.x),direction=p.flip?-1:1;
+    // A side-facing mouth cannot fire through its own skull: back away / align before charging.
+    if((target.x-mouth.x)*direction<80 || Math.cos(a)*direction<.55) {
+      p.dragonAlign=true;const k=Math.min(1,dt*4);p.x+=(target.x-direction*260-p.x)*k;p.y+=(target.y+90-p.y)*k;p.cd=0;return;
+    }
+    p.dragonAlign=false;p.dragonShot={id:++dragonSequence,start:G.t,a,x:mouth.x,y:mouth.y,fired:false};p.cd=2;
+    play('dragonCharge');
+    if(NET.role&&NET.fq.length<10)NET.fq.push(['d',p.i,p.x,p.y,a,0,p.flip?1:0]);
+  }
+  function dragonIntersects(o,s) {
+    const dx=o.x-s.x,dy=dragonAimY(o)-s.y,ux=Math.cos(s.a),uy=Math.sin(s.a),along=dx*ux+dy*uy,r=Math.min(130,o.r||80);
+    return along>=0&&along<=850+r&&Math.abs(dx*uy-dy*ux)<=r+28;
+  }
+  function dragonFire(p,owner,s) {
+    if(dragonBlocked(owner)||!dragonReady())return;
+    play('dragonBeam');
+    const targets=G.mons.filter(m=>m.alive&&dragonIntersects(m,s));
+    if(G.boss?.alive&&dragonIntersects(G.boss,s))targets.push(G.boss);
+    let impacts=0;
+    for(const m of targets) {
+      if(dragonBlocked(owner))break;
+      const n=NET.hq.length;
+      if(m===G.boss)dragonHitBoss(m);
+      else hitMon(m,Math.round(petDmg(owner.lv||1)*2.4),null,p.x,p.y,70);
+      if(NET.role==='guest'&&NET.hq.length>n)NET.hq[NET.hq.length-1][6]='dragon:'+s.id;
+      if(impacts++<4&&G.parts.length<180)G.parts.push({type:'fx',name:'dragon_impact',x:m.x,y:dragonAimY(m),sc:.65,life:.25,max:.25});
+    }
+    if(NET.role&&NET.fq.length<10)NET.fq.push(['d',p.i,p.x,p.y,s.a,1,p.flip?1:0]);
+  }
+  function dragonReceiveHit(h,hit) {
+    if(Q?.hero!=='b'||!Q.pets?.includes('dragon')||dragonBlocked(Q)||!dragonReady()||!/^dragon:[1-9][0-9]{0,12}$/.test(h[6]))return;
+    let ids=dragonReceived.get(h[6]);if(!ids){ids=new Set();dragonReceived.set(h[6],ids);if(dragonReceived.size>128)dragonReceived.delete(dragonReceived.keys().next().value);}
+    const id=Number(h[0]);if(ids.has(id))return;ids.add(id);hit();
+  }
+  function dragonRemote(p,f) {
+    if(p?.kind!=='dragon'||Q?.hero!=='b'||dragonBlocked(Q)||!dragonReady()||f.length<6||!f.slice(2,6).every(Number.isFinite))return;
+    if(Math.hypot(f[2]-Q.x,f[3]-Q.y)>1500)return;
+    p.x=f[2];p.y=f[3];p.flip=f[6]===1;
+    const mouth=dragonMouth(p);p.dragonShot={start:G.t-(f[5]===1?.3:0),a:f[4],x:mouth.x,y:mouth.y,fired:true};
+    play(f[5]===1?'dragonBeam':'dragonCharge');
+  }
+  function drawDragon(p) {
+    if(!dragonReady())return;
+    const owner=QPETE.includes(p)?Q:P,blocked=dragonBlocked(owner),s=blocked?null:p.dragonShot,t=s?G.t-s.start:9;
+    if(t>=.58)p.dragonShot=null;
+    const active=s&&t<.58,pose=active?'attack_'+(p.flip?'l':'r'):(p.flip?'l':'r')+(Math.floor(G.t*9)%4);
+    shadow(p.x,p.y,36*(p.sc||1),9*(p.sc||1),.2);
+    spr('dragon_'+pose,p.x,p.y-dragonLift(p),false,CHAR_M*(p.sc||1));
+    if(!active)return;
+    const mouth=dragonMouth(p);
+    if(t<.3){glow(mouth.x,mouth.y,18+45*t/.3,'130,230,255',.35+.5*t/.3);return;}
+    const f=FR.dragon_beam,alpha=Math.min(1,(.58-t)/.12),width=42+8*Math.sin(t*60);
+    // Stretch the painted beam along the attack line; all shape/detail comes from the sprite.
+    ctx.save();ctx.translate(mouth.x,mouth.y);ctx.rotate(s.a);ctx.globalAlpha*=alpha;
+    ctx.drawImage(f.img,f.sx,f.sy,f.w,f.h,0,-width/2,850,width);ctx.restore();
+  }
+  function dragonHitBoss(m) { hitBoss(null,m.x,m.y,false,2); }
+
   // ---------------------------------------------------------------- pets
   // st: "follow" trails the girl; "pounce" runs at a monster near her; "atk" plays the attack (Cafe's claw swipe,
   // Coca's bite) and lands the hit halfway through; then she follows again
@@ -3642,6 +3752,7 @@
   const partnerPetEnts = () => Q.pets.map((k, i) => allyInit({ kind: k, x: Q.x, y: Q.y, face: 0, flip: false, dist: 0, i, q: true }));
   function followPets(list, owner, dt, act) {
     for (const p of list) {
+      if(p.kind==="dragon"){dragonStep(p,owner,dt,act);continue;}
       // the friends fight as their classes (their own page: allyStep; the partner's, when her page sends no positions: they follow her)
       if (isCls(p)) { if (list === PETE) allyStep(p, owner, dt, act); else trailGirl(p, owner, dt); continue; }
       if (p.faintT > 0) { p.faintT -= dt; p.moving = false; p.at = -1; p.st = "follow"; continue; }
@@ -3870,6 +3981,7 @@
     for (const p of QPETE) { p.hostInv = (p.hostInv || 0) - dt; p.flash = (p.flash || 0) - dt; if (p.act) { if (p.faintT > 0) p.act = null; else stepAct(p, dt, false); } }
     if (!pl) return followPets(QPETE, Q, dt, false);
     QPETE.forEach((p, i) => {
+      if(p.kind==="dragon"&&p.dragonShot&&G.t-p.dragonShot.start<.58&&!dragonBlocked(Q))return;
       const a = Array.isArray(pl[i]) ? pl[i] : null; if (!a) return;
       const tx = num(a[0]), ty = num(a[1]), dx = tx - p.x, dy = ty - p.y, d = Math.hypot(dx, dy), k = Math.min(1, dt * 14);
       if (d > 900) { p.x = tx; p.y = ty; } else { p.x += dx * k; p.y += dy * k; p.dist += d * k; }
@@ -8128,6 +8240,7 @@
   function play(n) { const t = performance.now(); if (t - (sfxT[n] || 0) < (n === "zap" ? 110 : 55)) return; sfxT[n] = t; SFX[n] && SFX[n](); }
   function update(dt) {
     G.t += dt; G.frame++;
+    dragonClearPaused();
     if (G.say && ((G.say.t = dialogueClock(G.say, dt, dialogueWindows(G.say.seq), "say:" + G.say.seq[0][1].join(" "))) > seqTime(G.say.seq) + 0.5 || G.cine || G.rescue || G.bcut)) G.say = null;   // (a film takes over the screen: its own lines)
     if (G.fadeDir) {
       G.fade = clamp(G.fade + G.fadeDir * dt / 0.45, 0, 1);
@@ -8916,6 +9029,7 @@
     ctx.restore();
   }
   function drawPet(p) {
+    if(p.kind==="dragon")return drawDragon(p);
     const D = PETS[p.kind];
     if (isCls(p)) return drawClassAlly(p);
     if (p.faintT > 0) return drawPetFaint(p, D);
@@ -13543,7 +13657,8 @@
       // their pet's attacks (start of the animation, then the hit), replayed here
       for (const f of Array.isArray(d.f) ? d.f.slice(0, 40) : []) {
         if (!Array.isArray(f) || !Q) break;
-        const i = clamp(Math.floor(num(f[1])), 0, 5), pe = QPETE[i];   // (up to her own pet and four friends)
+        const i = Math.floor(num(f[1])), pe = i>=0 && i<QPETE.length ? QPETE[i] : null;   // (up to her own pet and four friends)
+        if(f[0]==="d"){dragonRemote(pe,f);continue;}
         if (f[0] === "c" && pe && isCls(pe)) {   // her friend starts a combo / a skill: the same poses here
           if (pe.faintT > 0) continue;
           pe.flip = !!num(f[3]); pe.face = 2; startAct(pe, ACTS[clamp(Math.floor(num(f[2])), 0, ACTS.length - 1)], null, false); pe.act.tx = num(f[4]); pe.act.ty = num(f[5]);
