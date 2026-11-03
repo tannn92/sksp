@@ -428,7 +428,7 @@
   }
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261103.1811", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261103.1824", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -7776,6 +7776,7 @@
       R.targets = candidates.length ? Array.from({length:24}, (_,i) => { const m=candidates[i%candidates.length]; return {m,x:m.x,y:m.y}; }) : [];
     }
     if (R.targets && t < 1.5) for (const target of R.targets) if(target.m.alive) { target.x=target.m.x; target.y=target.m.y; }
+    if(t>=1.5 && R.targets && !R.impacts) R.impacts=gomImpactSites(R.targets);
   }
   function gomRingPose(S, x, y, t, i, K=1) {
     const R=S.gomRing, target=R?.targets?.[i], flying=!!target && t>=1.1;
@@ -7786,9 +7787,41 @@
     return {x:ox+(tx-ox)*k,y:oy+(ty-oy)*k,rot:flying?Math.atan2(ty-oy,tx-ox):-Math.PI/2+Math.cos(a)*.12,
       front:flying || Math.sin(a)>=0, alpha:ss(0,.25,t)*(1-ss(flying?1.5:1.1,flying?1.7:1.6,t)), scale:(i<12?1.05:1.2)*K};
   }
+  // Merge nearby hits once, not per render. No extra damage or particle objects.
+  function gomImpactSites(targets) {
+    const unique=new Map();
+    for(const p of targets) if(!unique.has(p.m)) unique.set(p.m,{x:p.x,y:p.y,count:1});
+    const sites=Array.from(unique.values());
+    while(sites.length>1) {
+      let best=Infinity, ai=0,bi=1;
+      for(let i=0;i<sites.length;i++) for(let j=i+1;j<sites.length;j++) { const d=(sites[i].x-sites[j].x)**2+(sites[i].y-sites[j].y)**2;if(d<best){best=d;ai=i;bi=j;} }
+      if(sites.length<=12 && best>120*120)break;
+      const a=sites[ai],b=sites[bi],n=a.count+b.count;
+      a.x=(a.x*a.count+b.x*b.count)/n;a.y=(a.y*a.count+b.y*b.count)/n;a.count=n;sites.splice(bi,1);
+    }
+    return sites;
+  }
   function drawGomRing(S, x, y, t, cx, cy, layer, frame, K=1) {
     gomRingStep(S,x,y,t,cx,cy);
-    for(let i=0;i<24;i++) { const p=gomRingPose(S,x,y,t,i,K); if(p.alpha>.01 && (p.front?1:0)===layer) spr(frame,p.x,p.y,false,p.scale,p.alpha,p.rot); }
+    for(let i=0;i<24;i++) {
+      const p=gomRingPose(S,x,y,t,i,K); if(p.alpha<=.01 || (p.front?1:0)!==layer)continue;
+      if(t>=1.1 && t<1.5 && S.gomRing.targets?.[i]) {
+        ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot);ctx.scale(1,.3);ctx.globalCompositeOperation="lighter";
+        glow(0,0,110*p.scale,"100,190,255",.7*p.alpha);ctx.restore();
+      }
+      spr(frame,p.x,p.y,false,p.scale,p.alpha,p.rot);
+    }
+    const age=t-1.5, impacts=S.gomRing.impacts;
+    if(!impacts || age<0 || age>.65)return;
+    const a=(1-ss(.22,.65,age)), grow=.35+.85*ss(0,.14,age);
+    for(const p of impacts) {
+      const size=K*(1+Math.min(.35,(p.count-1)*.07));
+      if(layer===0) groundCircle(frame.replace("sword_fly","slash2"),p.x,p.y,(.5+ss(0,.4,age))*size,.55*a,0);
+      else {
+        glow(p.x,p.y-75*K,180*size,"130,205,255",.45*a);
+        spr(frame.replace("sword_fly","ult_land"),p.x,p.y,false,grow*size,a);
+      }
+    }
   }
   // GOM_RING_END
   const ULT_PACE = 0.62;   // the ultimate's show runs slower than real time so it can be enjoyed
