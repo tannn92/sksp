@@ -428,7 +428,7 @@
   }
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261103.2247", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261104.0810", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -578,6 +578,7 @@
     await loadBatch(old.sheets, sheetLoad, 20, 55, "Đang tải hình ảnh…");
     await loadBatch(AT.sheets.filter(S => S.keep || atlasPins().has(S.g)), sheetLoad, 55, 98, "Đang tải nhân vật và khung cảnh…");
     await loadDragon();
+    await loadTriDragon();
     FR.potion_energy = recolor("potion", "#ffc21a");
     placeholderWorldFrames();
     for (const k of ["meadow", "stage", "shop_room", "dock", "island"]) scene(k);
@@ -991,6 +992,7 @@
   // Cafe (Matcha's Scottish Fold cat) runs at a monster near her girl and scratches it.
   // Coca (Mochi's toy poodle) runs at one and bites: it is knocked back and slowed. at: where its cage sits along the path.
   const PETS = {
+    tridragon: {name:"Rồng ba đầu",owner:"g",rgb:"255,135,75",col:"#ff874b",cd:2,range:760,tip:"Ba đầu lần lượt phun băng, lửa và độc"},
     dragon: {name:"Rồng con",owner:"b",at:.44,rgb:"130,220,255",col:"#82dcff",cd:2,range:760,tip:"Rồng bay theo Gôm và phóng tia năng lượng xuyên quái"},
     cat: { name: "Cafe", owner: "s", at: 0.26, rgb: "255,190,120", col: "#ffcf8a", cd: 0.8, range: 600, tip: "Cafe sẽ đi theo và cào quái giúp Matcha" },
     dog: { name: "Coca", owner: "g", at: 0.34, rgb: "200,130,90", col: "#c98a5e", cd: 1.0, range: 600, bite: true, tip: "Coca sẽ lao tới cắn quái, làm chúng lùi lại và chậm đi" },
@@ -1865,6 +1867,7 @@
   }
   function gomReceiveHit(h, hit) {
     const token=h[6];
+    if(typeof token==="string"&&token.startsWith("tri:"))return triReceiveHit(h,hit);
     if(typeof token==="string"&&token.startsWith("dragon:"))return dragonReceiveHit(h,hit);
     if(!Number.isSafeInteger(token) || token<=0 || Q?.hero!=="b") return hit();
     let record=gomReceived.get(token);
@@ -3284,6 +3287,11 @@
   // Rồng Hắc Ám (the final battle's giant form): the camera pulls back a little, so she and her big moves fit (fbK: 0..1)
   let fbK = 0;
   function rescuePet(kind) {
+    if(kind==='dog'&&hero==='g'){
+      let added=false;for(const k of ['dog','tridragon'])if(!P.pets.includes(k)){P.pets.push(k);added=true;}
+      if(added){makePetEnts();showBanner('Mochi đã cứu Coca và Rồng ba đầu!','Coca cắn quái; rồng lần lượt phun băng, lửa và độc');}
+      return;
+    }
     // (Simmy joins when her rescue film ends)
     if (isAlly(kind) && G.rescue && G.rescue.kind === kind) { G.rescue.mine = true; return; }
     if (kind === "cat") SFX.meow();
@@ -3735,6 +3743,93 @@
   }
   function dragonHitBoss(m) { hitBoss(null,m.x,m.y,false,2); }
 
+  // Mochi's three-headed companion: painted flight and a distinct mouth for each element.
+  const TRI_ELEMENTS=['ice','fire','poison'], TRI_COLORS=['150,225,255','255,145,50','145,235,85'];
+  const TRI_POSES=[...['r','l'].flatMap(d=>[d+'0',d+'1',d+'2',...TRI_ELEMENTS.map(e=>e+'_'+d)]),...TRI_ELEMENTS.flatMap(e=>[e+'_beam',e+'_impact'])];
+  let triMeta=null,triSequence=0;
+  const triReceived=new Map();
+  async function loadTriDragon(){
+    const root='mochi-assets/dragon/',m=await(await fetch(root+'atlas.json',{cache:'no-cache'})).json();
+    if(m.version!==1||!Array.isArray(m.sheets)||!m.sheets.length||m.sheets.some(s=>!/^tridragon_[\w-]+\.webp$/.test(s))||!m.frames||TRI_POSES.some(k=>!m.frames[k]))throw Error('Rồng ba đầu thiếu hình');
+    const images=await Promise.all(m.sheets.map(s=>loadImg(root+s+'?v='+encodeURIComponent(m.hash)))),frames={};
+    for(const k of TRI_POSES){const f=m.frames[k],im=images[f[0]];
+      if(!Array.isArray(f)||f.length!==8||!f.every(Number.isFinite)||!im||!Number.isInteger(f[0])||f[1]<0||f[2]<0||f[3]<=0||f[4]<=0||f[5]<=0||f[1]+f[3]>im.width||f[2]+f[4]>im.height||f[6]<0||f[6]>f[3]||f[7]<0||f[7]>f[4])throw Error('Hình rồng ba đầu bị lỗi');
+      frames['tridragon_'+k]={img:im,sx:f[1],sy:f[2],w:f[3],h:f[4],s:f[5],ax:f[6],ay:f[7]};
+    }
+    for(const d of ['r','l'])for(const e of TRI_ELEMENTS){const k=e+'_'+d,a=m.mouth?.[k],f=m.frames[k];if(!Array.isArray(a)||a.length!==2||!a.every(Number.isFinite)||a[0]<0||a[0]>f[3]||a[1]<0||a[1]>f[4])throw Error('Miệng rồng ba đầu bị lỗi');}
+    Object.assign(FR,frames);triMeta=m;
+  }
+  function triReady(){return !!triMeta&&TRI_POSES.every(k=>FR['tridragon_'+k]?.img);}
+  function drawCocaDragonCage(c){
+    shadow(c.x,c.y,105,23);
+    if(!c.open){
+      glow(c.x,c.y-115,190,'255,165,95',.35+.12*Math.sin(G.t*3));
+      drawPet({kind:'dog',x:c.x-44,y:c.y-12,face:0,flip:false,moving:false,i:0,dist:0,sc:.65,at:-1});
+      drawTriDragon({kind:'tridragon',x:c.x+20,y:c.y-105,flip:false,i:0,sc:.5});
+      spr(PROPS.cage,c.x,c.y,false,1.5);
+      label('Cứu Coca và Rồng ba đầu!',c.x,c.y-330,36);
+    }else spr(PROPS.cageOpen,c.x,c.y,false,1.5,.85);
+  }
+  function triMouth(p,head=p.triShot?.head??p.triNext??0){
+    const k=TRI_ELEMENTS[head]+'_'+(p.flip?'l':'r'),f=FR['tridragon_'+k],a=triMeta.mouth[k],s=f.s*CHAR_M*(p.sc||1);
+    return {x:p.x+(a[0]-f.ax)*s,y:p.y-dragonLift(p)+(a[1]-f.ay)*s};
+  }
+  function triClearPaused(){
+    for(const [list,owner]of [[PETE,P],[QPETE,Q]])for(const p of list)if(p.kind==='tridragon'&&dragonBlocked(owner)){p.triShot=null;p.cd=Math.max(.35,p.cd||0);}
+  }
+  function triStep(p,owner,dt,act){
+    if(!triReady()){p.triShot=null;return;}
+    if(owner===Q&&p.triShot&&!dragonBlocked(owner)){if(G.t-p.triShot.start<.65)return;p.triShot=null;}
+    if(dragonBlocked(owner)||!act){p.triShot=null;p.triAlign=false;p.cd=Math.max(.35,p.cd||0);}
+    const shot=p.triShot;
+    if(shot){p.cd=Math.max(0,(p.cd||0)-dt);const t=G.t-shot.start;
+      if(!shot.fired&&t>=.3){shot.fired=true;const m=triMouth(p,shot.head);shot.x=m.x;shot.y=m.y;triFire(p,owner,shot);}
+      if(t>=.65)p.triShot=null;return;
+    }
+    const tx=owner.x+(owner.flip?190:-190),ty=owner.y+105,dx=tx-p.x,dy=ty-p.y,d=Math.hypot(dx,dy);
+    if(d>1400){p.x=tx;p.y=ty;}else if(d>2&&!p.triAlign){const k=Math.min(1,dt*3.2);p.x+=dx*k;p.y+=dy*k;if(Math.abs(dx)>4)p.flip=dx<0;}
+    p.moving=d>8;p.face=2;p.at=-1;
+    if(!act||dragonBlocked(owner)||(p.cd=(p.cd??.6)-dt)>0)return;
+    const target=nearestFoes(owner.x,owner.y,760,1)[0];if(!target){p.cd=.2;p.triAlign=false;return;}
+    const head=p.triNext||0;p.flip=target.x<p.x;const m=triMouth(p,head),a=Math.atan2(dragonAimY(target)-m.y,target.x-m.x),dir=p.flip?-1:1;
+    if((target.x-m.x)*dir<80||Math.cos(a)*dir<.55){p.triAlign=true;const k=Math.min(1,dt*4);p.x+=(target.x-dir*320-p.x)*k;p.y+=(target.y+90-p.y)*k;p.cd=0;return;}
+    p.triAlign=false;p.triShot={id:++triSequence,start:G.t,head,a,x:m.x,y:m.y,fired:false};p.cd=2;
+    play('dragonCharge');if(NET.role&&NET.fq.length<10)NET.fq.push(['t',p.i,p.x,p.y,a,0,p.flip?1:0,head]);
+  }
+  function triBossOpen(B){return !!B&&B.alive&&!['enter','quiz','morph','tele','throne','fly','ult'].includes(B.st)&&!(B.jz>60);}
+  function triFire(p,owner,s){
+    if(dragonBlocked(owner)||!triReady())return;
+    const el=TRI_ELEMENTS[s.head];if(!el)return;p.triNext=(s.head+1)%3;play('dragonBeam');
+    const targets=G.mons.filter(m=>m.alive&&dragonIntersects(m,s));if(G.boss?.alive&&triBossOpen(G.boss)&&dragonIntersects(G.boss,s))targets.push(G.boss);
+    let nfx=0;for(const m of targets){if(dragonBlocked(owner))break;const n=NET.hq.length;
+      if(m===G.boss)triHitBoss(m,el);else hitMon(m,Math.round(petDmg(owner.lv||1)*1.6),el,p.x,p.y,50);
+      if(NET.role==='guest'&&NET.hq.length>n)NET.hq[NET.hq.length-1][6]='tri:'+s.id;
+      if(nfx++<4&&G.parts.length<180)G.parts.push({type:'fx',name:'tridragon_'+el+'_impact',x:m.x,y:dragonAimY(m),sc:.6,life:.3,max:.3});
+    }
+    if(NET.role&&NET.fq.length<10)NET.fq.push(['t',p.i,p.x,p.y,s.a,1,p.flip?1:0,s.head]);
+  }
+  function triReceiveHit(h,hit){
+    if(Q?.hero!=='g'||!Q.pets?.includes('tridragon')||dragonBlocked(Q)||!triReady()||!/^tri:[1-9][0-9]{0,12}$/.test(h[6])||!TRI_ELEMENTS.includes(ELS[h[1]]))return;
+    let ids=triReceived.get(h[6]);if(!ids){ids=new Set();triReceived.set(h[6],ids);if(triReceived.size>128)triReceived.delete(triReceived.keys().next().value);}
+    const id=Number(h[0]);if(ids.has(id))return;if(id===-1&&!triBossOpen(G.boss))return;ids.add(id);
+    if(id===-1){damageBoss(2,G.boss.x,G.boss.y-220);applyElem(G.boss,ELS[h[1]],'q');return;}
+    hit();
+  }
+  function triRemote(p,f){
+    if(p?.kind!=='tridragon'||Q?.hero!=='g'||dragonBlocked(Q)||!triReady()||f.length<8||!f.slice(2,8).every(Number.isFinite)||![0,1,2].includes(f[7])||![0,1].includes(f[5])||Math.hypot(f[2]-Q.x,f[3]-Q.y)>1500)return;
+    p.x=f[2];p.y=f[3];p.flip=f[6]===1;const m=triMouth(p,f[7]);p.triShot={start:G.t-(f[5]===1?.3:0),a:f[4],head:f[7],x:m.x,y:m.y,fired:true};
+    play(f[5]===1?'dragonBeam':'dragonCharge');
+  }
+  function drawTriDragon(p){
+    if(!triReady())return;
+    const owner=QPETE.includes(p)?Q:P,s=dragonBlocked(owner)?null:p.triShot,t=s?G.t-s.start:9;if(t>=.65)p.triShot=null;
+    const active=s&&t<.65,dir=p.flip?'l':'r',pose=active?TRI_ELEMENTS[s.head]+'_'+dir:dir+[0,1,2,1][Math.floor(G.t*8)%4];
+    shadow(p.x,p.y,48*(p.sc||1),12*(p.sc||1),.2);spr('tridragon_'+pose,p.x,p.y-dragonLift(p),false,CHAR_M*(p.sc||1));
+    if(!active)return;const m=triMouth(p,s.head);if(t<.3){glow(m.x,m.y,16+40*t/.3,TRI_COLORS[s.head],.4+.4*t/.3);return;}
+    const f=FR['tridragon_'+TRI_ELEMENTS[s.head]+'_beam'],w=54+8*Math.sin(t*50);ctx.save();ctx.translate(m.x,m.y);ctx.rotate(s.a);ctx.globalAlpha*=Math.min(1,(.65-t)/.12);ctx.drawImage(f.img,f.sx,f.sy,f.w,f.h,0,-w/2,850,w);ctx.restore();
+  }
+  function triHitBoss(m,el){hitBoss(el,m.x,m.y,false,2);}
+
   // ---------------------------------------------------------------- pets
   // st: "follow" trails the girl; "pounce" runs at a monster near her; "atk" plays the attack (Cafe's claw swipe,
   // Coca's bite) and lands the hit halfway through; then she follows again
@@ -3752,6 +3847,7 @@
   const partnerPetEnts = () => Q.pets.map((k, i) => allyInit({ kind: k, x: Q.x, y: Q.y, face: 0, flip: false, dist: 0, i, q: true }));
   function followPets(list, owner, dt, act) {
     for (const p of list) {
+      if(p.kind==="tridragon"){triStep(p,owner,dt,act);continue;}
       if(p.kind==="dragon"){dragonStep(p,owner,dt,act);continue;}
       // the friends fight as their classes (their own page: allyStep; the partner's, when her page sends no positions: they follow her)
       if (isCls(p)) { if (list === PETE) allyStep(p, owner, dt, act); else trailGirl(p, owner, dt); continue; }
@@ -3981,6 +4077,7 @@
     for (const p of QPETE) { p.hostInv = (p.hostInv || 0) - dt; p.flash = (p.flash || 0) - dt; if (p.act) { if (p.faintT > 0) p.act = null; else stepAct(p, dt, false); } }
     if (!pl) return followPets(QPETE, Q, dt, false);
     QPETE.forEach((p, i) => {
+      if(p.kind==="tridragon"&&p.triShot&&G.t-p.triShot.start<.65&&!dragonBlocked(Q))return;
       if(p.kind==="dragon"&&p.dragonShot&&G.t-p.dragonShot.start<.58&&!dragonBlocked(Q))return;
       const a = Array.isArray(pl[i]) ? pl[i] : null; if (!a) return;
       const tx = num(a[0]), ty = num(a[1]), dx = tx - p.x, dy = ty - p.y, d = Math.hypot(dx, dy), k = Math.min(1, dt * 14);
@@ -8240,7 +8337,7 @@
   function play(n) { const t = performance.now(); if (t - (sfxT[n] || 0) < (n === "zap" ? 110 : 55)) return; sfxT[n] = t; SFX[n] && SFX[n](); }
   function update(dt) {
     G.t += dt; G.frame++;
-    dragonClearPaused();
+    dragonClearPaused();triClearPaused();
     if (G.say && ((G.say.t = dialogueClock(G.say, dt, dialogueWindows(G.say.seq), "say:" + G.say.seq[0][1].join(" "))) > seqTime(G.say.seq) + 0.5 || G.cine || G.rescue || G.bcut)) G.say = null;   // (a film takes over the screen: its own lines)
     if (G.fadeDir) {
       G.fade = clamp(G.fade + G.fadeDir * dt / 0.45, 0, 1);
@@ -9029,6 +9126,7 @@
     ctx.restore();
   }
   function drawPet(p) {
+    if(p.kind==="tridragon")return drawTriDragon(p);
     if(p.kind==="dragon")return drawDragon(p);
     const D = PETS[p.kind];
     if (isCls(p)) return drawClassAlly(p);
@@ -9093,6 +9191,7 @@
   const HANG_FLOORS = { lava_cage: 0.2 };   // (lava_cage's floor sits a little higher on its brick base)
   const hangFloor = (k) => HANG_FLOORS[cageOf(k)] || HANG_FLOOR;
   function drawCage(c) {
+    if(c.kind==='dog')return drawCocaDragonCage(c);
     const D = PETS[c.kind];
     if (c.big) {
       // the big cage of a friend of all: Simmy's `candy_cage[_open]` stands on the ground, Kairon's `pr_cage[_open]` and Phong's
@@ -13658,6 +13757,7 @@
       for (const f of Array.isArray(d.f) ? d.f.slice(0, 40) : []) {
         if (!Array.isArray(f) || !Q) break;
         const i = Math.floor(num(f[1])), pe = i>=0 && i<QPETE.length ? QPETE[i] : null;   // (up to her own pet and four friends)
+        if(f[0]==="t"){triRemote(pe,f);continue;}
         if(f[0]==="d"){dragonRemote(pe,f);continue;}
         if (f[0] === "c" && pe && isCls(pe)) {   // her friend starts a combo / a skill: the same poses here
           if (pe.faintT > 0) continue;
@@ -14021,6 +14121,7 @@
     flags(w.it, G.items, null);
     flags(w.ch, G.chests, (c) => { c.t = 0; chestFx(c); });
     flags(w.cg, G.cages, (c) => openCageFx(c));
+    if(hero==='g'&&G.cages.some(c=>c.kind==='dog'&&c.open)&&(!P.pets.includes('dog')||!P.pets.includes('tridragon')))rescuePet('dog');
     if (typeof w.gd === "string") G.cages.forEach((c, i) => { const v = w.gd[i]; if (v === undefined || v === "-" || c.gd === undefined) return; const n = clamp(num(+v), 0, 3); if (n === c.gd) return;
       if (n === 2 && c.gd < 2) guardWakeFx(c); if (n === 3) guardBeatenFx(c, null); c.gd = n; });
     if (G.stash && typeof w.ss === "number" && w.ss > G.stash.st) { const st = clamp(Math.floor(w.ss), 0, 3); if (st === 1) ambushFx(G.stash); if (st >= 3) stashOpenFx(G.stash); G.stash.st = st; }   // (never back: her page opens it first)
