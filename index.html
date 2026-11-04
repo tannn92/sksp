@@ -427,7 +427,7 @@
   }
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261104.2304", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261105.0027", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -3800,7 +3800,7 @@
   const mountedBeat=()=>[0,1,2,1][Math.floor(G.t*6)%4];
   const rideHero=(owner=P)=>owner===P?hero:owner.hero;
   const rideKind=(owner=P)=>({g:'tridragon',s:'silverdragon'})[rideHero(owner)];
-  function triRideShown(owner=P){return triRiding(owner)&&!G.combo&&!G.rescue&&!G.ult&&!(owner.ultT>0)&&!(G.cine&&(G.cine.lock||G.cine.ph!=='fight'))&&['play','pause'].includes(G.mode);}
+  function triRideShown(owner=P){return triRiding(owner)&&!G.combo&&!G.rescue&&(mountedUltTime(owner)<0||mountedUltActive(owner))&&!(G.cine&&(G.cine.lock||G.cine.ph!=='fight'))&&['play','pause'].includes(G.mode);}
   async function loadTriRiders(char='g'){
     const root=(char==='g'?'mochi':'matcha')+'-assets/mounted/',m=await(await fetch(root+'atlas.json',{cache:'no-cache'})).json();
     if(m.version!==1||!Array.isArray(m.sheets)||!m.sheets.length||m.sheets.some(s=>!/^[-\w]+\.webp$/.test(s))||MOUNT_POSES.some(k=>!m.frames?.[k]))throw Error('Thiếu tranh cưỡi rồng liền');
@@ -3811,18 +3811,57 @@
       if(points.length!==5||points.some(a=>!Array.isArray(a)||a.length!==2||!a.every(Number.isFinite)||a[0]<0||a[0]>f[3]||a[1]<0||a[1]>f[4])||!Array.isArray(dir)||dir.length!==2||!dir.every(Number.isFinite)||Math.abs(Math.hypot(...dir)-1)>.01)throw Error('Điểm bắn cưỡi rồng bị lỗi');
       fresh['mounted_'+char+'_'+k]={img:im,sx:f[1],sy:f[2],w:f[3],h:f[4],s:f[5]*MOUNT_SCALE,ax:f[6],ay:f[7]};
     }
-    Object.assign(FR,fresh);triRiders[char]=m;
+    Object.assign(FR,fresh);triRiders[char]=m;await loadMountedUlt(char);
   }
+
+  const MOUNT_ULT_POSES=['charge','beam','burst'].flatMap(k=>[0,1,2,3].map(i=>k+i)), mountedUltAssets={};
+  async function loadMountedUlt(char){
+    const root=(char==='g'?'mochi':'matcha')+'-assets/ultimate/';
+    try{
+      const m=await(await fetch(root+'atlas.json',{cache:'no-cache'})).json();
+      if(m.version!==1||typeof m.hash!=='string'||!Array.isArray(m.sheets)||!m.sheets.length||m.sheets.some(s=>!/^ultimate_[0-9]+\.webp$/.test(s)))throw Error('Thiếu tranh tuyệt chiêu cưỡi rồng');
+      const ims=await Promise.all(m.sheets.map(s=>loadImg(root+s+'?v='+m.hash))),fresh={};
+      for(const k of MOUNT_ULT_POSES){const f=m.frames?.[k],im=ims[f?.[0]];
+        if(!Array.isArray(f)||f.length!==8||!f.every(Number.isFinite)||!Number.isInteger(f[0])||!im||f[1]<0||f[2]<0||f[3]<=0||f[4]<=0||f[5]!==1||f[1]+f[3]>im.width||f[2]+f[4]>im.height||f[6]<0||f[6]>f[3]||f[7]<0||f[7]>f[4])throw Error('Tranh tuyệt chiêu cưỡi rồng bị lỗi');
+        fresh['mounted_ult_'+char+'_'+k]={img:im,sx:f[1],sy:f[2],w:f[3],h:f[4],s:1,ax:f[6],ay:f[7]};
+      }
+      Object.assign(FR,fresh);mountedUltAssets[char]=true;
+    }catch(e){mountedUltAssets[char]=false;}
+  }
+  function mountedUltTime(owner=P){return owner===P?(G.ult?.t??-1):(owner.ultT>0?owner.ultT:-1);}
+  function mountedUltReady(owner=P){return !!mountedUltAssets[rideHero(owner)]&&MOUNT_ULT_POSES.every(k=>FR['mounted_ult_'+rideHero(owner)+'_'+k]?.img);}
+  function mountedUltActive(owner=P){return triRiding(owner)&&mountedUltReady(owner)&&mountedUltTime(owner)>=0&&!G.combo&&!G.rescue&&['play','pause'].includes(G.mode)&&!(G.cine&&(G.cine.lock||G.cine.ph!=='fight'));}
+  function mountedUltTitle(owner=P){return mountedUltActive(owner)?(rideHero(owner)==='g'?'Bão Lửa Tam Đầu!':'Long Quang Đại Pháo!'):null;}
+  function mountedUltOffset(owner=P){const t=mountedUltActive(owner)?mountedUltTime(owner):-1;if(t<0)return [0,0];const v=triRiders[rideHero(owner)].direction['fly_'+mountedDir(owner)+'0'],recoil=ss(1.5,1.58,t)*(1-ss(1.6,2.25,t))*32;return [-v[0]*recoil,-120*ss(0,.65,t)*(1-ss(2.1,2.6,t))-v[1]*recoil];}
+  function drawMountedUlt(p,owner){
+    if(!mountedUltActive(owner))return;
+    const t=mountedUltTime(owner),h=rideHero(owner),prefix='mounted_ult_'+h+'_',focus=mountedPoint(p,owner,'focus'),v=mountedVector(p,owner),angle=Math.atan2(v[1],v[0]),fade=1-ss(2.2,2.6,t),chargeBeat=Math.min(3,Math.floor(t/1.5*4)),beamBeat=t<1.5?chargeBeat:1+Math.floor((t-1.5)*10)%2,burstBeat=Math.min(3,Math.max(0,Math.floor((t-1.5)/.225)));
+    const sprite=(kind,x,y,scale,alpha=1)=>spr(prefix+kind+(kind==='charge'?chargeBeat:burstBeat),x,y,false,scale,alpha*fade);
+    const beam=(x,y,a,length,width,alpha=1)=>{const f=FR[prefix+'beam'+beamBeat];ctx.save();ctx.translate(x,y);ctx.rotate(a);ctx.globalAlpha*=alpha*fade;const reach=length*f.w/Math.max(1,f.w-f.ax);ctx.drawImage(f.img,f.sx,f.sy,f.w,f.h,-f.ax/f.w*reach,-f.ay/f.h*width,reach,width);ctx.restore();};
+    if(t<1.5){
+      const q=ss(.05,1.5,t);
+      for(let i=0;i<3;i++){const m=mountedPoint(p,owner,'mouth',i),dx=focus.x-m.x,dy=focus.y-m.y;beam(m.x,m.y,Math.atan2(dy,dx),Math.hypot(dx,dy),8+q*21,.3+q*.7);sprite('charge',m.x,m.y,.10+q*.14,.7);}
+      sprite('charge',focus.x,focus.y,.2+q*.8);glow(focus.x,focus.y,60+q*130,h==='g'?'255,110,25':'170,230,255',.25+q*.35);
+    }else{
+      const q=ss(1.5,1.62,t),length=900*q;
+      for(let i=0;i<3;i++){const m=mountedPoint(p,owner,'mouth',i),dx=focus.x-m.x,dy=focus.y-m.y;beam(m.x,m.y,Math.atan2(dy,dx),Math.hypot(dx,dy),h==='g'?60:30);}
+      sprite('charge',focus.x,focus.y,1.05);
+      beam(focus.x,focus.y,angle,length,300);
+      sprite('burst',focus.x+v[0]*length*.75,focus.y+v[1]*length*.75,(h==='g'?2.1:1.6)*q);
+    }
+  }
+
   function triRiderReady(owner=P){return !!triRiders[rideHero(owner)]&&MOUNT_POSES.every(k=>FR['mounted_'+rideHero(owner)+'_'+k]?.img);}
   function mountedDir(owner=P){return owner.face===0?'d':owner.face>=3?'u':owner.face===1?(owner.flip?'dl':'dr'):(owner.flip?'l':'r');}
   function mountedPose(p,owner=petOwner(p)){
+    if(mountedUltActive(owner)){const t=mountedUltTime(owner);return (t<1.5?'fly_':'attack_')+mountedDir(owner)+[0,1,2,1][Math.floor(t*8)%4];}
     const attack=(p.triShot&&G.t-p.triShot.start<.65)||(p.silverCharge&&G.t-p.silverCharge.start<.65);
     return (attack?'attack_':'fly_')+mountedDir(owner)+mountedBeat();
   }
   function mountedFrame(p,owner=petOwner(p)){return FR['mounted_'+rideHero(owner)+'_'+mountedPose(p,owner)];}
   function mountedPoint(p,owner,key,index,pose=mountedPose(p,owner)){
     const f=FR['mounted_'+rideHero(owner)+'_'+pose],a=triRiders[rideHero(owner)][key][pose],q=index===undefined?a:a[index];
-    return {x:p.x+(q[0]-f.ax)*f.s,y:p.y-dragonLift(p)+(q[1]-f.ay)*f.s};
+    const offset=mountedUltOffset(owner);return {x:p.x+offset[0]+(q[0]-f.ax)*f.s,y:p.y-dragonLift(p)+offset[1]+(q[1]-f.ay)*f.s};
   }
   function mountedVector(p,owner=petOwner(p)){return triRiders[rideHero(owner)].direction[mountedPose(p,owner)];}
   function triRiding(owner=P){return !!owner?.triRide&&!!rideKind(owner)&&owner.pets?.includes(rideKind(owner))&&!owner.dead&&!(owner.tiredT>0)&&!(owner.winT>0||owner.win)&&triRiderReady(owner);}
@@ -3847,7 +3886,7 @@
     if(p.rideScale>1){p.x=owner.x;p.y=owner.y+105;p.flip=owner.flip;p.moving=owner.moving;p.face=2;p.triAlign=false;}
   }
   function triScale(p){return (p.sc||1)*(p.rideScale||1)*(p.kind==='silverdragon'?2:1);}
-  function drawTriRider(p,owner){spr(mountedFrame(p,owner),p.x,p.y-dragonLift(p),false,1,owner.inv>0&&Math.floor(G.t*16)%2===0?.5:1);}
+  function drawTriRider(p,owner){const offset=mountedUltOffset(owner);spr(mountedFrame(p,owner),p.x+offset[0],p.y-dragonLift(p)+offset[1],false,1,mountedUltActive(owner)?1:owner.inv>0&&Math.floor(G.t*16)%2===0?.5:1);drawMountedUlt(p,owner);}
   function triWand(owner=P){
     const p=(owner===P?PETE:owner.pete).find(p=>p.kind===rideKind(owner));if(!p)return [0,0];
     triRideFollow(p,owner);const mark=mountedPoint(p,owner,'wand');
@@ -9826,6 +9865,7 @@
   const ufxDim = (X, Y, x, y) => (Math.abs(X - x) < 240 && Y > y - 220 && Y < y + 520 ? 0.4 : 1);
   // layer 0: on the ground, under everyone standing; layer 1: in the air, over them. own: this page's girl (the partner's: no dimming)
   function drawUltFx(S, x, y, t, cx, cy, layer, own) {
+    if(mountedUltActive(own?P:ultQ()))return;
     if (!S.on) return;
     if (S.hk === "b") { drawGomRing(S,x,y,t,cx,cy,layer,"b.base.sword_fly",CHAR_K); return; }
     if(S.hk === "n") {
@@ -10238,14 +10278,15 @@
     const m = Math.min(W * 0.064, H * 0.1) * k * Math.max(0.05, pop) * bump / 100;
     ctx.save(); ctx.translate(W / 2, H * 0.8); ctx.scale(m, m);
     // (the words are painted once into their own picture, 1.6x sharp: big text is costly to draw afresh every frame on the iPad)
-    const tk = hk + (S.bliz ? "b" : "");   // (her blizzard has its own name)
+    const mountedTitle=mountedUltTitle(S===UFX.p?P:S===UFX.q?ultQ():null),title=mountedTitle||S.title;
+    const tk = hk + (mountedTitle?"mounted":S.bliz ? "b" : "");   // (her blizzard has its own name)
     let tc = A.tg[tk];
     if (tc && !A.tok[tk] && ufxFontOk()) tc = null;   // (painted before its font had loaded: paint it again now)
     if (!tc) {
       A.tok[tk] = ufxFontOk();
       const f = 1.6, c0 = document.createElement("canvas"), g0 = c0.getContext("2d");
       g0.font = "800 160px Grandstander, system-ui";
-      const tw = (g0.measureText(S.title).width || 1300) / f;
+      const tw = (g0.measureText(title).width || 1300) / f;
       tc = A.tg[tk] = c0; A.tw[tk] = tw;
       c0.width = Math.ceil((tw + 60) * f); c0.height = Math.ceil(170 * f);
       const g = c0.getContext("2d");
@@ -10254,9 +10295,9 @@
       const gr = hk === "c" ? g.createLinearGradient(-tw * 0.8, 0, tw * 0.8, 0) : g.createLinearGradient(0, -80, 0, 80);
       if (hk === "c") { gr.addColorStop(0, "#ff8fd2"); gr.addColorStop(0.5, "#fff6fb"); gr.addColorStop(1, "#8fc1ff"); }   // (the sisters': pink to silver-blue)
       else if (hk === "g") { gr.addColorStop(0, "#fff6fb"); gr.addColorStop(0.5, "#ffa8da"); gr.addColorStop(1, "#ff4fae"); } else { gr.addColorStop(0, "#ffffff"); gr.addColorStop(0.5, "#cfe3ff"); gr.addColorStop(1, "#78aaff"); }
-      g.lineWidth = 35; g.strokeStyle = hk === "g" ? "#5a0f3f" : hk === "c" ? "#2a1048" : "#0d1f4a"; g.strokeText(S.title, 0, 0);
-      g.lineWidth = 13; g.strokeStyle = "#fff"; g.strokeText(S.title, 0, 0);
-      g.fillStyle = gr; g.fillText(S.title, 0, 0);
+      g.lineWidth = 35; g.strokeStyle = hk === "g" ? "#5a0f3f" : hk === "c" ? "#2a1048" : "#0d1f4a"; g.strokeText(title, 0, 0);
+      g.lineWidth = 13; g.strokeStyle = "#fff"; g.strokeText(title, 0, 0);
+      g.fillStyle = gr; g.fillText(title, 0, 0);
     }
     const hw = A.tw[tk] / 2;
     ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = 1;
