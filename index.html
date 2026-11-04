@@ -189,20 +189,11 @@
   .scard[aria-pressed="true"] { background: rgba(255,211,77,.2); box-shadow: inset 0 0 0 4px var(--gold), 0 0 22px rgba(255,211,77,.5); }
   .scard.worn::after { content: ""; position: absolute; top: .35em; right: .35em; width: 1.5em; height: 1.5em; border-radius: 50%; background: var(--mint) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5' fill='none' stroke='%23063b2a' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/70% no-repeat; }
   .scprice { display: flex; align-items: center; gap: .3em; font-weight: 800; font-size: 1.15em; min-height: 1.3em; }
-  .scprice img { width: 1.2em; height: 1.2em; }
   .scprice svg { width: 1.2em; height: 1.2em; color: var(--mint); }
-  .scprice.no { color: #ff9aa8; }
   #shopAct { display: flex; gap: calc(1.6 * var(--u)); justify-content: center; min-height: calc(9 * var(--u)); }
   #shopAct .btn { font-size: calc(3.6 * var(--u)); padding: .5em 1.4em; display: inline-flex; align-items: center; gap: .4em; }
-  #shopAct .btn img { width: 1.1em; height: 1.1em; }
-  #shopAct .btn.off { filter: grayscale(.85); opacity: .65; }
-  #shopAct .btn.pending { opacity: .6; }
-  #shopAct .btn.pending::after { content: ""; width: .9em; height: .9em; border-radius: 50%; border: .18em solid rgba(59,36,0,.35); border-top-color: #3b2400; animation: spin .8s linear infinite; }
-  #shopAct .btn small { font-size: .6em; color: #8a1d1d; font-weight: 800; }
   @keyframes spin { to { transform: rotate(360deg); } }
   #shopAct .btn.go { animation: verPulse .6s ease-in-out infinite alternate; background: linear-gradient(180deg, #c8ffe8, var(--mint) 55%, #29c795); box-shadow: 0 6px 0 #167a5c, 0 12px 22px rgba(0,0,0,.4); color: #063b2a; }
-  #shopAct .btn.shake { animation: shake .4s; }
-  @keyframes shake { 20%, 60% { transform: translateX(-8px); } 40%, 80% { transform: translateX(8px); } }
   #shopKeep { justify-self: center; font-size: calc(3 * var(--u)); padding: .5em 1.6em; }
   #shopKeep.wait { background: linear-gradient(180deg, #c8ffe8, var(--mint) 55%, #29c795); box-shadow: 0 6px 0 #167a5c, 0 12px 22px rgba(0,0,0,.4); color: #063b2a; display: inline-flex; align-items: center; gap: .5em; }
   #shopKeep.wait::after { content: ""; width: .8em; height: .8em; border-radius: 50%; border: .18em solid rgba(6,59,42,.3); border-top-color: #063b2a; animation: spin .9s linear infinite; }
@@ -335,7 +326,6 @@
     </div>
     <div id="shopCards"></div>
     <div id="shopAct">
-      <button class="btn" id="shopBuy" aria-label="Mua"><span>Mua</span><img src="assets/ui_star.webp" alt=""><b id="shopBuyN"></b><small id="shopNo" hidden>Chưa đủ sao</small></button>
       <button class="btn go" id="shopWear" aria-label="Mặc">Mặc</button>
     </div>
     <button class="btn ghost" id="shopKeep">Giữ bộ đang mặc</button>
@@ -428,7 +418,7 @@
   }
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261104.0904", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261104.0958", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -1079,7 +1069,7 @@
     elem: null, elemT: 0, lv: 1, xp: 0, prog: 0, pets: [], outfit: "base" };
   // ---- outfits: the outfit worn is kept per sister in localStorage `sksp-outfit-<char>`; one with no frames falls back to "base"
   // (kept in memory as well: with localStorage blocked, e.g. Safari private mode, a paid outfit can still be worn this session)
-  const MEM = { outfit: {}, owned: { b: new Set(), g: new Set(), s: new Set() } };
+  const MEM = { outfit: {} };
   function loadOutfit() {
     P.outfit = MEM.outfit[hero] || "base";
     try { const v = localStorage.getItem("sksp-outfit-" + hero); if (v && /^[\w-]{1,24}$/.test(v)) P.outfit = v; } catch (e) {}
@@ -10539,7 +10529,7 @@
 
   // ---------------------------------------------------------------- the clothes shop
   // Before the island (Màn 2 starts here, after Simmy's walk from the candy boss): a shop for the next land's theme. A big turntable character, a grid of outfit cards
-  // (tap = try on, "Mua" = buy with stars, "Mặc" = wear), then the team walks a runway and a photo is taken, then the island (startLevel2).
+  // (tap = try on, "Mặc" = wear; every outfit is free, the stars are only for fun), then the team walks a runway and a photo is taken, then the island (startLevel2).
   // Outfit ids are `<char>.<outfit>` (frames are `<char>.<outfit>.<pose><i>`). simmy.pirate is free: she puts it on herself when the shop closes.
   // pirate1..10 as drawn (tools/g4_outfits_local.py OUTFITS): 4 mermaid, 5 explorer (map, compass), 6 sea princess, 7 candy, 8 crowned captain, 9 snowy captain, 10 rainbow
   const OUTFIT_NAMES = ["Thủy thủ", "Cướp biển", "Thuyền trưởng", "Tiên cá", "Nhà thám hiểm", "Công chúa biển", "Cướp biển kẹo ngọt", "Thuyền trưởng hoàng gia", "Thuyền trưởng băng giá", "Cướp biển cầu vồng"];
@@ -10579,69 +10569,15 @@
   const SHOP_VIEWS = [{ face: 0, flip: false }, { face: 2, flip: false }, { face: 4, flip: false }, { face: 2, flip: true }];   // front, right, back, left
   const outKey = (o) => o.id.slice(o.id.indexOf(".") + 1);
   const cardOutfit = (c) => (c.id === "base" ? "base" : outKey(c));
-  function ownedIds(c) {
-    let a = [];
-    try { const v = JSON.parse(localStorage.getItem("sksp-owned-" + c) || "[]"); if (Array.isArray(v)) a = v.filter((x) => typeof x === "string"); } catch (e) {}
-    const m = MEM.owned[c]; if (m) for (const x of m) if (!a.includes(x)) a.push(x);
-    return a;
-  }
-  function addOwned(c, id) {
-    if (MEM.owned[c]) MEM.owned[c].add(id);
-    try { localStorage.setItem("sksp-owned-" + c, JSON.stringify([...ownedIds(c)])); } catch (e) {}
-  }
-  const isOwned = (o) => o.id === "base" || o.price === 0 || ownedIds(o.char).includes(o.id);
   function shopCards() {
-    // only the outfits that are drawn (packed) are on sale: one whose art is not in yet (lava6..10 for now) is simply not listed
+    // only the outfits that are drawn (packed) are listed: one whose art is not in yet (lava6..10 for now) is simply not listed
     const drawn = OUTFITS4.filter((o) => o.char === hero && (o.theme === SH.theme || hero === "b" && o.theme === "candy" && SH.theme === "pirate") && o.price > 0 && hasOutfit(o.char, outKey(o)));
     return [{ id: "base", char: hero, theme: "", name: "Đồ của bé", price: 0 }, ...drawn];
   }
 
-  function buyOutfit(id) {
-    if (id === "base") return wearOutfit(id);
-    const o = OUTFITS4.find((x) => x.id === id);
-    if (!o || o.char !== hero) return false;
-    if (isOwned(o)) return wearOutfit(id);
-    // the stars are one pool that the host keeps: a guest only asks, the host checks the price, pays and answers; she marks it hers on the answer
-    if (NET.role === "guest") {
-      if (G.stars < o.price) return false;
-      if (BUY.id) return "pending";
-      BUY.id = o.id; BUY.t = 6;
-      netEmit("shop", { op: "buy", char: hero, id: outKey(o) });
-      if (SH.open) shopRefresh();
-      return "pending";
-    }
-    if (G.stars < o.price) return false;
-    G.stars -= o.price;
-    addOwned(hero, o.id);
-    if (NET.role === "host") netEmit("shop", { op: "stars", n: G.stars });
-    updateHud();
-    if (SH.open) shopRefresh();
-    return wearOutfit(id);
-  }
-  const BUY = { id: null, t: 0 };   // the guest's purchase waiting for the host's answer
-  // the host's side of a guest's purchase request: enough stars -> pay and say yes; otherwise no (the pool never goes below what it holds)
-  function hostBuy(d) {
-    const k = heroKey(d.char), id = typeof d.id === "string" && /^[\w-]{1,24}$/.test(d.id) ? d.id : "", full = k + "." + id;
-    const o = OUTFITS4.find((x) => x.id === full);
-    NET.bought = NET.bought || new Set();
-    let ok = !!o && o.price > 0 && (NET.bought.has(full) || G.stars >= o.price);
-    if (ok && !NET.bought.has(full)) { G.stars -= o.price; NET.bought.add(full); updateHud(); if (SH.open) shopRefresh(); }
-    netEmit("shop", { op: "ack", id: full, ok, stars: G.stars });
-  }
-  // the guest's side of the answer
-  function guestBought(d) {
-    const full = typeof d.id === "string" ? d.id : "", o = OUTFITS4.find((x) => x.id === full), mine = !!o && o.char === hero;
-    if (!mine) return;
-    // (an answer that comes after the wait ran out still counts: the host may well have paid already)
-    const wasWaiting = BUY.id === full; if (wasWaiting) BUY.id = null;
-    G.stars = Math.max(0, Math.floor(num(d.stars))); updateHud();
-    if (d.ok) { const fresh = !isOwned(o); addOwned(hero, full); if (SH.open) { if (wasWaiting || fresh) wearOutfit(full); play("level"); burstUi(); } }
-    else if (wasWaiting) { SH.noT = 2.2; if (SH.open) { shake($("shopBuy")); play("hurt"); } }
-    if (SH.open) shopRefresh();
-  }
   function wearOutfit(id) {
     const o = id === "base" ? { id: "base", char: hero, price: 0 } : OUTFITS4.find((x) => x.id === id);
-    if (!o || o.char !== hero || !isOwned(o)) return false;
+    if (!o || o.char !== hero) return false;
     setOutfit(id === "base" ? "base" : outKey(o));
     netEmit("outfit", { char: hero, id: P.outfit });
     if (SH.open) shopRefresh();
@@ -10706,8 +10642,8 @@
     if (onShip()) leaveShip();   // (a guest whose host's page opened the shop while she was still on the ship)
     SH.theme = SHOP_THEMES[theme] ? theme : "pirate";
     G.cine = null; G.rescue = null; $("skipFilm").hidden = true;
-    SH.done = false; SH.waitT = 0; SH.bothT = 0; SH.teamKey = null; SH.autoT = 0; SH.noT = 0; BUY.id = null;
-    NET.bought = new Set(); G.shopPhase = "open"; G.shopDone = false;   // (what the guest has paid for is counted per shop visit; the phase goes out with the host's world)
+    SH.done = false; SH.waitT = 0; SH.bothT = 0; SH.teamKey = null; SH.autoT = 0;
+    G.shopPhase = "open"; G.shopDone = false;   // (the phase goes out with the host's world)
     if (NET.role === "host" && !fromNet) netEmit("shop", { op: "open", theme: SH.theme, stars: G.stars });
     const th = SHOP_THEMES[SH.theme];
     SH.open = true; SH.cards = shopCards(); SH.view = 0; SH.prev = 0; SH.turnT = 0; SH.t = 0; SH.start = P.outfit;
@@ -10739,23 +10675,22 @@
   function shopRefresh() {
     const box = $("shopCards"), top = box.scrollTop; box.innerHTML = "";   // (the list scrolls: keep where it was)
     SH.cards.forEach((c, i) => {
-      const owned = isOwned(c), worn = cardOutfit(c) === P.outfit, can = G.stars >= c.price;
+      const worn = cardOutfit(c) === P.outfit;
       const b = document.createElement("button"); b.className = "scard" + (worn ? " worn" : ""); b.setAttribute("aria-pressed", i === SH.sel ? "true" : "false"); b.setAttribute("aria-label", c.name);
       const cv2 = document.createElement("canvas"); cv2.width = 190; cv2.height = 230;
       const g2 = cv2.getContext("2d"), oc = cardOutfit(c);
       if (!drawSelectionHeroAt(g2, hero, oc, { face: 0 }, 95, 222, 210, true)) badgeQ(g2, 150, 36, 22);
-      const pr = document.createElement("div"); pr.className = "scprice" + (owned || can ? "" : " no");
-      pr.innerHTML = owned ? '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg>' : `<img src="assets/ui_star.webp" alt=""><span>${c.price}</span>`;
+      const pr = document.createElement("div"); pr.className = "scprice";
+      pr.innerHTML = worn ? '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg>' : "";
       b.append(cv2, pr);
       b.addEventListener("click", () => { SH.sel = i; play("star"); shopUnready(); shopRefresh(); });   // (choosing again: not ready any more)
       box.append(b);
     });
     box.scrollTop = top;
-    const c = SH.cards[SH.sel], owned = isOwned(c), worn = cardOutfit(c) === P.outfit, can = G.stars >= c.price;
+    const c = SH.cards[SH.sel], worn = cardOutfit(c) === P.outfit;
     $("shopName").textContent = c.name;
     $("shopStars").textContent = G.stars;
-    $("shopBuy").hidden = owned; $("shopBuyN").textContent = c.price; $("shopBuy").className = "btn" + (can ? "" : " off") + (BUY.id ? " pending" : ""); $("shopNo").hidden = !(SH.noT > 0);
-    $("shopWear").hidden = !owned || worn; $("shopWorn").hidden = !worn;
+    $("shopWear").hidden = worn; $("shopWorn").hidden = !worn;
     const wait = !!(SH.done && NET.role);
     $("shopKeep").textContent = wait ? "Sẵn sàng! Chờ bạn…" : P.outfit === SH.start ? "Giữ bộ đang mặc" : "Xong! Ra sàn diễn";
     $("shopKeep").className = "btn ghost" + (wait ? " wait" : "");
@@ -10772,23 +10707,14 @@
   }
   // the sister's page's girl bits (her presence, slot 4): 256 = her shop is open, 512 = she pressed "Sẵn sàng" there
   function partnerBits() { const gl = NET.pp && NET.pp.gl; return Array.isArray(gl) ? num(gl[4]) : 0; }
-  // choosing again (a card, Mua, Mặc) or pressing the button again: no longer ready (co-op only: alone the button leaves at once)
+  // choosing again (a card, Mặc) or pressing the button again: no longer ready (co-op only: alone the button leaves at once)
   function shopUnready() { if (!SH.open || !SH.done || !NET.role) return; SH.done = false; NET.sendT = 0; shopRefresh(); }   // (her presence goes out on the next frame)
   function shopInfo() {
     const c = SH.cards[SH.sel] || {}, oc = c.id ? cardOutfit(c) : "base";
-    return { open: SH.open, done: !!SH.done, pdone: !!(NET.role && partnerBits() & 512), theme: SH.theme, sel: SH.sel, card: c.id, view: SH.view, placeholder: !(oc === "base" || hasOutfit(hero, oc)), canBuy: !!c.id && !isOwned(c) && G.stars >= c.price, owned: ownedIds(hero), cards: SH.cards.map((x) => x.id) };
+    return { open: SH.open, done: !!SH.done, pdone: !!(NET.role && partnerBits() & 512), theme: SH.theme, sel: SH.sel, card: c.id, view: SH.view, placeholder: !(oc === "base" || hasOutfit(hero, oc)), cards: SH.cards.map((x) => x.id) };
   }
-  function shake(el) { el.classList.remove("shake"); void el.offsetWidth; el.classList.add("shake"); }
   $("shopL").addEventListener("click", () => shopTurn(-1));
   $("shopR").addEventListener("click", () => shopTurn(1));
-  $("shopBuy").addEventListener("click", () => {
-    if (!SH.open) return;
-    shopUnready();
-    const c = SH.cards[SH.sel];
-    const r = buyOutfit(c.id);
-    if (r === "pending") play("star");   // (the host answers in a moment)
-    else if (r) { play("level"); burstUi(); } else { SH.noT = 2.2; shopRefresh(); shake($("shopBuy")); play("hurt"); }
-  });
   $("shopWear").addEventListener("click", () => { shopUnready(); if (SH.open && wearOutfit(SH.cards[SH.sel].id)) { play("ready"); burstUi(); } });
   $("shopKeep").addEventListener("click", () => shopDone());
   function burstUi() { SH.sparkT = 0.8; }
@@ -10868,9 +10794,7 @@
     if (SH.turnT > 0) SH.turnT = Math.max(0, SH.turnT - dt / 0.3);
     if (SH.sparkT > 0) SH.sparkT = Math.max(0, SH.sparkT - dt);
     if (String($("shopStars").textContent) !== String(G.stars)) $("shopStars").textContent = G.stars;
-    if (SH.noT > 0 && (SH.noT -= dt) <= 0) shopRefresh();
     syncShop();
-    if (BUY.id && (BUY.t -= dt) <= 0) { BUY.id = null; shopRefresh(); }   // no answer: she may ask again
     // Each girl has her own "Sẵn sàng": together the host closes the shop (the runway, the photo, the next map for both) only once both
     // are ready (her sister's from her presence: bit 512). Nobody is ever dragged out while still choosing; the only other way on is a
     // sister whose page is not in the shop at all (held elsewhere, a dead link) for SHOP_WAIT s. Alone (or once her sister has left: the
@@ -10915,17 +10839,12 @@
     if (!NET.role) { closeShop(); return; }
     play("ready"); shopRefresh();
   }
-  // the other page's shop messages: open / done / close / stars (from the host), buy (to the host), ack (to the guest)
+  // the other page's shop messages, all from the host: walk / open / close
   function onShopMsg(d) {
     const op = d.op;
-    if (NET.role === "host") {
-      if (op === "buy") hostBuy(d);
-      return;
-    }
+    if (NET.role === "host") return;
     if (op === "walk") { if (G.mode === "play" && !SH.open && !G.cine && !G.shopDone) startDockWalk(true); return; }
     if (op === "open") { if ((G.mode === "play" || G.mode === "pause" || onShip()) && !SH.open) { G.stars = Math.max(0, Math.floor(num(d.stars))); $("pauseScreen").hidden = true; openShop(d.theme, true); } }
-    else if (op === "stars") { G.stars = Math.max(0, Math.floor(num(d.n))); updateHud(); if (SH.open) shopRefresh(); }
-    else if (op === "ack") guestBought(d);
     else if (op === "close") closeShop(true);
   }
 
@@ -14295,7 +14214,7 @@
     getQ: () => Q,
     setHero: (k) => { hero = heroKey(k); loadOutfit(); loadPets(); renderHeroes(); },
     setOutfit, hasOutfit, CHAR_H, ART_H, CHAR_K, HERO_R, view: () => ({ VW, VH }), girlSpot, drawTeamScene, drawOpening,
-    OUTFITS4, openShop, buyOutfit, wearOutfit, closeShop, shop: shopInfo, simmy: SIMMY, frostOn, applyFrost, FROST_T, FROST_BOSS, SHOP_THEMES,
+    OUTFITS4, openShop, wearOutfit, closeShop, shop: shopInfo, simmy: SIMMY, frostOn, applyFrost, FROST_T, FROST_BOSS, SHOP_THEMES,
     BLIZ_TITLE, ultLightFor, blizArt, blizSeen: () => BLIZ_SEEN,
     skipCine, startOpening, startAllyRescue, updateSksp, lightLetter, endLevel, startDockWalk, dockWay, opCast, drawFilmActor, WK_END, readStart,
     talkMul, lineTime, SAYS, sayAt, seqTime, said: null, saidAt: null, summonBats,   // (said: an array -> talkBubble records each drawn bubble's text; saidAt: an array -> the walk-in's bubbles as [text, x, y, camX, camY, VW, VH])
