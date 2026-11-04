@@ -427,7 +427,7 @@
   }
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261105.0027", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261105.0611", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -3814,7 +3814,7 @@
     Object.assign(FR,fresh);triRiders[char]=m;await loadMountedUlt(char);
   }
 
-  const MOUNT_ULT_POSES=['charge','beam','burst'].flatMap(k=>[0,1,2,3].map(i=>k+i)), mountedUltAssets={};
+  const MOUNT_ULT_POSES=['charge','beam','burst','aura','nova','firework'].flatMap(k=>[0,1,2,3].map(i=>k+i)), mountedUltAssets={};
   async function loadMountedUlt(char){
     const root=(char==='g'?'mochi':'matcha')+'-assets/ultimate/';
     try{
@@ -3831,23 +3831,79 @@
   function mountedUltTime(owner=P){return owner===P?(G.ult?.t??-1):(owner.ultT>0?owner.ultT:-1);}
   function mountedUltReady(owner=P){return !!mountedUltAssets[rideHero(owner)]&&MOUNT_ULT_POSES.every(k=>FR['mounted_ult_'+rideHero(owner)+'_'+k]?.img);}
   function mountedUltActive(owner=P){return triRiding(owner)&&mountedUltReady(owner)&&mountedUltTime(owner)>=0&&!G.combo&&!G.rescue&&['play','pause'].includes(G.mode)&&!(G.cine&&(G.cine.lock||G.cine.ph!=='fight'));}
-  function mountedUltTitle(owner=P){return mountedUltActive(owner)?(rideHero(owner)==='g'?'Bão Lửa Tam Đầu!':'Long Quang Đại Pháo!'):null;}
+  function mountedUltTitle(owner=P){return mountedUltActive(owner)?(rideHero(owner)==='g'?'Bão Lửa Tam Đầu!':'Thiên Long Tinh Tú!'):null;}
   function mountedUltOffset(owner=P){const t=mountedUltActive(owner)?mountedUltTime(owner):-1;if(t<0)return [0,0];const v=triRiders[rideHero(owner)].direction['fly_'+mountedDir(owner)+'0'],recoil=ss(1.5,1.58,t)*(1-ss(1.6,2.25,t))*32;return [-v[0]*recoil,-120*ss(0,.65,t)*(1-ss(2.1,2.6,t))-v[1]*recoil];}
+  let mountedAuraSequence=0;
+  const mountedAuraImpacts=new Map();
+  const mountedAuraCaster=owner=>owner===P?(NET.me||'local'):owner.peer;
+  function mountedAuraAccept(impact){
+    if(!impact||typeof impact.caster!=='string'||typeof impact.cast!=='string'||impact.cast.length>160||!impact.cast.startsWith(impact.caster+':')||!Array.isArray(impact.area)||impact.area.length!==7||impact.area[6]!==impact.cast||!impact.area.slice(0,5).every(Number.isFinite)||!Array.isArray(impact.area[5])||impact.area[5].length>256||impact.area[5].some(m=>!Array.isArray(m)||m.length!==3||!Number.isFinite(m[1])||!Number.isFinite(m[2])))return;
+    const old=mountedAuraImpacts.get(impact.caster),seq=k=>Number(k.slice(k.lastIndexOf(':')+1));
+    if(!Number.isSafeInteger(seq(impact.cast))||seq(impact.cast)<1||old&&seq(old.cast)>seq(impact.cast))return;
+    mountedAuraImpacts.set(impact.caster,impact);if(mountedAuraImpacts.size>16)mountedAuraImpacts.delete(mountedAuraImpacts.keys().next().value);
+    const owner=impact.caster===mountedAuraCaster(P)?P:QS.find(q=>q.peer===impact.caster);
+    if(owner&&mountedUltActive(owner)){const state=owner===P?G.ult?.mountedAura:owner.mountedAura;if(state?.cast===impact.cast)mountedAuraRead(owner,impact.area,true);}
+  }
+  // Each owner's visual record survives the monster being removed by the authoritative blast.
+  function mountedAuraState(owner=P){
+    if(!mountedUltActive(owner))return null;
+    const t=mountedUltTime(owner),holder=owner===P?G.ult:owner;
+    let s=holder.mountedAura;
+    if(!s||t<s.last-.25){s=holder.mountedAura={last:t,cx:owner.x,cy:owner.y,hw:VW/2+120,hh:VH/2+160,targets:[],hit:false,cast:mountedAuraCaster(owner)+':'+(++mountedAuraSequence)};}
+    s.last=t;
+    if(owner===P&&!s.hit){s.cx=G.ult.cx;s.cy=G.ult.cy;s.hw=VW/2+120;s.hh=VH/2+160;}
+    if(!s.hit){
+      const found=[];for(const m of G.mons)if(m.alive&&Math.abs(m.x-s.cx)<s.hw&&Math.abs(m.y-s.cy)<s.hh)found.push({id:m.id,x:m.x,y:m.y});
+      const b=G.boss;if(b?.alive&&Math.abs(b.x-s.cx)<s.hw+100&&Math.abs(b.y-s.cy)<s.hh+100)found.push({id:'boss',x:b.x,y:b.y});
+      // Never throw away the last visible marker when a received world snapshot removes its victim.
+      const byId=new Map(s.targets.map(m=>[m.id,m]));for(const m of found)byId.set(m.id,m);s.targets=[...byId.values()];
+    }
+    return s;
+  }
+  function mountedAuraCapture(owner=P,bounds){const s=mountedAuraState(owner);if(!s)return null;if(bounds)Object.assign(s,bounds);s.targets=[];s.hit=false;mountedAuraState(owner);s.hit=true;s.authoritative=NET.role!=='guest';if(NET.role==='host'){const impact={caster:mountedAuraCaster(owner),cast:s.cast,area:mountedAuraWire(owner)};mountedAuraAccept(impact);netEmit('mountedAuraImpact',impact);}return s;}
+  function mountedAuraWire(owner=P){const s=mountedAuraState(owner);return s?[s.cx,s.cy,s.hw,s.hh,s.hit?1:0,s.targets.map(m=>[m.id,m.x,m.y]),s.cast]:0;}
+  function mountedAuraRead(owner,data,authority=false){
+    if(!owner||!Array.isArray(data)||data.length!==7||typeof data[6]!=='string'||data[6].length>160||!data.slice(0,5).every(Number.isFinite)||!Array.isArray(data[5]))return;
+    const holder=owner===P?G.ult:owner;if(!holder)return;
+    const t=mountedUltTime(owner);if(t<0){holder.mountedAura=null;return;}
+    const old=holder.mountedAura;
+    const caster=mountedAuraCaster(owner);if(caster&&!data[6].startsWith(caster+':'))return;
+    const seq=k=>Number(k.slice(k.lastIndexOf(':')+1));if(old&&seq(old.cast)>seq(data[6]))return;
+    // A delayed pre-hit presence must never undo the host's captured death positions.
+    if(!authority&&old?.hit&&old.cast===data[6]&&t>=old.last-.25){const impact=mountedAuraImpacts.get(caster);if(!old.authoritative&&impact?.cast===old.cast)return mountedAuraRead(owner,impact.area,true);old.last=Math.max(old.last,t);return;}
+    const targets=data[5].filter(m=>Array.isArray(m)&&m.length===3&&(typeof m[0]==='string'||Number.isFinite(m[0]))&&Number.isFinite(m[1])&&Number.isFinite(m[2])).slice(0,256).map(m=>({id:m[0],x:m[1],y:m[2]}));
+    holder.mountedAura={last:t,cx:data[0],cy:data[1],hw:clamp(data[2],0,2200),hh:clamp(data[3],0,1400),hit:!!data[4],cast:data[6],authoritative:authority,targets:targets.length?targets:!authority&&old&&old.cast===data[6]&&t>=old.last-.25?old.targets:[]};
+    const impact=mountedAuraImpacts.get(mountedAuraCaster(owner));if(!authority&&impact?.cast===data[6])mountedAuraRead(owner,impact.area,true);
+  }
+  function mountedAuraGeometry(owner=P){
+    const s=mountedAuraState(owner);if(!s)return null;
+    const t=mountedUltTime(owner),q=ss(.65,1.4,t),dx=Math.abs(s.cx-owner.x)+s.hw+100,dy=Math.abs(s.cy-owner.y)+s.hh+100,r=Math.hypot(dx,dy/.72);
+    return {x:owner.x,y:owner.y,rx:r*q,ry:r*.72*q,coverage:q,state:s};
+  }
+  function mountedAuraPaint(owner,kind,frame,x,y,rx,ry,alpha){
+    const f=FR['mounted_ult_'+rideHero(owner)+'_'+kind+frame];if(!f||rx<=0||ry<=0||alpha<=0)return;
+    const ground=kind==='aura'?({g:[[185,58],[195,58],[200,58],[195,58]],s:[[160,66],[190,80],[198,85],[190,72]]})[rideHero(owner)][frame]:null,w=ground?f.w*rx/ground[0]:rx*2,h=ground?f.h*ry/ground[1]:ry*2;ctx.save();ctx.globalAlpha*=alpha;ctx.drawImage(f.img,f.sx,f.sy,f.w,f.h,x-f.ax/f.w*w,y-f.ay/f.h*h,w,h);ctx.restore();
+  }
+  function drawMountedAura(owner=P){
+    const g=mountedAuraGeometry(owner);if(!g)return;const t=mountedUltTime(owner),fade=1-ss(2.1,2.6,t),stage=Math.min(3,Math.floor(ss(.65,1.4,t)*4));
+    mountedAuraPaint(owner,'aura',stage,g.x,g.y,g.rx*1.12,g.ry*1.12,(.35+.25*ss(.65,1.4,t))*fade);
+    if(t>1.05)mountedAuraPaint(owner,'aura',Math.min(3,Math.floor(ss(1.05,1.6,t)*4)),g.x,g.y,g.rx*.52,g.ry*.52,.32*ss(1.05,1.4,t)*fade);
+    if(t>=1.5){const beat=Math.min(3,Math.floor((t-1.5)/.225));mountedAuraPaint(owner,'nova',beat,g.x,g.y,g.rx*1.18,g.ry*1.18,.65*fade);}
+    if(t>.9)for(const m of g.state.targets){const q=ss(.9,1.35,t);mountedAuraPaint(owner,'charge',Math.min(3,Math.floor(q*4)),m.x,m.y,36+q*22,20+q*12,.75*fade);}
+  }
+  function drawAllMountedAuras(){drawMountedAura();if(NET.role&&!G.combo)eachQ(q=>drawMountedAura(q));}
   function drawMountedUlt(p,owner){
     if(!mountedUltActive(owner))return;
-    const t=mountedUltTime(owner),h=rideHero(owner),prefix='mounted_ult_'+h+'_',focus=mountedPoint(p,owner,'focus'),v=mountedVector(p,owner),angle=Math.atan2(v[1],v[0]),fade=1-ss(2.2,2.6,t),chargeBeat=Math.min(3,Math.floor(t/1.5*4)),beamBeat=t<1.5?chargeBeat:1+Math.floor((t-1.5)*10)%2,burstBeat=Math.min(3,Math.max(0,Math.floor((t-1.5)/.225)));
-    const sprite=(kind,x,y,scale,alpha=1)=>spr(prefix+kind+(kind==='charge'?chargeBeat:burstBeat),x,y,false,scale,alpha*fade);
-    const beam=(x,y,a,length,width,alpha=1)=>{const f=FR[prefix+'beam'+beamBeat];ctx.save();ctx.translate(x,y);ctx.rotate(a);ctx.globalAlpha*=alpha*fade;const reach=length*f.w/Math.max(1,f.w-f.ax);ctx.drawImage(f.img,f.sx,f.sy,f.w,f.h,-f.ax/f.w*reach,-f.ay/f.h*width,reach,width);ctx.restore();};
-    if(t<1.5){
-      const q=ss(.05,1.5,t);
-      for(let i=0;i<3;i++){const m=mountedPoint(p,owner,'mouth',i),dx=focus.x-m.x,dy=focus.y-m.y;beam(m.x,m.y,Math.atan2(dy,dx),Math.hypot(dx,dy),8+q*21,.3+q*.7);sprite('charge',m.x,m.y,.10+q*.14,.7);}
-      sprite('charge',focus.x,focus.y,.2+q*.8);glow(focus.x,focus.y,60+q*130,h==='g'?'255,110,25':'170,230,255',.25+q*.35);
-    }else{
-      const q=ss(1.5,1.62,t),length=900*q;
-      for(let i=0;i<3;i++){const m=mountedPoint(p,owner,'mouth',i),dx=focus.x-m.x,dy=focus.y-m.y;beam(m.x,m.y,Math.atan2(dy,dx),Math.hypot(dx,dy),h==='g'?60:30);}
-      sprite('charge',focus.x,focus.y,1.05);
-      beam(focus.x,focus.y,angle,length,300);
-      sprite('burst',focus.x+v[0]*length*.75,focus.y+v[1]*length*.75,(h==='g'?2.1:1.6)*q);
+    const t=mountedUltTime(owner),prefix='mounted_ult_'+rideHero(owner)+'_',focus=mountedPoint(p,owner,'focus'),fade=1-ss(2.1,2.6,t),chargeBeat=Math.min(3,Math.floor(t/1.5*4));
+    const beam=(x,y,a,length,width,alpha=1)=>{const f=FR[prefix+'beam'+(t<1.5?chargeBeat:1+Math.floor((t-1.5)*10)%2)];ctx.save();ctx.translate(x,y);ctx.rotate(a);ctx.globalAlpha*=alpha*fade;const reach=length*f.w/Math.max(1,f.w-f.ax);ctx.drawImage(f.img,f.sx,f.sy,f.w,f.h,-f.ax/f.w*reach,-f.ay/f.h*width,reach,width);ctx.restore();};
+    if(t<1.5){const q=ss(.05,1.5,t);for(let i=0;i<3;i++){const m=mountedPoint(p,owner,'mouth',i),dx=focus.x-m.x,dy=focus.y-m.y;beam(m.x,m.y,Math.atan2(dy,dx),Math.hypot(dx,dy),8+q*21,.3+q*.7);}spr(prefix+'charge'+chargeBeat,focus.x,focus.y,false,.15+q*.55,fade);}
+    else{const s=mountedAuraState(owner),beat=Math.min(3,Math.floor((t-1.5)/.225)),flowers=new Set();let pillars=0,blooms=0;
+      for(let i=0;i<s.targets.length;i++){const m=s.targets[i];if(pillars++<24)beam(m.x,m.y-380,Math.PI/2,380,75,.85);mountedAuraPaint(owner,'burst',beat,m.x,m.y,110,85,fade);
+        const cell=Math.floor(m.x/220)+','+Math.floor(m.y/180),age=t-1.5-(i%5)*.035;
+        if(age<0||age>.95||flowers.has(cell)||blooms>=16)continue;flowers.add(cell);blooms++;
+        const phase=Math.min(3,Math.floor(age/.16)),near=Math.hypot(m.x-owner.x,m.y-owner.y)<200,size=135+(i%3)*25;
+        mountedAuraPaint(owner,'firework',phase,m.x,m.y-110,size,size,(near?.3:.95)*(1-ss(.55,.95,age)));
+      }
     }
   }
 
@@ -3886,7 +3942,7 @@
     if(p.rideScale>1){p.x=owner.x;p.y=owner.y+105;p.flip=owner.flip;p.moving=owner.moving;p.face=2;p.triAlign=false;}
   }
   function triScale(p){return (p.sc||1)*(p.rideScale||1)*(p.kind==='silverdragon'?2:1);}
-  function drawTriRider(p,owner){const offset=mountedUltOffset(owner);spr(mountedFrame(p,owner),p.x+offset[0],p.y-dragonLift(p)+offset[1],false,1,mountedUltActive(owner)?1:owner.inv>0&&Math.floor(G.t*16)%2===0?.5:1);drawMountedUlt(p,owner);}
+  function drawTriRider(p,owner){const offset=mountedUltOffset(owner),release=mountedUltActive(owner)&&mountedUltTime(owner)>=1.5;if(release)drawMountedUlt(p,owner);spr(mountedFrame(p,owner),p.x+offset[0],p.y-dragonLift(p)+offset[1],false,1,mountedUltActive(owner)?1:owner.inv>0&&Math.floor(G.t*16)%2===0?.5:1);if(!release)drawMountedUlt(p,owner);}
   function triWand(owner=P){
     const p=(owner===P?PETE:owner.pete).find(p=>p.kind===rideKind(owner));if(!p)return [0,0];
     triRideFollow(p,owner);const mark=mountedPoint(p,owner,'wand');
@@ -8311,11 +8367,13 @@
     if (G.quiz) { if (!U.fired) { G.energy = 100; updateHud(); } ultEnd(); return; }
     U.t += dt * ULT_PACE;
     U.cx = G.camX + VW / 2; U.cy = G.camY + VH / 2;
+    mountedAuraState();
     P.z = ultZ(U.t);
     ufxStep(UFX.p, hero, P.x, P.y, U.t, U.cx, U.cy, true);   // (the look: drawUltFx)
     if (!U.fired && U.t > 1.5) {
+      mountedAuraCapture();
       U.fired = true; SFX.boom(); ultShake();
-      if (NET.role === "guest") netEmit("ult", { cx: U.cx | 0, cy: U.cy | 0, hw: (VW / 2 + 120) | 0, hh: (VH / 2 + 160) | 0 });
+      if (NET.role === "guest") netEmit("ult", { cast:U.mountedAura?.cast, cx: U.cx | 0, cy: U.cy | 0, hw: (VW / 2 + 120) | 0, hh: (VH / 2 + 160) | 0 });
       else ultBlast(U.cx, U.cy, VW / 2 + 120, VH / 2 + 160);
     }
     if (U.t > 2.6) ultEnd();
@@ -9690,6 +9748,7 @@
       S.et.fill(-1); S.eN = S.booms = S.merged = S.chip = 0; S.sndT = -1;
     }
     S.t = t;
+    if(!S.cb&&mountedUltActive(own?P:ultQ())){S.flash=0;S.titleA=ss(.15,.3,t)*(1-ss(2.1,2.45,t));return;}
     S.vis = own || (Math.abs(x - (G.camX + VW / 2)) < VW / 2 + 200 && Math.abs(y - (G.camY + VH / 2)) < VH / 2 + 300);
     if(hk==="b") { gomRingStep(S,x,y,t,cx,cy); S.flash=0; S.titleA=S.cb?0:ss(.15,.3,t)*(1-ss(2.1,2.45,t)); return; }
     if(hk==="n") { S.flash=0; S.titleA=S.cb?0:ss(.15,.3,t)*(1-ss(2.1,2.45,t)); return; }
@@ -10504,6 +10563,7 @@
     // the elemental auras' rings lie on the ground, under everything standing
     if (G.mode !== "title" && !G.combo && P.elem && !G.ult && !P.dead) drawAura(P.elem, P.x, P.y, P.elemT, 0);
     if (NET.role && !G.combo) eachQ((q) => { if (q.elem && !q.dead && !(q.ultT > 0)) drawAura(q.elem, q.x, q.y, qElemLeft(), 0); });
+    drawAllMountedAuras();
     // everything standing, sorted by the y of its feet
     let n = 0;
     const add = (y, k, o) => { let e = DL[n]; if (!e) DL[n] = e = { y: 0, k: 0, o: null }; e.y = y; e.k = k; e.o = o; n++; };
@@ -14063,6 +14123,7 @@
     onPeerMsg(msg, d); netFocus();
   }
   function onPeerMsg(msg, d) {
+    if(msg.topic==='mountedAuraImpact'){if(NET.role==='guest'&&msg.peer===NET.host)mountedAuraAccept(d);return;}
     if (msg.topic === "outfit") {   // the partner changed clothes ({char, id})
       const k = heroKey(d.char), id = typeof d.id === "string" && /^[\w-]{1,24}$/.test(d.id) ? d.id : "base";
       const qof = { k, id, t: performance.now() / 1000 }; NET.peers.get(msg.peer).qof = qof; if (Q && Q.hero === k) { Q.outfit = id; Q.of = hasOutfit(k, id) ? id : "base"; }
@@ -14126,6 +14187,8 @@
           });
         }
       } else if (msg.topic === "ult") {
+        if(typeof d.cast==='string'&&Q){if(!d.cast.startsWith(Q.peer+':')||mountedAuraImpacts.get(Q.peer)?.cast===d.cast)return;const state=mountedAuraState(Q);if(state){if(state.cast!==d.cast)return;}}
+        if(Q)mountedAuraCapture(Q,{cx:num(d.cx),cy:num(d.cy),hw:clamp(num(d.hw),0,2200),hh:clamp(num(d.hh),0,1400)});
         ultBlast(num(d.cx), num(d.cy), clamp(num(d.hw), 0, 2200), clamp(num(d.hh), 0, 1400), "q"); SFX.boom(); ultShake();   // (her show is played from her clock: UFX.q)
       } else if (msg.topic === "shoo") shoo(num(d.x), num(d.y));
       else if (msg.topic === "portal") { if (G.portal && G.portal.open && !P.winT) enterPortal(); }
@@ -14199,13 +14262,14 @@
   function girlState() {
     const bits = (triRiding()?1024:0) | (P.dead ? 1 : 0) | (P.inv > 0 ? 2 : 0) | (P.slowT > 0 ? 4 : 0) | (P.castT > 0.1 ? 8 : 0) | (P.winT ? 16 : 0) | (P.flip ? 32 : 0) | (G.mode === "pause" ? 64 : 0) | (G.story ? 128 : 0) | (SH.open ? 256 : 0) | (SH.open && SH.done ? 512 : 0);   // (64: this page is paused; 128: it shows a story card; 256: its shop is open, 512: its girl is ready there)
     return [P.x | 0, P.y | 0, P.face, (G.mode === "play" && P.fn) || "", bits, ELS.indexOf(P.elem), G.ult ? Math.round(G.ult.t * 10) : 0, hero, G.hearts, 0, P.vx | 0, P.vy | 0, P.pets.join(","), P.lv,
-      PETE.map((p) => [p.x | 0, p.y | 0, p.face + (p.flip ? 8 : 0) + (p.faintT > 0 ? 16 : 0), ...(isCls(p) ? [Math.round(100 * p.hp / p.max), p.faintT > 0 ? Math.round(100 * clamp(Math.max(p.rev / (p.revMax || ALLY_REVIVE_T), 1 - p.faintT / (p.fmax || ALLY_FAINT_T)), 0, 1)) : 0, ...(G.esc && G.esc.k === p.kind ? [G.esc.ph, Math.round(G.esc.t * 10), G.esc.say, G.esc.sayN] : [])] : [])]), P.dead ? Math.round((1 - clamp(G.reviveT / FAINT_T, 0, 1)) * 100) : 0, P.helped ? 1 : 0, P.elem ? Math.ceil(P.elemT * 10) : 0, P.outfit || "base", onShip() && SHIP.ph !== "dock" ? 1 : 0, rodSlot(), onShip() && NET.role === "guest" && SHIPX.mine.length ? SHIPX.mine : 0];   // [18] = outfit id (`of`); older copies send 18 slots; [19] = on the ship's deck (x, y are deck px then); [20] = her fishing rod (rodSlot) or 0; [21] = a guest's last landed fish on the ship ([[id, kind], ...]) or 0
+      PETE.map((p) => [p.x | 0, p.y | 0, p.face + (p.flip ? 8 : 0) + (p.faintT > 0 ? 16 : 0), ...(isCls(p) ? [Math.round(100 * p.hp / p.max), p.faintT > 0 ? Math.round(100 * clamp(Math.max(p.rev / (p.revMax || ALLY_REVIVE_T), 1 - p.faintT / (p.fmax || ALLY_FAINT_T)), 0, 1)) : 0, ...(G.esc && G.esc.k === p.kind ? [G.esc.ph, Math.round(G.esc.t * 10), G.esc.say, G.esc.sayN] : [])] : [])]), P.dead ? Math.round((1 - clamp(G.reviveT / FAINT_T, 0, 1)) * 100) : 0, P.helped ? 1 : 0, P.elem ? Math.ceil(P.elemT * 10) : 0, P.outfit || "base", onShip() && SHIP.ph !== "dock" ? 1 : 0, rodSlot(), onShip() && NET.role === "guest" && SHIPX.mine.length ? SHIPX.mine : 0, mountedAuraWire()];   // [18] = outfit id (`of`); older copies send 18 slots; [19] = on the ship's deck (x, y are deck px then); [20] = her fishing rod (rodSlot) or 0; [21] = a guest's last landed fish on the ship ([[id, kind], ...]) or 0
   }
   function worldState() {
     const B = G.boss, near = QS.length ? (o) => QS.some((q) => d2(o.x, o.y, q.x, q.y) < 1900 * 1900) : () => true;
     const sb = (o) => (o.slow > 0 ? 4 : 0) | (o.burn > 0 ? 8 : 0) | (o.poison > 0 ? 16 : 0) | (o.frz > 0 ? 32 : 0) | (o.crust > 0 || o.chill > 0 ? 4096 : 0);   // (4096: the ice queen's frost)
     const bitsOf = (a) => a.map((o) => (o.got || o.open ? 1 : 0)).join("");
     return {
+      ma:[...mountedAuraImpacts.values()],
       lv: G.level, dl: G.dialogueRead || null,
       m: G.mons.filter((m) => m.alive).map((m) => [m.id, MKINDS.indexOf(m.kind), m.x | 0, m.y | 0, m.face + (m.flip ? 8 : 0), MST.indexOf(m.st), m.hp,
         (m.hurt > 0 ? 1 : 0) | (m.flash > 0 ? 2 : 0) | sb(m) | (m.summoned ? 64 : 0) | (m.elite ? 128 : 0) | (m.sk ? 256 : 0) | (m.guard ? 512 : 0) | (m.champ ? 1024 : 0) | (m.mini ? 2048 : 0), Math.round(m.t * 10), m.max,
@@ -14282,6 +14346,7 @@
     if (!(ur > 0)) Q.ultT = 0;
     else if (!(u0 > 0) || u0 > ur + 1) Q.ultT = ur;
     else { const v = dt * ULT_PACE; Q.ultT = Math.min(u0 + (u0 < ur ? 2 * v : v), Math.max(u0, ur + 0.15)); }
+    mountedAuraRead(Q,gl[22]);
     if (ultQ() === Q) ufxStep(UFX.q, Q.hero, Q.x, Q.y, Q.ultT, Q.x, Q.y, false); else if (UFX.q.on && !ultQ()) ufxEnd(UFX.q);
   }
 
@@ -14308,6 +14373,7 @@
       }
       return;
     }
+    if(Array.isArray(w.ma))for(const impact of w.ma.slice(0,16))mountedAuraAccept(impact);
     const now = performance.now() / 1000;
     // monsters
     const seen = new Set(), byId = new Map(G.mons.map((m) => [m.id, m]));
