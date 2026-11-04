@@ -427,7 +427,7 @@
   }
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261104.2205", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261104.2304", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -3795,8 +3795,9 @@
   }
 
   // One painted rider + dragon, with a dedicated costume. The saved walking outfit stays untouched.
-  const triRiders={},MOUNT_DIRS=['r','l','u','d','dl','dr'];
-  const MOUNT_POSES=MOUNT_DIRS.flatMap(d=>['fly_'+d+'0','fly_'+d+'1','fly_'+d+'2','attack_'+d]);
+  const MOUNT_SCALE=.75,triRiders={},MOUNT_DIRS=['r','l','u','d','dl','dr'];
+  const MOUNT_POSES=MOUNT_DIRS.flatMap(d=>['fly','attack'].flatMap(state=>[0,1,2].map(i=>state+'_'+d+i)));
+  const mountedBeat=()=>[0,1,2,1][Math.floor(G.t*6)%4];
   const rideHero=(owner=P)=>owner===P?hero:owner.hero;
   const rideKind=(owner=P)=>({g:'tridragon',s:'silverdragon'})[rideHero(owner)];
   function triRideShown(owner=P){return triRiding(owner)&&!G.combo&&!G.rescue&&!G.ult&&!(owner.ultT>0)&&!(G.cine&&(G.cine.lock||G.cine.ph!=='fight'))&&['play','pause'].includes(G.mode);}
@@ -3808,15 +3809,15 @@
       const f=m.frames[k],im=ims[f?.[0]],points=[m.wand?.[k],...(m.mouth?.[k]||[]),m.focus?.[k]],dir=m.direction?.[k];
       if(!Array.isArray(f)||f.length!==8||!f.every(Number.isFinite)||!im||f[3]<=0||f[4]<=0||f[5]<=0||f[1]<0||f[2]<0||f[1]+f[3]>im.width||f[2]+f[4]>im.height||f[6]<0||f[6]>f[3]||f[7]<0||f[7]>f[4])throw Error('Khung cưỡi rồng bị lỗi');
       if(points.length!==5||points.some(a=>!Array.isArray(a)||a.length!==2||!a.every(Number.isFinite)||a[0]<0||a[0]>f[3]||a[1]<0||a[1]>f[4])||!Array.isArray(dir)||dir.length!==2||!dir.every(Number.isFinite)||Math.abs(Math.hypot(...dir)-1)>.01)throw Error('Điểm bắn cưỡi rồng bị lỗi');
-      fresh['mounted_'+char+'_'+k]={img:im,sx:f[1],sy:f[2],w:f[3],h:f[4],s:f[5],ax:f[6],ay:f[7]};
+      fresh['mounted_'+char+'_'+k]={img:im,sx:f[1],sy:f[2],w:f[3],h:f[4],s:f[5]*MOUNT_SCALE,ax:f[6],ay:f[7]};
     }
     Object.assign(FR,fresh);triRiders[char]=m;
   }
   function triRiderReady(owner=P){return !!triRiders[rideHero(owner)]&&MOUNT_POSES.every(k=>FR['mounted_'+rideHero(owner)+'_'+k]?.img);}
   function mountedDir(owner=P){return owner.face===0?'d':owner.face>=3?'u':owner.face===1?(owner.flip?'dl':'dr'):(owner.flip?'l':'r');}
   function mountedPose(p,owner=petOwner(p)){
-    const attack=owner.castT>0||owner.cast===true||(p.triShot&&G.t-p.triShot.start<.65)||(p.silverCharge&&G.t-p.silverCharge.start<.65);
-    return attack?'attack_'+mountedDir(owner):'fly_'+mountedDir(owner)+[0,1,2,1][Math.floor(G.t*8)%4];
+    const attack=(p.triShot&&G.t-p.triShot.start<.65)||(p.silverCharge&&G.t-p.silverCharge.start<.65);
+    return (attack?'attack_':'fly_')+mountedDir(owner)+mountedBeat();
   }
   function mountedFrame(p,owner=petOwner(p)){return FR['mounted_'+rideHero(owner)+'_'+mountedPose(p,owner)];}
   function mountedPoint(p,owner,key,index,pose=mountedPose(p,owner)){
@@ -3846,7 +3847,7 @@
     if(p.rideScale>1){p.x=owner.x;p.y=owner.y+105;p.flip=owner.flip;p.moving=owner.moving;p.face=2;p.triAlign=false;}
   }
   function triScale(p){return (p.sc||1)*(p.rideScale||1)*(p.kind==='silverdragon'?2:1);}
-  function drawTriRider(p,owner){spr(mountedFrame(p,owner),p.x,p.y-dragonLift(p),false,1,owner.inv&&Math.floor(G.t*16)%2===0?.5:1);}
+  function drawTriRider(p,owner){spr(mountedFrame(p,owner),p.x,p.y-dragonLift(p),false,1,owner.inv>0&&Math.floor(G.t*16)%2===0?.5:1);}
   function triWand(owner=P){
     const p=(owner===P?PETE:owner.pete).find(p=>p.kind===rideKind(owner));if(!p)return [0,0];
     triRideFollow(p,owner);const mark=mountedPoint(p,owner,'wand');
@@ -3876,7 +3877,7 @@
     }else spr(PROPS.cageOpen,c.x,c.y,false,1.5,.85);
   }
   function triMouth(p,head=p.triShot?.head??p.triNext??0,attack=false){
-    const owner=petOwner(p);if(!p.sc&&triRiding(owner))return mountedPoint(p,owner,'mouth',head,attack?'attack_'+mountedDir(owner):mountedPose(p,owner));
+    const owner=petOwner(p);if(!p.sc&&triRiding(owner))return mountedPoint(p,owner,'mouth',head,attack?'attack_'+mountedDir(owner)+mountedBeat():mountedPose(p,owner));
     const k=TRI_ELEMENTS[head]+'_'+(p.flip?'l':'r'),f=FR['tridragon_'+k],a=triMeta.mouth[k],s=f.s*CHAR_M*triScale(p);
     return {x:p.x+(a[0]-f.ax)*s,y:p.y-dragonLift(p)+(a[1]-f.ay)*s};
   }
