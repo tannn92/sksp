@@ -427,7 +427,7 @@
   }
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261104.2050", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261104.2205", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -3794,24 +3794,36 @@
     Object.assign(FR,frames);triMeta=m;await loadTriRiders();
   }
 
-  // Painted rider frames are keyed by the equipped outfit; mounting never changes the save.
-  const triRiders={};
+  // One painted rider + dragon, with a dedicated costume. The saved walking outfit stays untouched.
+  const triRiders={},MOUNT_DIRS=['r','l','u','d','dl','dr'];
+  const MOUNT_POSES=MOUNT_DIRS.flatMap(d=>['fly_'+d+'0','fly_'+d+'1','fly_'+d+'2','attack_'+d]);
   const rideHero=(owner=P)=>owner===P?hero:owner.hero;
   const rideKind=(owner=P)=>({g:'tridragon',s:'silverdragon'})[rideHero(owner)];
-  const riderFrame=(owner,d)=>'rider_'+rideHero(owner)+'_'+triRiderKey(owner)+'_'+d;
   function triRideShown(owner=P){return triRiding(owner)&&!G.combo&&!G.rescue&&!G.ult&&!(owner.ultT>0)&&!(G.cine&&(G.cine.lock||G.cine.ph!=='fight'))&&['play','pause'].includes(G.mode);}
   async function loadTriRiders(char='g'){
-    const root=(char==='g'?'mochi':'matcha')+'-assets/riding/',m=await(await fetch(root+'atlas.json',{cache:'no-cache'})).json();
-    if(m.version!==1||!m.frames||!Array.isArray(m.sheets))throw Error('Thiếu tranh Mochi cưỡi rồng');
-    const ims=await Promise.all(m.sheets.map(s=>loadImg(root+s+'?v='+m.hash)));
-    for(const [k,f]of Object.entries(m.frames)){
-      if(!/^[a-z0-9]+_[rl]$/.test(k)||!Array.isArray(f)||f.length!==8||!f.every(Number.isFinite)||!ims[f[0]]||f[3]<=0||f[4]<=0||f[5]<=0)throw Error('Tranh cưỡi rồng bị lỗi');
-      FR['rider_'+char+'_'+k]={img:ims[f[0]],sx:f[1],sy:f[2],w:f[3],h:f[4],s:f[5],ax:f[6],ay:f[7]};
+    const root=(char==='g'?'mochi':'matcha')+'-assets/mounted/',m=await(await fetch(root+'atlas.json',{cache:'no-cache'})).json();
+    if(m.version!==1||!Array.isArray(m.sheets)||!m.sheets.length||m.sheets.some(s=>!/^[-\w]+\.webp$/.test(s))||MOUNT_POSES.some(k=>!m.frames?.[k]))throw Error('Thiếu tranh cưỡi rồng liền');
+    const ims=await Promise.all(m.sheets.map(s=>loadImg(root+s+'?v='+m.hash))),fresh={};
+    for(const k of MOUNT_POSES){
+      const f=m.frames[k],im=ims[f?.[0]],points=[m.wand?.[k],...(m.mouth?.[k]||[]),m.focus?.[k]],dir=m.direction?.[k];
+      if(!Array.isArray(f)||f.length!==8||!f.every(Number.isFinite)||!im||f[3]<=0||f[4]<=0||f[5]<=0||f[1]<0||f[2]<0||f[1]+f[3]>im.width||f[2]+f[4]>im.height||f[6]<0||f[6]>f[3]||f[7]<0||f[7]>f[4])throw Error('Khung cưỡi rồng bị lỗi');
+      if(points.length!==5||points.some(a=>!Array.isArray(a)||a.length!==2||!a.every(Number.isFinite)||a[0]<0||a[0]>f[3]||a[1]<0||a[1]>f[4])||!Array.isArray(dir)||dir.length!==2||!dir.every(Number.isFinite)||Math.abs(Math.hypot(...dir)-1)>.01)throw Error('Điểm bắn cưỡi rồng bị lỗi');
+      fresh['mounted_'+char+'_'+k]={img:im,sx:f[1],sy:f[2],w:f[3],h:f[4],s:f[5],ax:f[6],ay:f[7]};
     }
-    triRiders[char]=m;
+    Object.assign(FR,fresh);triRiders[char]=m;
   }
-  function triRiderKey(owner=P){ return owner===P?(P.outfit||'base'):(owner.of||'base'); }
-  function triRiderReady(owner=P){const k=triRiderKey(owner);return !!FR[riderFrame(owner,'r')]&&!!FR[riderFrame(owner,'l')];}
+  function triRiderReady(owner=P){return !!triRiders[rideHero(owner)]&&MOUNT_POSES.every(k=>FR['mounted_'+rideHero(owner)+'_'+k]?.img);}
+  function mountedDir(owner=P){return owner.face===0?'d':owner.face>=3?'u':owner.face===1?(owner.flip?'dl':'dr'):(owner.flip?'l':'r');}
+  function mountedPose(p,owner=petOwner(p)){
+    const attack=owner.castT>0||owner.cast===true||(p.triShot&&G.t-p.triShot.start<.65)||(p.silverCharge&&G.t-p.silverCharge.start<.65);
+    return attack?'attack_'+mountedDir(owner):'fly_'+mountedDir(owner)+[0,1,2,1][Math.floor(G.t*8)%4];
+  }
+  function mountedFrame(p,owner=petOwner(p)){return FR['mounted_'+rideHero(owner)+'_'+mountedPose(p,owner)];}
+  function mountedPoint(p,owner,key,index,pose=mountedPose(p,owner)){
+    const f=FR['mounted_'+rideHero(owner)+'_'+pose],a=triRiders[rideHero(owner)][key][pose],q=index===undefined?a:a[index];
+    return {x:p.x+(q[0]-f.ax)*f.s,y:p.y-dragonLift(p)+(q[1]-f.ay)*f.s};
+  }
+  function mountedVector(p,owner=petOwner(p)){return triRiders[rideHero(owner)].direction[mountedPose(p,owner)];}
   function triRiding(owner=P){return !!owner?.triRide&&!!rideKind(owner)&&owner.pets?.includes(rideKind(owner))&&!owner.dead&&!(owner.tiredT>0)&&!(owner.winT>0||owner.win)&&triRiderReady(owner);}
   function triToggleRide(){
     if(!rideKind()||!P.pets.includes(rideKind())||dragonBlocked(P)||!(hero==='g'?triReady():silverReady())||!triRiderReady())return false;
@@ -3834,18 +3846,11 @@
     if(p.rideScale>1){p.x=owner.x;p.y=owner.y+105;p.flip=owner.flip;p.moving=owner.moving;p.face=2;p.triAlign=false;}
   }
   function triScale(p){return (p.sc||1)*(p.rideScale||1)*(p.kind==='silverdragon'?2:1);}
-  function triSeat(p){
-    if(p.kind==='silverdragon'&&silverReady()){const pose=silverPose(p),f=FR['silverdragon_'+pose],a=silverMeta.seat?.[pose]||[f.ax,f.ay-70],k=f.s*CHAR_M*triScale(p);return {x:p.x+(a[0]-f.ax)*k,y:p.y-dragonLift(p)+(a[1]-f.ay)*k};}
-    return {x:p.x+(p.flip?28:-28),y:p.y-dragonLift(p)-62};
-  }
-  function drawTriRider(p,owner){
-    const seat=triSeat(p),f=FR[riderFrame(owner,p.flip?'l':'r')];
-    spr(f,seat.x,seat.y,false,1,owner.inv&&Math.floor(G.t*16)%2===0?.5:1);
-  }
+  function drawTriRider(p,owner){spr(mountedFrame(p,owner),p.x,p.y-dragonLift(p),false,1,owner.inv&&Math.floor(G.t*16)%2===0?.5:1);}
   function triWand(owner=P){
     const p=(owner===P?PETE:owner.pete).find(p=>p.kind===rideKind(owner));if(!p)return [0,0];
-    triRideFollow(p,owner);const seat=triSeat(p),f=FR[riderFrame(owner,p.flip?'l':'r')],mark=triRiders[rideHero(owner)].wand[triRiderKey(owner)+'_'+(p.flip?'l':'r')];
-    return [seat.x-owner.x+(mark[0]-f.ax)*f.s,seat.y-owner.y+(mark[1]-f.ay)*f.s+BOLT_Z];
+    triRideFollow(p,owner);const mark=mountedPoint(p,owner,'wand');
+    return [mark.x-owner.x,mark.y-owner.y+BOLT_Z];
   }
   // The transparent joystick zone covers the left half, so it checks the same tap first.
   cv.addEventListener('pointerdown',triTap);
@@ -3854,7 +3859,7 @@
     const rect=cv.getBoundingClientRect(),zm=quizZoom()*comboZoom()*bcutZoom()*rescueZoom()*morphZoom(),sc=Math.min(cv.width/VW,cv.height/VH),zs=sc*zm;
     const sx=(e.clientX-rect.left)*cv.width/rect.width,sy=(e.clientY-rect.top)*cv.height/rect.height;
     const x=G.camX+VW/2+(sx-cv.width/2)/zs,y=G.camY+VH/2+(sy-cv.height/2)/zs;
-    const f=FR[p.kind+'_'+(p.flip?'l':'r')+'1'],k=f.s*CHAR_M*triScale(p),yy=p.y-dragonLift(p);
+    triRideFollow(p,P);const mounted=triRiding(),f=mounted?mountedFrame(p,P):FR[p.kind+'_'+(p.flip?'l':'r')+'1'],k=f.s*(mounted?1:CHAR_M*triScale(p)),yy=p.y-dragonLift(p);
     if(x>=p.x-f.ax*k-20&&x<=p.x+(f.w-f.ax)*k+20&&y>=yy-f.ay*k-20&&y<=yy+(f.h-f.ay)*k+20){if(triToggleRide()){e.preventDefault();return true;}}
     return false;
   }
@@ -3870,7 +3875,8 @@
       label('Cứu Coca và Rồng ba đầu!',c.x,c.y-330,36);
     }else spr(PROPS.cageOpen,c.x,c.y,false,1.5,.85);
   }
-  function triMouth(p,head=p.triShot?.head??p.triNext??0){
+  function triMouth(p,head=p.triShot?.head??p.triNext??0,attack=false){
+    const owner=petOwner(p);if(!p.sc&&triRiding(owner))return mountedPoint(p,owner,'mouth',head,attack?'attack_'+mountedDir(owner):mountedPose(p,owner));
     const k=TRI_ELEMENTS[head]+'_'+(p.flip?'l':'r'),f=FR['tridragon_'+k],a=triMeta.mouth[k],s=f.s*CHAR_M*triScale(p);
     return {x:p.x+(a[0]-f.ax)*s,y:p.y-dragonLift(p)+(a[1]-f.ay)*s};
   }
@@ -3884,17 +3890,18 @@
     if(dragonBlocked(owner)||!act){p.triShot=null;p.triAlign=false;p.cd=Math.max(.35,p.cd||0);}
     const shot=p.triShot;
     if(shot){p.cd=Math.max(0,(p.cd||0)-dt);const t=G.t-shot.start;
-      if(!shot.fired&&t>=.3){shot.fired=true;const m=triMouth(p,shot.head);shot.x=m.x;shot.y=m.y;triFire(p,owner,shot);}
+      if(!shot.fired&&t>=.3){shot.fired=true;const m=triMouth(p,shot.head);shot.x=m.x;shot.y=m.y;if(shot.target?.alive)shot.a=Math.atan2(dragonAimY(shot.target)-m.y,shot.target.x-m.x);triFire(p,owner,shot);}
       if(t>=.65)p.triShot=null;return;
     }
     const riding=triRiding(owner),tx=owner.x+(riding?0:(owner.flip?190:-190)),ty=owner.y+105,dx=tx-p.x,dy=ty-p.y,d=Math.hypot(dx,dy);
     if(d>1400){p.x=tx;p.y=ty;}else if(d>2&&!p.triAlign){const k=Math.min(1,dt*3.2);p.x+=dx*k;p.y+=dy*k;if(Math.abs(dx)>4)p.flip=dx<0;}
     p.moving=d>8;p.face=2;p.at=-1;
     if(!act||dragonBlocked(owner)||(p.cd=(p.cd??.6)-dt)>0)return;
-    const target=nearestFoes(owner.x,owner.y,760,1)[0];if(!target){p.cd=.2;p.triAlign=false;return;}
-    const head=p.triNext||0;if(!riding)p.flip=target.x<p.x;const m=triMouth(p,head),a=Math.atan2(dragonAimY(target)-m.y,target.x-m.x),dir=p.flip?-1:1;
+    const forward=riding?mountedVector(p,owner):null;
+    const target=nearestFoes(owner.x,owner.y,760,riding?12:1).find(m=>!riding||(m.x-owner.x)*forward[0]+(m.y-owner.y)*forward[1]>40);if(!target){p.cd=.2;p.triAlign=false;return;}
+    const head=p.triNext||0;if(!riding)p.flip=target.x<p.x;const m=triMouth(p,head,true),a=Math.atan2(dragonAimY(target)-m.y,target.x-m.x),dir=p.flip?-1:1;
     if(!riding&&((target.x-m.x)*dir<80||Math.cos(a)*dir<.55)){p.triAlign=true;const k=Math.min(1,dt*4);p.x+=(target.x-dir*320-p.x)*k;p.y+=(target.y+90-p.y)*k;p.cd=0;return;}
-    p.triAlign=false;p.triShot={id:++triSequence,start:G.t,head,a,x:m.x,y:m.y,fired:false};p.cd=2;
+    p.triAlign=false;p.triShot={id:++triSequence,start:G.t,head,a,x:m.x,y:m.y,target,fired:false};p.cd=2;
     play('dragonCharge');if(NET.role&&NET.fq.length<10)NET.fq.push(['t',p.i,p.x,p.y,a,0,p.flip?1:0,head]);
   }
   function triBossOpen(B){return !!B&&B.alive&&!['enter','quiz','morph','tele','throne','fly','ult'].includes(B.st)&&!(B.jz>60);}
@@ -3926,8 +3933,7 @@
     const owner=petOwner(p);if(!p.sc)triRideFollow(p,owner);
     const s=dragonBlocked(owner)?null:p.triShot,t=s?G.t-s.start:9;if(t>=.65)p.triShot=null;
     const active=s&&t<.65,dir=p.flip?'l':'r',pose=active?TRI_ELEMENTS[s.head]+'_'+dir:dir+[0,1,2,1][Math.floor(G.t*8)%4];
-    shadow(p.x,p.y,48*(p.sc||1),12*(p.sc||1),.2);spr('tridragon_'+pose,p.x,p.y-dragonLift(p),false,CHAR_M*triScale(p));
-    if(!p.sc&&triRideShown(owner))drawTriRider(p,owner);
+    if(!p.sc&&triRiding(owner)){if(!triRideShown(owner))return;drawTriRider(p,owner);}else{shadow(p.x,p.y,48*(p.sc||1),12*(p.sc||1),.2);spr('tridragon_'+pose,p.x,p.y-dragonLift(p),false,CHAR_M*triScale(p));}
     if(!active)return;const m=triMouth(p,s.head);if(t<.3){glow(m.x,m.y,16+40*t/.3,TRI_COLORS[s.head],.4+.4*t/.3);return;}
     const f=FR['tridragon_'+TRI_ELEMENTS[s.head]+'_beam'],w=54+8*Math.sin(t*50);ctx.save();ctx.translate(m.x,m.y);ctx.rotate(s.a);ctx.globalAlpha*=Math.min(1,(.65-t)/.12);ctx.drawImage(f.img,f.sx,f.sy,f.w,f.h,0,-w/2,850,w);ctx.restore();
   }
@@ -3950,9 +3956,9 @@
     Object.assign(FR,fresh);silverMeta=m;await loadTriRiders('s');
   }
   function silverReady(){return !!silverMeta&&SILVER_POSES.every(k=>FR['silverdragon_'+k]?.img);}
-  function silverFocus(p){const k='attack_'+(p.flip?'l':'r'),f=FR['silverdragon_'+k],a=silverMeta.focus[k],s=f.s*CHAR_M*triScale(p);return {x:p.x+(a[0]-f.ax)*s,y:p.y-dragonLift(p)+(a[1]-f.ay)*s};}
+  function silverFocus(p){const owner=petOwner(p);if(!p.sc&&triRiding(owner))return mountedPoint(p,owner,'focus');const k='attack_'+(p.flip?'l':'r'),f=FR['silverdragon_'+k],a=silverMeta.focus[k],s=f.s*CHAR_M*triScale(p);return {x:p.x+(a[0]-f.ax)*s,y:p.y-dragonLift(p)+(a[1]-f.ay)*s};}
   function silverClearPaused(){for(const p of allPets())if(p.kind==='silverdragon'&&dragonBlocked(petOwner(p))){p.silverCharge=null;p.silverOrbs=[];p.silverImpacts=[];p.cd=Math.max(.35,p.cd||0);}}
-  function silverEmit(p,phase,id,x=p.x,y=p.y,dir=p.flip?-1:1){if(NET.role&&NET.fq.length<10)NET.fq.push(['v',p.i,x,y,dir,phase,id]);}
+  function silverEmit(p,phase,id,x=p.x,y=p.y,dir=p.flip?-1:1,vector=[dir,0]){if(NET.role&&NET.fq.length<10)NET.fq.push(['v',p.i,x,y,dir,phase,id,...vector]);}
   function silverBurst(p,owner,o,damage){
     (p.silverImpacts||=[]).push({id:o.id,x:o.x,y:o.y,start:G.t});if(p.silverImpacts.length>4)p.silverImpacts.shift();
     if(!damage||dragonBlocked(owner))return;play('dragonBeam');
@@ -3964,10 +3970,10 @@
   }
   function silverAdvance(p,owner,dt,damage){
     const out=[];
-    for(const o of p.silverOrbs||[]){const x0=o.x;o.x+=o.dir*850*dt;o.life-=dt;
+    for(const o of p.silverOrbs||[]){const x0=o.x,y0=o.y,dx=o.dx??o.dir,dy=o.dy??0;o.x+=dx*850*dt;o.y+=dy*850*dt;o.life-=dt;
       const targets=G.mons.filter(m=>m.alive);if(triBossOpen(G.boss))targets.push(G.boss);
-      const hits=targets.filter(m=>{const x=clamp(m.x,Math.min(x0,o.x),Math.max(x0,o.x));return Math.hypot(m.x-x,dragonAimY(m)-o.y)<60+(m.r||40);}).sort((a,b)=>(a.x-b.x)*o.dir);
-      if(hits.length||o.life<=0){if(hits.length)o.x=hits[0].x;silverBurst(p,owner,o,damage);}else out.push(o);
+      const hits=targets.filter(m=>{const vx=o.x-x0,vy=o.y-y0,t=clamp(((m.x-x0)*vx+(dragonAimY(m)-y0)*vy)/(vx*vx+vy*vy||1),0,1);return Math.hypot(m.x-x0-vx*t,dragonAimY(m)-y0-vy*t)<60+(m.r||40);}).sort((a,b)=>(a.x-b.x)*dx+(dragonAimY(a)-dragonAimY(b))*dy);
+      if(hits.length||o.life<=0){if(hits.length){o.x=hits[0].x;o.y=dragonAimY(hits[0]);}silverBurst(p,owner,o,damage);}else out.push(o);
     }
     p.silverOrbs=out;p.silverImpacts=(p.silverImpacts||[]).filter(o=>G.t-o.start<.45);
   }
@@ -3979,11 +3985,12 @@
     if(owner!==P)return;
     if(!act){p.silverCharge=null;return;}p.cd=Math.max(0,(p.cd??.6)-dt);
     const c=p.silverCharge;if(c){const t=G.t-c.start;
-      if(!c.fired&&t>=.35){c.fired=true;const m=silverFocus(p),dir=p.flip?-1:1;(p.silverOrbs||=[]).push({id:c.id,x:m.x,y:m.y,dir,life:1});silverEmit(p,1,c.id,m.x,m.y,dir);play('dragonBeam');}
+      if(!c.fired&&t>=.35){c.fired=true;const m=silverFocus(p),dir=p.flip?-1:1,[dx,dy]=triRiding(owner)?mountedVector(p,owner):[dir,0];(p.silverOrbs||=[]).push({id:c.id,x:m.x,y:m.y,dir,dx,dy,life:1});silverEmit(p,1,c.id,m.x,m.y,dir,[dx,dy]);play('dragonBeam');}
       if(t>=.65)p.silverCharge=null;return;
     }
     if(p.cd>0)return;
-    const target=nearestFoes(owner.x,owner.y,850,12).find(m=>!triRiding(owner)||(m.x-owner.x)*(owner.flip?-1:1)>80);
+    const forward=triRiding(owner)?mountedVector(p,owner):[owner.flip?-1:1,0];
+    const target=nearestFoes(owner.x,owner.y,850,12).find(m=>!triRiding(owner)||(m.x-owner.x)*forward[0]+(m.y-owner.y)*forward[1]>80);
     if(!target){p.cd=.2;return;}if(!triRiding(owner))p.flip=target.x<p.x;
     p.silverCharge={id:++silverSequence,start:G.t,fired:false};p.cd=2;play('dragonCharge');silverEmit(p,0,p.silverCharge.id);
   }
@@ -3995,20 +4002,25 @@
     h[1]=0;h[2]=Math.round(petDmg(Q.lv||1)*1.6);h[3]=50;hit();
   }
   function silverRemote(p,f){
-    if(p?.kind!=='silverdragon'||Q?.hero!=='s'||dragonBlocked(Q)||!silverReady()||f.length!==7||!f.slice(2).every(Number.isFinite)||![-1,1].includes(f[4])||![0,1,2].includes(f[5])||!Number.isSafeInteger(f[6])||f[6]<=0||Math.hypot(f[2]-Q.x,f[3]-Q.y)>1800)return;
+    if(p?.kind!=='silverdragon'||Q?.hero!=='s'||dragonBlocked(Q)||!silverReady()||![7,9].includes(f.length)||!f.slice(2).every(Number.isFinite)||f.length===9&&Math.abs(Math.hypot(f[7],f[8])-1)>.01||![-1,1].includes(f[4])||![0,1,2].includes(f[5])||!Number.isSafeInteger(f[6])||f[6]<=0||Math.hypot(f[2]-Q.x,f[3]-Q.y)>1800)return;
     const key=f[6]+':'+f[5];p.silverSeen||=new Set();if(p.silverSeen.has(key))return;p.silverSeen.add(key);if(p.silverSeen.size>64)p.silverSeen.delete(p.silverSeen.values().next().value);
     p.flip=f[4]<0;
     if(f[5]===0){p.silverCharge={id:f[6],start:G.t,fired:true};play('dragonCharge');}
-    else if(f[5]===1){p.silverCharge={id:f[6],start:G.t-.35,fired:true};(p.silverOrbs||=[]).push({id:f[6],x:f[2],y:f[3],dir:f[4],life:1});play('dragonBeam');}
+    else if(f[5]===1){p.silverCharge={id:f[6],start:G.t-.35,fired:true};(p.silverOrbs||=[]).push({id:f[6],x:f[2],y:f[3],dir:f[4],dx:f[7]??f[4],dy:f[8]??0,life:1});play('dragonBeam');}
     else{p.silverOrbs=(p.silverOrbs||[]).filter(o=>o.id!==f[6]);if(!(p.silverImpacts||[]).some(o=>o.id===f[6]))(p.silverImpacts||=[]).push({id:f[6],x:f[2],y:f[3],start:G.t});}
   }
   function silverPose(p){const c=p.silverCharge,t=c?G.t-c.start:9,d=p.flip?'l':'r';return t<.35?'charge_'+d:t<.5?'attack_'+d:t<.65?'recover_'+d:d+[0,1,2,1][Math.floor(G.t*8)%4];}
   function drawSilverDragon(p){
     if(!silverReady())return;const owner=petOwner(p);if(!p.sc)triRideFollow(p,owner);
     const c=dragonBlocked(owner)?null:p.silverCharge,t=c?G.t-c.start:9,d=p.flip?'l':'r',pose=t<.35?'charge_'+d:t<.5?'attack_'+d:t<.65?'recover_'+d:d+[0,1,2,1][Math.floor(G.t*8)%4];
+    if(!p.sc&&triRiding(owner)){
+      if(!triRideShown(owner))return;drawTriRider(p,owner);
+      if(t<.35){const focus=silverFocus(p),f=FR.tridragon_ice_beam;
+        for(let i=0;i<3;i++){const m=mountedPoint(p,owner,'mouth',i),dx=focus.x-m.x,dy=focus.y-m.y;ctx.save();ctx.translate(m.x,m.y);ctx.rotate(Math.atan2(dy,dx));ctx.globalAlpha*=.5+.5*t/.35;ctx.drawImage(f.img,f.sx,f.sy,f.w,f.h,0,-12,Math.hypot(dx,dy),24);ctx.restore();}glow(focus.x,focus.y,30+45*t/.35,'205,235,255',.3);
+      }return;
+    }
     shadow(p.x,p.y,48*triScale(p),12*triScale(p),.2);spr('silverdragon_'+pose,p.x,p.y-dragonLift(p),false,CHAR_M*triScale(p));
     if(t<.35){spr('silverdragon_converge_'+d,p.x,p.y-dragonLift(p),false,CHAR_M*triScale(p),.5+.5*t/.35);const m=silverFocus(p);glow(m.x,m.y,30+45*t/.35,'205,235,255',.3);}
-    if(!p.sc&&triRideShown(owner))drawTriRider(p,owner);
   }
   function drawSilverAir(p){if(!silverReady()||dragonBlocked(petOwner(p)))return;
     for(const o of p.silverOrbs||[]){const f=FR['silverdragon_orb'+Math.floor(G.t*12)%3];spr(f,o.x,o.y,false,120/(f.w*f.s));glow(o.x,o.y,85,'205,235,255',.25);}
