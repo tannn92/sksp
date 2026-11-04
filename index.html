@@ -428,7 +428,7 @@
   }
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261104.0810", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261104.0904", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -10597,10 +10597,10 @@
   }
 
   function buyOutfit(id) {
-    if (id === "base") return true;
+    if (id === "base") return wearOutfit(id);
     const o = OUTFITS4.find((x) => x.id === id);
     if (!o || o.char !== hero) return false;
-    if (isOwned(o)) return true;
+    if (isOwned(o)) return wearOutfit(id);
     // the stars are one pool that the host keeps: a guest only asks, the host checks the price, pays and answers; she marks it hers on the answer
     if (NET.role === "guest") {
       if (G.stars < o.price) return false;
@@ -10616,7 +10616,7 @@
     if (NET.role === "host") netEmit("shop", { op: "stars", n: G.stars });
     updateHud();
     if (SH.open) shopRefresh();
-    return true;
+    return wearOutfit(id);
   }
   const BUY = { id: null, t: 0 };   // the guest's purchase waiting for the host's answer
   // the host's side of a guest's purchase request: enough stars -> pay and say yes; otherwise no (the pool never goes below what it holds)
@@ -10635,7 +10635,7 @@
     // (an answer that comes after the wait ran out still counts: the host may well have paid already)
     const wasWaiting = BUY.id === full; if (wasWaiting) BUY.id = null;
     G.stars = Math.max(0, Math.floor(num(d.stars))); updateHud();
-    if (d.ok) { addOwned(hero, full); if (SH.open) { play("level"); burstUi(); } }
+    if (d.ok) { const fresh = !isOwned(o); addOwned(hero, full); if (SH.open) { if (wasWaiting || fresh) wearOutfit(full); play("level"); burstUi(); } }
     else if (wasWaiting) { SH.noT = 2.2; if (SH.open) { shake($("shopBuy")); play("hurt"); } }
     if (SH.open) shopRefresh();
   }
