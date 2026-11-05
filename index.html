@@ -427,7 +427,7 @@
   }
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261105.0722", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261105.1530", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -3840,7 +3840,7 @@
         if(!Array.isArray(f)||f.length!==8||!f.every(Number.isFinite)||!Number.isInteger(f[0])||!im||f[1]<0||f[2]<0||f[3]<=0||f[4]<=0||f[5]!==1||f[1]+f[3]>im.width||f[2]+f[4]>im.height||f[6]<0||f[6]>f[3]||f[7]<0||f[7]>f[4])throw Error('Tranh tuyệt chiêu cưỡi rồng bị lỗi');
         fresh['mounted_ult_'+char+'_'+k]={img:im,sx:f[1],sy:f[2],w:f[3],h:f[4],s:1,ax:f[6],ay:f[7]};
       }
-      Object.assign(FR,fresh);mountedUltAssets[char]=true;
+      Object.assign(FR,fresh);mountedUltAssets[char]=true;await loadMountedGround();
     }catch(e){mountedUltAssets[char]=false;}
   }
   function mountedUltTime(owner=P){return owner===P?(G.ult?.t??-1):(owner.ultT>0?owner.ultT:-1);}
@@ -3852,7 +3852,7 @@
   const mountedAuraImpacts=new Map();
   const mountedAuraCaster=owner=>owner===P?(NET.me||'local'):owner.peer;
   function mountedAuraAccept(impact){
-    if(!impact||typeof impact.caster!=='string'||typeof impact.cast!=='string'||impact.cast.length>160||!impact.cast.startsWith(impact.caster+':')||!Array.isArray(impact.area)||impact.area.length!==7||impact.area[6]!==impact.cast||!impact.area.slice(0,5).every(Number.isFinite)||!Array.isArray(impact.area[5])||impact.area[5].length>256||impact.area[5].some(m=>!Array.isArray(m)||m.length!==3||!Number.isFinite(m[1])||!Number.isFinite(m[2])))return;
+    if(!impact||typeof impact.caster!=='string'||typeof impact.cast!=='string'||impact.cast.length>160||!impact.cast.startsWith(impact.caster+':')||!Array.isArray(impact.area)||impact.area.length!==7||impact.area[6]!==impact.cast||!impact.area.slice(0,5).every(Number.isFinite)||!Array.isArray(impact.area[5])||impact.area[5].length>256||impact.area[5].some(m=>!Array.isArray(m)||![3,4].includes(m.length)||!Number.isFinite(m[1])||!Number.isFinite(m[2])||(m.length===4&&(!Number.isFinite(m[3])||m[3]<40||m[3]>440))))return;
     const old=mountedAuraImpacts.get(impact.caster),seq=k=>Number(k.slice(k.lastIndexOf(':')+1));
     if(!Number.isSafeInteger(seq(impact.cast))||seq(impact.cast)<1||old&&seq(old.cast)>seq(impact.cast))return;
     mountedAuraImpacts.set(impact.caster,impact);if(mountedAuraImpacts.size>16)mountedAuraImpacts.delete(mountedAuraImpacts.keys().next().value);
@@ -3868,15 +3868,15 @@
     s.last=t;
     if(owner===P&&!s.hit){s.cx=G.ult.cx;s.cy=G.ult.cy;s.hw=VW/2+120;s.hh=VH/2+160;}
     if(!s.hit){
-      const found=[];for(const m of G.mons)if(m.alive&&Math.abs(m.x-s.cx)<s.hw&&Math.abs(m.y-s.cy)<s.hh)found.push({id:m.id,x:m.x,y:m.y});
-      const b=G.boss;if(b?.alive&&Math.abs(b.x-s.cx)<s.hw+100&&Math.abs(b.y-s.cy)<s.hh+100)found.push({id:'boss',x:b.x,y:b.y});
+      const found=[];for(const m of G.mons)if(m.alive&&Math.abs(m.x-s.cx)<s.hw&&Math.abs(m.y-s.cy)<s.hh)found.push({id:m.id,x:m.x,y:m.y,size:mountedGroundSize(m)});
+      const b=G.boss;if(b?.alive&&Math.abs(b.x-s.cx)<s.hw+100&&Math.abs(b.y-s.cy)<s.hh+100)found.push({id:'boss',x:b.x,y:b.y,size:mountedGroundSize(b,true)});
       // Never throw away the last visible marker when a received world snapshot removes its victim.
       const byId=new Map(s.targets.map(m=>[m.id,m]));for(const m of found)byId.set(m.id,m);s.targets=[...byId.values()];
     }
     return s;
   }
   function mountedAuraCapture(owner=P,bounds){const s=mountedAuraState(owner);if(!s)return null;if(bounds)Object.assign(s,bounds);s.targets=[];s.hit=false;mountedAuraState(owner);s.hit=true;s.authoritative=NET.role!=='guest';if(NET.role==='host'){const impact={caster:mountedAuraCaster(owner),cast:s.cast,area:mountedAuraWire(owner)};mountedAuraAccept(impact);netEmit('mountedAuraImpact',impact);}return s;}
-  function mountedAuraWire(owner=P){const s=mountedAuraState(owner);return s?[s.cx,s.cy,s.hw,s.hh,s.hit?1:0,s.targets.map(m=>[m.id,m.x,m.y]),s.cast]:0;}
+  function mountedAuraWire(owner=P){const s=mountedAuraState(owner);return s?[s.cx,s.cy,s.hw,s.hh,s.hit?1:0,s.targets.map(m=>[m.id,m.x,m.y,m.size||100]),s.cast]:0;}
   function mountedAuraRead(owner,data,authority=false){
     if(!owner||!Array.isArray(data)||data.length!==7||typeof data[6]!=='string'||data[6].length>160||!data.slice(0,5).every(Number.isFinite)||!Array.isArray(data[5]))return;
     const holder=owner===P?G.ult:owner;if(!holder)return;
@@ -3886,7 +3886,7 @@
     const seq=k=>Number(k.slice(k.lastIndexOf(':')+1));if(old&&seq(old.cast)>seq(data[6]))return;
     // A delayed pre-hit presence must never undo the host's captured death positions.
     if(!authority&&old?.hit&&old.cast===data[6]&&t>=old.last-.25){const impact=mountedAuraImpacts.get(caster);if(!old.authoritative&&impact?.cast===old.cast)return mountedAuraRead(owner,impact.area,true);old.last=Math.max(old.last,t);return;}
-    const targets=data[5].filter(m=>Array.isArray(m)&&m.length===3&&(typeof m[0]==='string'||Number.isFinite(m[0]))&&Number.isFinite(m[1])&&Number.isFinite(m[2])).slice(0,256).map(m=>({id:m[0],x:m[1],y:m[2]}));
+    const targets=data[5].filter(m=>Array.isArray(m)&&[3,4].includes(m.length)&&(m.length===3||Number.isFinite(m[3]))&&(typeof m[0]==='string'||Number.isFinite(m[0]))&&Number.isFinite(m[1])&&Number.isFinite(m[2])).slice(0,256).map(m=>({id:m[0],x:m[1],y:m[2],size:clamp(m[3]??100,40,440)}));
     holder.mountedAura={last:t,cx:data[0],cy:data[1],hw:clamp(data[2],0,2200),hh:clamp(data[3],0,1400),hit:!!data[4],cast:data[6],authoritative:authority,targets:targets.length?targets:!authority&&old&&old.cast===data[6]&&t>=old.last-.25?old.targets:[]};
     const impact=mountedAuraImpacts.get(mountedAuraCaster(owner));if(!authority&&impact?.cast===data[6])mountedAuraRead(owner,impact.area,true);
   }
@@ -3899,12 +3899,31 @@
     const f=FR['mounted_ult_'+rideHero(owner)+'_'+kind+frame];if(!f||rx<=0||ry<=0||alpha<=0)return;
     const ground=kind==='aura'?({g:[[185,58],[195,58],[200,58],[195,58]],s:[[160,66],[190,80],[198,85],[190,72]]})[rideHero(owner)][frame]:null,w=ground?f.w*rx/ground[0]:rx*2,h=ground?f.h*ry/ground[1]:ry*2;ctx.save();ctx.globalAlpha*=alpha;ctx.drawImage(f.img,f.sx,f.sy,f.w,f.h,x-f.ax/f.w*w,y-f.ay/f.h*h,w,h);ctx.restore();
   }
+  function mountedGroundSize(m,boss=false){return clamp((Number.isFinite(m.r)?m.r:(boss?150:40))*(m.elite?1.3:1)*2.2,boss?220:60,440);}
+  let mountedGroundPromise=null;
+  function loadMountedGround(){return mountedGroundPromise ||= (async()=>{try{
+    const root='mochi-assets/ground/',m=await(await fetch(root+'atlas.json',{cache:'no-cache'})).json();
+    if(m.version!==1||!m.hash||!Array.isArray(m.sheets)||m.sheets.some(s=>!/^ground_[0-9]+\.webp$/.test(s)))throw Error('Missing earth eruption art');
+    const ims=await Promise.all(m.sheets.map(s=>loadImg(root+s+'?v='+m.hash))),fresh={};
+    for(const k of ['fire','ice'].flatMap(k=>[0,1,2,3].map(i=>k+i))){const f=m.frames?.[k],im=ims[f?.[0]];
+      if(!Array.isArray(f)||f.length!==8||!f.every(Number.isFinite)||!im||f[1]<0||f[2]<0||f[3]<=0||f[4]<=0||f[1]+f[3]>im.width||f[2]+f[4]>im.height||f[6]<0||f[6]>f[3]||f[7]<0||f[7]>f[4])throw Error('Invalid earth eruption frame');
+      fresh['mounted_ground_'+k]={img:im,sx:f[1],sy:f[2],w:f[3],h:f[4],ax:f[6],ay:f[7]};
+    }Object.assign(FR,fresh);
+  }catch(e){}})();}
+  function drawMountedGround(owner,state,t){
+    if(t<1.5)return;const age=t-1.5,phase=age<.08?0:age<.3?1:age<.65?2:3;
+    const f=FR['mounted_ground_'+(rideHero(owner)==='g'?'fire':'ice')+phase];if(!f)return;
+    ctx.save();ctx.globalAlpha*=1-ss(2.1,2.6,t);
+    for(const m of state.targets){const size=m.size||100,w=size*2,h=size*1.8;ctx.drawImage(f.img,f.sx,f.sy,f.w,f.h,m.x-f.ax/f.w*w,m.y-f.ay/f.h*h,w,h);}
+    ctx.restore();
+  }
   function drawMountedAura(owner=P){
     const g=mountedAuraGeometry(owner);if(!g)return;const t=mountedUltTime(owner),fade=1-ss(2.1,2.6,t),stage=Math.min(3,Math.floor(ss(.65,1.4,t)*4));
     mountedAuraPaint(owner,'aura',stage,g.x,g.y,g.rx*1.12,g.ry*1.12,(rideHero(owner)==='g'&&mountedLotusReady() ? .18 : .35+.25*ss(.65,1.4,t))*fade);
     if(t>1.05&&!(rideHero(owner)==='g'&&mountedLotusReady()))mountedAuraPaint(owner,'aura',Math.min(3,Math.floor(ss(1.05,1.6,t)*4)),g.x,g.y,g.rx*.52,g.ry*.52,.32*ss(1.05,1.4,t)*fade);
     if(rideHero(owner)==='g'&&mountedLotusReady())drawMountedLotus(owner,g);
     if(t>=1.5&&!(rideHero(owner)==='g'&&mountedLotusReady())){const beat=Math.min(3,Math.floor((t-1.5)/.225));mountedAuraPaint(owner,'nova',beat,g.x,g.y,g.rx*1.18,g.ry*1.18,.65*fade);}
+    drawMountedGround(owner,g.state,t);
     if(t>.9)for(const m of g.state.targets){const q=ss(.9,1.35,t);mountedAuraPaint(owner,'charge',Math.min(3,Math.floor(q*4)),m.x,m.y,36+q*22,20+q*12,.75*fade);}
   }
   function drawAllMountedAuras(){drawMountedAura();if(NET.role&&!G.combo)eachQ(q=>drawMountedAura(q));}
@@ -3984,7 +4003,7 @@
   async function loadSilverStream(){try{
     const root='matcha-assets/burststream/',m=await(await fetch(root+'atlas.json',{cache:'no-cache'})).json();
     if(m.version!==1||!m.hash||!Array.isArray(m.sheets)||!m.sheets.length||m.sheets.some(s=>!/^burststream_[0-9]+\.webp$/.test(s)))throw Error('Thiếu tranh luồng sét');
-    const ims=await Promise.all(m.sheets.map(s=>loadImg(root+s+'?v='+m.hash))),fresh={};for(let i=0;i<4;i++){const f=m.frames?.['beam'+i],im=ims[f?.[0]];if(!Array.isArray(f)||f.length!==8||!f.every(Number.isFinite)||!im||f[1]<0||f[2]<0||f[3]<=0||f[4]<=0||f[5]!==1||f[1]+f[3]>im.width||f[2]+f[4]>im.height||f[6]<0||f[6]>f[3]||f[7]<0||f[7]>f[4])throw Error('Tranh luồng sét bị lỗi');fresh['silver_stream_beam'+i]={img:im,sx:f[1],sy:f[2],w:f[3],h:f[4],s:1,ax:f[6],ay:f[7]};}Object.assign(FR,fresh);silverStreamMeta=m;
+    const ims=await Promise.all(m.sheets.map(s=>loadImg(root+s+'?v='+m.hash))),fresh={};for(const key of [...Array.from({length:4},(_,i)=>'beam'+i),...Object.keys(m.frames||{}).filter(k=>/^rift[0-3]$/.test(k))]){const f=m.frames?.[key],im=ims[f?.[0]];if(!Array.isArray(f)||f.length!==8||!f.every(Number.isFinite)||!im||f[1]<0||f[2]<0||f[3]<=0||f[4]<=0||f[5]!==1||f[1]+f[3]>im.width||f[2]+f[4]>im.height||f[6]<0||f[6]>f[3]||f[7]<0||f[7]>f[4])throw Error('Tranh luồng sét bị lỗi');fresh['silver_stream_'+key]={img:im,sx:f[1],sy:f[2],w:f[3],h:f[4],s:1,ax:f[6],ay:f[7]};}Object.assign(FR,fresh);silverStreamMeta=m;
   }catch(e){silverStreamMeta=null;}}
   function silverStreamReady(){return !!silverStreamMeta&&[0,1,2,3].every(i=>FR['silver_stream_beam'+i]?.img);}
   function mountedPoseFrame(owner,pose){return FR[((pose.startsWith('summon')||pose.startsWith('release'))?'mounted_gesture_g_':pose.startsWith('sky_')?'mounted_sky_s_':pose.startsWith('head')?'mounted_head_g_':'mounted_'+rideHero(owner)+'_')+pose];}
@@ -4136,9 +4155,9 @@
   }
   function silverReady(){return !!silverMeta&&SILVER_POSES.every(k=>FR['silverdragon_'+k]?.img);}
   function silverFocus(p){const owner=petOwner(p);if(!p.sc&&triRiding(owner))return mountedPoint(p,owner,'focus');const k='attack_'+(p.flip?'l':'r'),f=FR['silverdragon_'+k],a=silverMeta.focus[k],s=f.s*CHAR_M*triScale(p);return {x:p.x+(a[0]-f.ax)*s,y:p.y-dragonLift(p)+(a[1]-f.ay)*s};}
-  function silverClearPaused(){for(const p of allPets())if(p.kind==='silverdragon'&&dragonBlocked(petOwner(p))){p.silverCharge=null;p.silverStream=null;p.silverOrbs=[];p.silverImpacts=[];p.cd=Math.max(.35,p.cd||0);}}
+  function silverClearPaused(){for(const p of allPets())if(p.kind==='silverdragon'&&dragonBlocked(petOwner(p))){p.silverCharge=null;p.silverStream=null;p.silverRift=null;p.silverOrbs=[];p.silverImpacts=[];p.cd=Math.max(.35,p.cd||0);}}
   function silverEmit(p,phase,id,x=p.x,y=p.y,dir=p.flip?-1:1,vector=[dir,0]){if(NET.role&&NET.fq.length<10)NET.fq.push(['v',p.i,x,y,dir,phase,id,...vector]);}
-  function silverIntersects(m,s){const x=m.x-s.x,y=dragonAimY(m)-s.y,along=x*s.dx+y*s.dy,r=Math.min(130,m.r||40);return along>=0&&along<=850+r&&Math.abs(x*s.dy-y*s.dx)<=60+r;}
+  function silverIntersects(m,s){const x=m.x-s.x,y=dragonAimY(m)-s.y,along=x*s.dx+y*s.dy,r=Math.min(130,m.r||40);return along>=0&&along<=850+r&&Math.abs(x*s.dy-y*s.dx)<=120+r;}
   function silverAdvance(p,owner,dt,damage){
     p.silverOrbs=[];p.silverImpacts=[];const s=p.silverStream;if(!s)return;
     if(dragonBlocked(owner)||G.t-s.start>=.4){p.silverStream=null;return;}
@@ -4147,42 +4166,42 @@
     if(!damage)return;
     const targets=G.mons.filter(m=>m.alive&&silverIntersects(m,s));if(triBossOpen(G.boss)&&silverIntersects(G.boss,s))targets.push(G.boss);
     for(const m of targets){const key=m===G.boss?'boss':m.id;if(s.hits.has(key))continue;s.hits.add(key);const n=NET.hq.length;
-      if(m===G.boss)silverHitBoss(m);else hitMon(m,Math.round(petDmg(owner.lv||1)*1.6),null,s.x,s.y,50);
+      if(m===G.boss)silverHitBoss(m);else hitMon(m,Math.round(petDmg(owner.lv||1)*8),null,s.x,s.y,50);
       if(NET.role==='guest'&&NET.hq.length>n){const h=NET.hq[NET.hq.length-1];h[6]='silver:'+s.id;h[7]=s.x;h[8]=s.y;h[9]=s.dx;h[10]=s.dy;}
     }
   }
   function silverStep(p,owner,dt,act){
     triRideFollow(p,owner);if(!silverReady())return;
-    if(dragonBlocked(owner)){p.silverCharge=null;p.silverStream=null;p.silverOrbs=[];p.silverImpacts=[];p.cd=Math.max(.35,p.cd||0);return;}
+    if(dragonBlocked(owner)){p.silverCharge=null;p.silverStream=null;p.silverRift=null;p.silverOrbs=[];p.silverImpacts=[];p.cd=Math.max(.35,p.cd||0);return;}
     silverAdvance(p,owner,dt,owner===P&&act);
     if(!triRiding(owner)){const tx=owner.x+(owner.flip?190:-190),ty=owner.y+105,k=Math.min(1,dt*3.2),dx=tx-p.x;p.x+=dx*k;p.y+=(ty-p.y)*k;if(!p.silverCharge&&Math.abs(dx)>4)p.flip=dx<0;}
     if(owner!==P){if(p.silverCharge&&G.t-p.silverCharge.start>=.65)p.silverCharge=null;return;}
-    if(!act){p.silverCharge=null;p.silverStream=null;return;}p.cd=Math.max(0,(p.cd??.6)-dt);
+    if(!act){p.silverCharge=null;p.silverStream=null;p.silverRift=null;return;}p.cd=Math.max(0,(p.cd??.6)-dt);
     const c=p.silverCharge;if(c){const t=G.t-c.start;
       if(!c.fired&&t>=.25){c.fired=true;const m=silverFocus(p),dir=p.flip?-1:1,v=triRiding(owner)?mountedVector(p,owner):c.target?.alive?[c.target.x-m.x,dragonAimY(c.target)-m.y]:[dir,0],len=Math.hypot(...v)||1;
-        p.silverStream={id:c.id,start:G.t,x:m.x,y:m.y,dx:v[0]/len,dy:v[1]/len,hits:new Set()};silverEmit(p,1,c.id,m.x,m.y,dir,[v[0]/len,v[1]/len]);play('dragonBeam');silverAdvance(p,owner,0,true);}
+        p.silverStream={id:c.id,start:G.t,x:m.x,y:m.y,dx:v[0]/len,dy:v[1]/len,hits:new Set()};silverStartRift(p);silverEmit(p,1,c.id,m.x,m.y,dir,[v[0]/len,v[1]/len]);play('dragonBeam');silverAdvance(p,owner,0,true);}
       if(t>=.65)p.silverCharge=null;return;
     }
     if(p.cd>0)return;
     const forward=triRiding(owner)?mountedVector(p,owner):[owner.flip?-1:1,0];
     const target=nearestFoes(owner.x,owner.y,850,12).find(m=>!triRiding(owner)||(m.x-owner.x)*forward[0]+(m.y-owner.y)*forward[1]>80);
     if(!target){p.cd=.2;return;}if(!triRiding(owner))p.flip=target.x<p.x;
-    p.silverCharge={id:++silverSequence,start:G.t,fired:false,target};p.cd=1.25;play('dragonCharge');silverEmit(p,0,p.silverCharge.id);
+    p.silverCharge={id:++silverSequence,start:G.t,fired:false,target};p.cd=2;play('dragonCharge');silverEmit(p,0,p.silverCharge.id);
   }
   function silverReceiveHit(h,hit){
     if(Q?.hero!=='s'||!Q.pets?.includes('silverdragon')||dragonBlocked(Q)||!silverReady()||!/^silver:[1-9][0-9]{0,12}$/.test(h[6]))return;
     const id=Number(h[0]),m=id===-1?G.boss:G.mons.find(m=>m.id===id&&m.alive);if(!m?.alive||id===-1&&!triBossOpen(m)||Math.hypot(m.x-Q.x,m.y-Q.y)>1800)return;
     if(h.length<11||!h.slice(7,11).every(Number.isFinite)||Math.abs(Math.hypot(h[9],h[10])-1)>.01||Math.hypot(h[7]-Q.x,h[8]-Q.y)>1800||!silverIntersects(m,{x:h[7],y:h[8],dx:h[9],dy:h[10]}))return;
     const key=Q.peer+':'+h[6];let ids=silverReceived.get(key);if(!ids){ids=new Set();silverReceived.set(key,ids);if(silverReceived.size>128)silverReceived.delete(silverReceived.keys().next().value);}if(ids.has(id))return;ids.add(id);
-    if(id===-1){damageBoss(2,m.x,m.y-220);return;}
-    h[1]=0;h[2]=Math.round(petDmg(Q.lv||1)*1.6);h[3]=50;hit();
+    if(id===-1){damageBoss(10,m.x,m.y-220);return;}
+    h[1]=0;h[2]=Math.round(petDmg(Q.lv||1)*8);h[3]=50;hit();
   }
   function silverRemote(p,f){
     if(p?.kind!=='silverdragon'||Q?.hero!=='s'||dragonBlocked(Q)||!silverReady()||![7,9].includes(f.length)||!f.slice(2).every(Number.isFinite)||f.length===9&&Math.abs(Math.hypot(f[7],f[8])-1)>.01||![-1,1].includes(f[4])||![0,1,2].includes(f[5])||!Number.isSafeInteger(f[6])||f[6]<=0||Math.hypot(f[2]-Q.x,f[3]-Q.y)>1800)return;
     const key=f[6]+':'+f[5];p.silverSeen||=new Set();if(p.silverSeen.has(key))return;p.silverSeen.add(key);if(p.silverSeen.size>64)p.silverSeen.delete(p.silverSeen.values().next().value);
     p.flip=f[4]<0;
     if(f[5]===0){p.silverCharge={id:f[6],start:G.t,fired:true};play('dragonCharge');}
-    else if(f[5]===1){p.silverCharge={id:f[6],start:G.t-.25,fired:true};p.silverStream={id:f[6],start:G.t,x:f[2],y:f[3],dx:f[7]??f[4],dy:f[8]??0,hits:new Set()};p.silverOrbs=[];play('dragonBeam');}
+    else if(f[5]===1){p.silverCharge={id:f[6],start:G.t-.25,fired:true};p.silverStream={id:f[6],start:G.t,x:f[2],y:f[3],dx:f[7]??f[4],dy:f[8]??0,hits:new Set()};silverStartRift(p);p.silverOrbs=[];play('dragonBeam');}
     else if(p.silverStream?.id===f[6])p.silverStream=null;
   }
   function silverPose(p){const c=p.silverCharge,t=c?G.t-c.start:9,d=p.flip?'l':'r';return t<.25?'charge_'+d:t<.6?'attack_'+d:t<.65?'recover_'+d:d+[0,1,2,1][Math.floor(G.t*8)%4];}
@@ -4198,14 +4217,27 @@
     shadow(p.x,p.y,48*triScale(p),12*triScale(p),.2);spr('silverdragon_'+pose,p.x,p.y-dragonLift(p),false,CHAR_M*triScale(p));
     if(t<.25){spr('silverdragon_converge_'+d,p.x,p.y-dragonLift(p),false,CHAR_M*triScale(p),.5+.5*t/.25);const m=silverFocus(p);glow(m.x,m.y,30+45*t/.25,'205,235,255',.3);}
   }
+  function silverStartRift(p){
+    const s=p.silverStream;if(!s)return;
+    p.silverRift={start:s.start,x:s.x,y:s.y+55,dx:s.dx,dy:s.dy};
+  }
+  function drawSilverGround(p){
+    const s=p.silverRift;if(!s||dragonBlocked(petOwner(p)))return;
+    const t=G.t-s.start;if(t<0||t>=1.25)return;
+    const i=t<.13?0:t<.4?1:t<.75?2:3,f=FR['silver_stream_rift'+i];if(!f)return;
+    const progress=Math.min(1,t/.14),width=210,reach=850*f.w/Math.max(1,f.w-f.ax);
+    ctx.save();ctx.translate(s.x,s.y);ctx.rotate(Math.atan2(s.dy,s.dx));ctx.globalAlpha*=Math.min(1,(1.25-t)/.4);
+    // Reveal the painted fissure along the shot, without stretching the rocks.
+    ctx.drawImage(f.img,f.sx,f.sy,f.w*progress,f.h,-f.ax/f.w*reach,-f.ay/f.h*width,reach*progress,width);ctx.restore();
+  }
   function drawSilverAir(p){if(!silverReady()||dragonBlocked(petOwner(p)))return;
-    const s=p.silverStream;if(!s||G.t-s.start>=.4)return;const owner=petOwner(p),m=silverFocus(p),v=triRiding(owner)?mountedVector(p,owner):[s.dx,s.dy],f=FR['silver_stream_beam'+Math.floor((G.t-s.start)*20)%4]||FR.tridragon_ice_beam,width=120;
+    const s=p.silverStream;if(!s||G.t-s.start>=.4)return;const owner=petOwner(p),m=silverFocus(p),v=triRiding(owner)?mountedVector(p,owner):[s.dx,s.dy],f=FR['silver_stream_beam'+Math.floor((G.t-s.start)*20)%4]||FR.tridragon_ice_beam,width=240;
     ctx.save();ctx.translate(m.x,m.y);ctx.rotate(Math.atan2(v[1],v[0]));ctx.globalAlpha*=Math.min(1,(.4-G.t+s.start)/.07);const reach=850*f.w/Math.max(1,f.w-f.ax);ctx.drawImage(f.img,f.sx,f.sy,f.w,f.h,-f.ax/f.w*reach,-f.ay/f.h*width,reach,width);ctx.restore();
   }
   function drawCafeDragonCage(c){
     shadow(c.x,c.y,105,23);if(!c.open){glow(c.x,c.y-115,190,'205,235,255',.35+.12*Math.sin(G.t*3));drawPet({kind:'cat',x:c.x-44,y:c.y-12,face:0,flip:false,moving:false,i:0,dist:0,sc:.65,at:-1});drawSilverDragon({kind:'silverdragon',x:c.x+20,y:c.y-105,flip:false,i:0,sc:.5});spr(PROPS.cage,c.x,c.y,false,1.5);label('Cứu Cafe và Rồng bạc!',c.x,c.y-330,36);}else spr(PROPS.cageOpen,c.x,c.y,false,1.5,.85);
   }
-  function silverHitBoss(m){hitBoss(null,m.x,m.y,false,2);}
+  function silverHitBoss(m){hitBoss(null,m.x,m.y,false,10);}
 
   // ---------------------------------------------------------------- pets
   // st: "follow" trails the girl; "pounce" runs at a monster near her; "atk" plays the attack (Cafe's claw swipe,
@@ -10643,6 +10675,7 @@
     // the elemental auras' rings lie on the ground, under everything standing
     if (G.mode !== "title" && !G.combo && P.elem && !G.ult && !P.dead) drawAura(P.elem, P.x, P.y, P.elemT, 0);
     if (NET.role && !G.combo) eachQ((q) => { if (q.elem && !q.dead && !(q.ultT > 0)) drawAura(q.elem, q.x, q.y, qElemLeft(), 0); });
+    for(const p of allPets())if(p.kind==='silverdragon')drawSilverGround(p);
     drawAllMountedAuras();
     // everything standing, sorted by the y of its feet
     let n = 0;
