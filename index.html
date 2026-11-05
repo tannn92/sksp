@@ -427,7 +427,7 @@
   }
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261105.1530", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261105.1625", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -4223,15 +4223,26 @@
   }
   function drawSilverGround(p){
     const s=p.silverRift;if(!s||dragonBlocked(petOwner(p)))return;
-    const t=G.t-s.start;if(t<0||t>=1.25)return;
-    const i=t<.13?0:t<.4?1:t<.75?2:3,f=FR['silver_stream_rift'+i];if(!f)return;
-    const progress=Math.min(1,t/.14),width=210,reach=850*f.w/Math.max(1,f.w-f.ax);
-    ctx.save();ctx.translate(s.x,s.y);ctx.rotate(Math.atan2(s.dy,s.dx));ctx.globalAlpha*=Math.min(1,(1.25-t)/.4);
+    const t=G.t-s.start;if(t<0||t>=1.9)return;
+    const i=t<.05?0:t<.5?1:t<1?2:3,f=FR['silver_stream_rift'+i];if(!f)return;
+    const progress=Math.min(1,t/.14),width=420,reach=850*f.w/Math.max(1,f.w-f.ax);
+    ctx.save();ctx.translate(s.x,s.y);ctx.rotate(Math.atan2(s.dy,s.dx));ctx.globalAlpha*=Math.min(1,(1.9-t)/.6);
     // Reveal the painted fissure along the shot, without stretching the rocks.
     ctx.drawImage(f.img,f.sx,f.sy,f.w*progress,f.h,-f.ax/f.w*reach,-f.ay/f.h*width,reach*progress,width);ctx.restore();
   }
   function drawSilverAir(p){if(!silverReady()||dragonBlocked(petOwner(p)))return;
     const s=p.silverStream;if(!s||G.t-s.start>=.4)return;const owner=petOwner(p),m=silverFocus(p),v=triRiding(owner)?mountedVector(p,owner):[s.dx,s.dy],f=FR['silver_stream_beam'+Math.floor((G.t-s.start)*20)%4]||FR.tridragon_ice_beam,width=240;
+    // Keep the three mouths visibly feeding the combined blast for its entire lifetime.
+    const fade=Math.min(1,(.4-G.t+s.start)/.07);
+    for(let i=0;i<3;i++){
+      let mouth;
+      if(!p.sc&&triRiding(owner))mouth=mountedPoint(p,owner,'mouth',i);
+      else{const key='attack_'+(p.flip?'l':'r'),body=FR['silverdragon_'+key],q=silverMeta.mouth[key][i],scale=body.s*CHAR_M*triScale(p);mouth={x:p.x+(q[0]-body.ax)*scale,y:p.y-dragonLift(p)+(q[1]-body.ay)*scale};}
+      const dx=m.x-mouth.x,dy=m.y-mouth.y,length=Math.hypot(dx,dy),reach=length*f.w/Math.max(1,f.w*.8-f.ax),width=48;
+      ctx.save();ctx.translate(mouth.x,mouth.y);ctx.rotate(Math.atan2(dy,dx));ctx.globalAlpha*=fade;
+      ctx.drawImage(f.img,f.sx,f.sy,f.w,f.h,-f.ax/f.w*reach,-f.ay/f.h*width,reach,width);ctx.restore();
+      glow(mouth.x,mouth.y,23,'175,235,255',.5*fade);
+    }
     ctx.save();ctx.translate(m.x,m.y);ctx.rotate(Math.atan2(v[1],v[0]));ctx.globalAlpha*=Math.min(1,(.4-G.t+s.start)/.07);const reach=850*f.w/Math.max(1,f.w-f.ax);ctx.drawImage(f.img,f.sx,f.sy,f.w,f.h,-f.ax/f.w*reach,-f.ay/f.h*width,reach,width);ctx.restore();
   }
   function drawCafeDragonCage(c){
