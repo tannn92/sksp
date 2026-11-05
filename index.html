@@ -427,7 +427,7 @@
   }
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261105.0654", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261105.0722", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -1053,7 +1053,7 @@
   try { if (["g","s","b","n"].includes(localStorage.getItem("sksp-hero"))) hero = localStorage.getItem("sksp-hero"); } catch (e) {}
   const HD = () => HEROES[hero];
   const heroKey = k => Object.hasOwn(HEROES,k) ? k : "g";
-  const maxHearts = (k = hero) => k === "b" ? 8 : 5;
+  const maxHearts = (k = hero) => k === "b" ? 8 : (k === "g" || k === "s") ? 7 : 5;
   const NAM_OUTFITS = ["base","mushroom","autumn","starlight"], NAM_SCALE = 275 / (465 * 0.5);
   const GOM_OUTFITS = ["base","candy","pirate","snow","lava","castle1","castle2","castle3"];
   // first frame name that exists
@@ -1378,6 +1378,7 @@
     $("bossbar").hidden = true;
   }
   function respawnHero() {
+    G.heartRegenT = 0;
     const p = G.path, i = Math.min(3, p.n - 1), [dx, dy] = pathDir(i);
     Object.assign(P, { x: p.x[i], y: p.y[i], vx: 0, vy: 0, z: 0, moving: false, inv: 0, hurtT: 0, slowT: 0, castT: 0, shootCd: 0.5, dead: false, tiredT: 0, winT: 0, prog: i });
     setFace(P, dx, dy);
@@ -1665,7 +1666,7 @@
     mon.tg = best;
     return best;
   }
-  // what a hit costs (the girls have 5 hearts): a monster's 1; a boss's light hit (his body, a crack, a geyser, a whirlpool's middle,
+  // what a hit costs (Mochi and Matcha have 7 hearts): a monster's 1; a boss's light hit (his body, a crack, a geyser, a whirlpool's middle,
   // an ice spike, a falling rock) 2, his big moves 3, his second form's big moves 4. Each boss hazard carries its move's cost (`cost`, set
   // where it is made: bossHit of the move he is making); the host applies it to both girls (the guest's page is told how many: "hurt" n).
   const BOSS_HIT = { contact: 2, furrow: 2, crows: 1, lolli: 3, geyser: 2, whirl: 2, tsunami: 3, tsunami2: 4, icespikes: 2, blizzard: 0, snowball: 3, avalanche: 4,
@@ -1732,7 +1733,21 @@
     if (P.dead || P.tiredT > 0 || G.ult || P.winT) { P.gomPending=null; return; }
     const pending=P.gomPending; if(pending && (pending.t-=dt)<=0) { P.gomPending=null; pending.strike(); }
   }
+  // Each player heals on their own page; presence already carries fractional hearts.
+  function updateHeartRegen(dt) {
+    if (hero !== 'g' && hero !== 's') { G.heartRegenT = 0; return; }
+    if (P.dead || P.tiredT > 0 || G.hearts <= 0 || G.hearts >= maxHearts()) { G.heartRegenT = 0; return; }
+    if (G.mode !== 'play' || P.winT || G.quiz || G.story || (G.cine && (G.cine.lock || G.cine.ph !== 'fight')) || G.rescue || G.bcut || G.combo || G.ult) return;
+    G.heartRegenT = (G.heartRegenT || 0) + dt;
+    const ticks = Math.floor((G.heartRegenT + 1e-9) / 5);
+    if (!ticks) return;
+    G.heartRegenT = Math.max(0, G.heartRegenT - ticks * 5);
+    G.hearts = Math.min(maxHearts(), G.hearts + ticks / 3);
+    if (maxHearts() - G.hearts < 1e-9) { G.hearts = maxHearts(); G.heartRegenT = 0; }
+    renderHearts();
+  }
   function updateHero(dt) {
+    updateHeartRegen(dt);
     gomStep(dt);
     P.inv -= dt; P.hurtT -= dt; P.slowT -= dt; P.castT -= dt;
     if (P.tiredT > 0) { P.moving = false; P.vx = P.vy = 0; if ((P.tiredT = Math.max(0, P.tiredT - dt)) === 0) reviveHero(); return; }
