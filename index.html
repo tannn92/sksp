@@ -237,6 +237,9 @@
   #coopRoster .seat small { opacity: .85; }
   #coopRoster .dots { animation: dotsGo 1.2s ease-in-out infinite alternate; }
   @keyframes dotsGo { from { opacity: .3; } to { opacity: 1; } }
+#winScreen .card{max-width:70em;gap:.4em}
+#winPic{display:block;max-width:100%;height:min(52vh,50vw);aspect-ratio:8/5;object-fit:contain;border-radius:22px;box-shadow:0 0 0 5px #ffd67e,0 0 26px #ffce7970}
+#winPic[hidden]{display:none}
 </style>
 
 <div id="rotate" role="alert">Xoay ngang iPad để chơi nhé</div>
@@ -311,6 +314,7 @@
 <div class="screen" id="winScreen" hidden>
   <div class="card">
     <h1 id="winTitle">Còn <span>tiếp…</span></h1>
+    <img id="winPic" alt="Cả nhóm và những người bạn đồng hành trong ngày chiến thắng" hidden>
     <p id="winText"></p>
     <p>Cả nhóm đã an toàn! Về ăn bữa tiệc cắm trại thôi!</p>
     <p id="winStats"></p>
@@ -427,7 +431,7 @@
   }
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261105.1625", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261106.1910", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -8292,6 +8296,7 @@
   const FIN = { t: 0, fw: [], cf: [], nextFw: 0 };
   function startFinale() {
     if (G.mode === "finale" || (G.won && G.mode === "win")) return;
+    FIN.participants=victoryParticipants();
     G.won = true; P.winT = 99; P.vx = P.vy = 0; IN.ultPressed = false; G.ult = null;
     G.mode = "finale"; delete FIN.readLine; delete FIN.readTo; FIN.t = 0; FIN.fw = []; FIN.cf = []; FIN.nextFw = 0.5;
     closeStory(); for (const id of ["controls", "bossbar", "quiz", "pauseScreen", "hud"]) $(id).hidden = true;
@@ -8395,8 +8400,64 @@
     const ga = g.globalAlpha; g.globalAlpha = ga * Math.min(1, a); g.drawImage(c, x - r, y - r, r * 2, r * 2); g.globalAlpha = ga;
   }
   // the end of the game: "Hết", a thank-you, and the way back to the title (on both co-op pages)
+  // One painted family portrait for any 1–4 seats, including repeated heroes.
+  function endingArtKey(ps) {
+    if(ps.length===1 && ['g','s'].includes(ps[0].hk)) return ps[0].hk;
+    return ps.length===2 && ps.map(p=>p.hk).sort().join('')==='gs' ? 'gs' : null;
+  }
+  function victoryLayout(ps) {
+    const dragons=[],allies=[],pets=[],seen=new Set(),heroes=[];
+    ps.forEach((p,i)=>{
+      heroes.push({...p,type:'hero',owner:i});
+      for(const kind of new Set(p.pets||[])) {
+        if(!PETS[kind])continue;
+        const item={type:'pet',kind,owner:i};
+        if(['dragon','tridragon','silverdragon'].includes(kind))dragons.push(item);
+        else if(PETS[kind].owner==='any') {if(!seen.has(kind)){seen.add(kind);allies.push({...item,type:'ally'});}}
+        else pets.push(item);
+      }
+    });
+    const row=(items,y,w,h)=>items.map((p,i)=>({...p,x:800+(i-(items.length-1)/2)*Math.min(w+30,1420/items.length),y,w:Math.min(w,1380/items.length),h}));
+    const crowded=allies.length>0;
+    const rear=row(dragons,crowded?390:470,470,crowded?310:380);
+    const middle=row(allies,650,260,240);
+    const front=row(heroes,875,ps.length===1?430:310,crowded?320:430).map(p=>({...p,h:p.h*({s:1,g:.93,b:.84,n:.9}[p.hk]||1)}));
+    const small=pets.map((p,i)=>({...p,x:Math.max(90,Math.min(1510,front[p.owner].x+100)),y:955,w:160,h:145}));
+    return [...rear,...middle,...front,...small];
+  }
+  function victoryPortrait(ps) {
+    const c=document.createElement('canvas');c.width=1600;c.height=1000;
+    const ctx=c.getContext('2d'),bg=IMG.scene_meadow;
+    if(bg)ctx.drawImage(bg,0,0,1600,1000);
+    for(const item of victoryLayout(ps)) {
+      const f=victoryFrame(item);if(!f)continue;
+      const k=Math.min(item.w/f.w,item.h/f.h);
+      ctx.drawImage(f.img,f.sx,f.sy,f.w,f.h,item.x-f.w*k/2,item.y-f.h*k,f.w*k,f.h*k);
+    }
+    return c.toDataURL('image/png');
+  }
+  function victoryFrame(p) {
+    if(p.type==='hero')return FR[heroFrame4({char:p.hk,outfit:p.outfit||'base',face:0,winT:1})];
+    if(p.type==='ally')return FR[outfitFrame(p.kind,allyOutfit(p.kind),'cheer')];
+    return FR[p.kind+'_r0']||FR[petPoseFrame(p.kind,'joy')];
+  }
+  function victoryParticipants() {
+    return [{hk:hero,outfit:P.outfit||'base',pets:[...(P.pets||[])]},...(NET.role?QS:[]).map(q=>({hk:q.hero,outfit:q.of||'base',pets:[...(q.pets||[])]}))];
+  }
+  async function prepareVictoryPortrait(ps) {
+    if(!IMG.scene_meadow)IMG.scene_meadow=await loadImg('assets/scene_meadow.webp');
+    const frames=victoryLayout(ps).map(victoryFrame).filter(Boolean);
+    await Promise.all(frames.map(f=>f.S?sheetLoad(f.S):null));
+    if(frames.some(f=>f.S&&!f.S.img))throw Error('Ending portrait artwork unavailable');
+    return victoryPortrait(ps);
+  }
   function showEnd() {
     G.mode = "win"; G.won = true;
+    const pic=$("winPic"),ticket=Symbol();pic._ticket=ticket;pic.hidden=true;
+    prepareVictoryPortrait(FIN.participants||victoryParticipants()).then(src=>{
+      if(pic._ticket!==ticket||G.mode!=="win")return;
+      pic.onload=()=>{pic.hidden=false;};pic.src=src;
+    }).catch(()=>{pic.hidden=true;});
     $("winTitle").textContent = "Hết";
     $("winText").textContent = teamAll().length > 2 ? "Cảm ơn các bé đã chơi!" : girlsIn().length > 1 ? "Cảm ơn hai bé đã chơi!" : "Cảm ơn " + HEROES[hero].name + " đã chơi!";   // (alone: her name only)
     // (the monsters defeated over the whole adventure; a start from the picker has only this map's, none if she went straight to the
@@ -15001,6 +15062,7 @@
   }
   // test hooks for automated checks. __sksp.autopilot = true makes this girl walk the path on her own.
   const API = window.__sksp = {
+    victoryLayout, victoryFrame, victoryPortrait, prepareVictoryPortrait, victoryParticipants, endingArtKey,
     startTravel, travelMembers, travelPhase, syncTravel, TRAVEL_END, TRAVEL_LAYOUT, drawTravel,
     petOutfitPrefix, petPoseFrame, takePhoto, drawPetAt, teamPets,
     gomFire, gomStep, autoFire, updateShots, reviveHero, maxHearts, girlsIn,
